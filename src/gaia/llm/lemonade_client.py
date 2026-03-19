@@ -1363,6 +1363,10 @@ class LemonadeClient:
                                     and choice.delta.content
                                     else None
                                 ),
+                                "reasoning_content": (
+                                    getattr(choice.delta, "reasoning_content", None)
+                                    or None
+                                ),
                             },
                             "finish_reason": choice.finish_reason,
                         }
