@@ -188,6 +188,21 @@ class ShellToolsMixin:
                 else:
                     cwd = str(Path.cwd())
 
+                # Block dangerous shell operators before any other parsing.
+                # On Windows shell=True is used, so cmd.exe interprets &&, ||,
+                # ;, backticks, and $(...) — a whitelist on the first token
+                # alone would not prevent command chaining.
+                _DANGEROUS_SHELL_OPERATORS = re.compile(
+                    r"(&&|\|\||;|`|\$\(|>\s*/|2>&1.*rm)"
+                )
+                if _DANGEROUS_SHELL_OPERATORS.search(command):
+                    return {
+                        "status": "error",
+                        "error": "Command contains dangerous shell operators (&&, ||, ;, backticks, $(...)) which are not allowed",
+                        "has_errors": True,
+                        "hint": "Run one command at a time without chaining operators",
+                    }
+
                 # Parse command safely
                 try:
                     cmd_parts = shlex.split(command)
@@ -351,11 +366,41 @@ class ShellToolsMixin:
                 if hasattr(self, "debug") and self.debug:
                     logger.info(f"Executing command: {command} in {cwd}")
 
+                # On Windows, many commands are shell built-ins (dir, cd, type,
+                # echo) and Unix commands (ls, pwd, cat) don't exist as .exe
+                # files.  Since we have already validated the command against the
+                # whitelist, we use shell=True on Windows so cmd.exe can resolve
+                # both built-ins and commands on PATH (including those from Git
+                # for Windows which provides ls, cat, grep, etc.).
+                use_shell = os.name == "nt"
+
+                # On Windows, also map common Unix commands to Windows equivalents
+                # when Git-for-Windows tools aren't on PATH.
+                if os.name == "nt":
+                    _UNIX_TO_WIN = {
+                        "ls": "dir",
+                        "pwd": "cd",
+                        "cat": "type",
+                        "which": "where",
+                        "cp": "copy",
+                        "mv": "move",
+                    }
+                    if cmd_base in _UNIX_TO_WIN:
+                        # Check if the Unix command exists on PATH (e.g. Git Bash)
+                        import shutil
+
+                        if not shutil.which(cmd_base):
+                            win_cmd = _UNIX_TO_WIN[cmd_base]
+                            logger.info(
+                                f"Mapping Unix command '{cmd_base}' -> Windows '{win_cmd}'"
+                            )
+                            cmd_parts[0] = win_cmd
+
                 # Execute command
                 start_time = datetime.utcnow()
                 try:
                     result = subprocess.run(
-                        cmd_parts,
+                        cmd_parts if not use_shell else " ".join(cmd_parts),
                         cwd=cwd,
                         capture_output=True,
                         text=True,
