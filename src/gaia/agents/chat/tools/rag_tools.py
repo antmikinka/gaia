@@ -498,6 +498,12 @@ class RAGToolsMixin:
             This is faster than query_documents because it searches only one file.
             """
             try:
+                if not self.rag:
+                    return {
+                        "status": "error",
+                        "error": 'RAG not available. Install with: uv pip install -e ".[rag]"',
+                    }
+
                 # Debug information collection
                 debug_info = (
                     {
@@ -886,6 +892,12 @@ class RAGToolsMixin:
             Faster than semantic RAG for exact matches.
             """
             try:
+                if not self.rag:
+                    return {
+                        "status": "error",
+                        "error": 'RAG not available. Install with: uv pip install -e ".[rag]"',
+                    }
+
                 # Debug information collection
                 debug_info = (
                     {
@@ -1069,6 +1081,11 @@ class RAGToolsMixin:
         def index_document(file_path: str) -> Dict[str, Any]:
             """Index a document with path validation and detailed statistics."""
             try:
+                if not self.rag:
+                    return {
+                        "status": "error",
+                        "error": 'RAG not available. Install with: uv pip install -e ".[rag]"',
+                    }
 
                 if not os.path.exists(file_path):
                     return {"status": "error", "error": f"File not found: {file_path}"}
@@ -1141,6 +1158,11 @@ class RAGToolsMixin:
         def list_indexed_documents() -> Dict[str, Any]:
             """List indexed documents."""
             try:
+                if not self.rag:
+                    return {
+                        "status": "error",
+                        "error": 'RAG not available. Install with: uv pip install -e ".[rag]"',
+                    }
                 docs = list(self.rag.indexed_files)
                 return {
                     "status": "success",
@@ -1166,6 +1188,11 @@ class RAGToolsMixin:
         def rag_status() -> Dict[str, Any]:
             """Get RAG system status."""
             try:
+                if not self.rag:
+                    return {
+                        "status": "error",
+                        "error": 'RAG not available. Install with: uv pip install -e ".[rag]"',
+                    }
                 status = self.rag.get_status()
                 return {
                     "status": "success",
@@ -1217,6 +1244,11 @@ class RAGToolsMixin:
             4. Combine section summaries into a final comprehensive summary
             """
             try:
+                if not self.rag:
+                    return {
+                        "status": "error",
+                        "error": 'RAG not available. Install with: uv pip install -e ".[rag]"',
+                    }
 
                 # Find the file in indexed files
                 matching_files = [
@@ -1546,6 +1578,11 @@ Use the {summary_type} style. Ensure page references from section summaries are 
             This uses the cached full_text from file_metadata, avoiding re-extraction.
             """
             try:
+                if not self.rag:
+                    return {
+                        "status": "error",
+                        "error": 'RAG not available. Install with: uv pip install -e ".[rag]"',
+                    }
 
                 # Find the file in indexed files
                 matching_files = [
@@ -1658,6 +1695,12 @@ Use the {summary_type} style. Ensure page references from section summaries are 
             Returns statistics about indexed files.
             """
             try:
+                if not self.rag:
+                    return {
+                        "status": "error",
+                        "error": 'RAG not available. Install with: uv pip install -e ".[rag]"',
+                    }
+
                 dir_path = Path(directory_path).resolve()
 
                 if not dir_path.exists():
