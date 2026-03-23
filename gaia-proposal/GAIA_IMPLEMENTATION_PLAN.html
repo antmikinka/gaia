@@ -1,0 +1,1219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAIA Implementation Plan</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black:wght@900&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ===========================================
+           VIEWPORT FITTING: MANDATORY BASE STYLES
+           =========================================== */
+        html, body {
+            height: 100%;
+            overflow-x: hidden;
+        }
+
+        html {
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            scroll-snap-align: start;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .slide-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            max-height: 100%;
+            overflow: hidden;
+            padding: var(--slide-padding);
+        }
+
+        :root {
+            --title-size: clamp(1.5rem, 5vw, 4rem);
+            --h2-size: clamp(1.25rem, 3.5vw, 2.5rem);
+            --h3-size: clamp(1rem, 2.5vw, 1.75rem);
+            --body-size: clamp(0.75rem, 1.5vw, 1.125rem);
+            --small-size: clamp(0.65rem, 1vw, 0.875rem);
+            --slide-padding: clamp(1rem, 4vw, 4rem);
+            --content-gap: clamp(0.5rem, 2vw, 2rem);
+            --element-gap: clamp(0.25rem, 1vw, 1rem);
+        }
+
+        .card, .container, .content-box {
+            max-width: min(90vw, 1000px);
+            max-height: min(80vh, 700px);
+        }
+
+        .feature-list, .bullet-list {
+            gap: clamp(0.4rem, 1vh, 1rem);
+        }
+
+        .feature-list li, .bullet-list li {
+            font-size: var(--body-size);
+            line-height: 1.4;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+            gap: clamp(0.5rem, 1.5vw, 1rem);
+        }
+
+        img, .image-container {
+            max-width: 100%;
+            max-height: min(50vh, 400px);
+            object-fit: contain;
+        }
+
+        @media (max-height: 700px) {
+            :root {
+                --slide-padding: clamp(0.75rem, 3vw, 2rem);
+                --content-gap: clamp(0.4rem, 1.5vw, 1rem);
+                --title-size: clamp(1.25rem, 4.5vw, 2.5rem);
+                --h2-size: clamp(1rem, 3vw, 1.75rem);
+            }
+        }
+
+        @media (max-height: 600px) {
+            :root {
+                --slide-padding: clamp(0.5rem, 2.5vw, 1.5rem);
+                --content-gap: clamp(0.3rem, 1vw, 0.75rem);
+                --title-size: clamp(1.1rem, 4vw, 2rem);
+                --body-size: clamp(0.7rem, 1.2vw, 0.95rem);
+            }
+            .nav-dots, .keyboard-hint, .decorative {
+                display: none;
+            }
+        }
+
+        @media (max-height: 500px) {
+            :root {
+                --slide-padding: clamp(0.4rem, 2vw, 1rem);
+                --title-size: clamp(1rem, 3.5vw, 1.5rem);
+                --h2-size: clamp(0.9rem, 2.5vw, 1.25rem);
+                --body-size: clamp(0.65rem, 1vw, 0.85rem);
+            }
+        }
+
+        @media (max-width: 600px) {
+            :root {
+                --title-size: clamp(1.25rem, 7vw, 2.5rem);
+            }
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                transition-duration: 0.2s !important;
+            }
+            html {
+                scroll-behavior: auto;
+            }
+        }
+
+        /* ===========================================
+           BOLD SIGNAL THEME
+           =========================================== */
+        :root {
+            --bg-primary: #1a1a1a;
+            --bg-gradient: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%);
+            --card-bg: #FF5722;
+            --text-primary: #ffffff;
+            --text-secondary: #b0b0b0;
+            --text-on-card: #1a1a1a;
+            --accent-orange: #FF5722;
+            --accent-light: #FF8A65;
+            --border-color: #3a3a3a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            overflow-x: hidden;
+        }
+
+        /* ===========================================
+           SLIDE STYLES
+           =========================================== */
+        .slide {
+            background: var(--bg-gradient);
+            position: relative;
+        }
+
+        .slide-number {
+            position: absolute;
+            top: var(--slide-padding);
+            left: var(--slide-padding);
+            font-family: 'Archivo Black', sans-serif;
+            font-size: clamp(3rem, 8vw, 8rem);
+            color: var(--card-bg);
+            opacity: 0.3;
+            z-index: 10;
+        }
+
+        .slide-content {
+            position: relative;
+            z-index: 20;
+        }
+
+        .card {
+            background: var(--card-bg);
+            color: var(--text-on-card);
+            padding: clamp(1.5rem, 4vw, 3rem);
+            border-radius: 12px;
+            margin-top: var(--content-gap);
+        }
+
+        .card h2 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: var(--title-size);
+            margin-bottom: var(--element-gap);
+        }
+
+        .card p, .card li {
+            font-size: var(--body-size);
+            line-height: 1.6;
+        }
+
+        h1 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: var(--title-size);
+            line-height: 1.1;
+            margin-bottom: var(--element-gap);
+        }
+
+        h2 {
+            font-family: 'Archivo Black', sans-serif;
+            font-size: var(--h2-size);
+            margin-bottom: var(--element-gap);
+        }
+
+        h3 {
+            font-size: var(--h3-size);
+            margin-bottom: calc(var(--element-gap) / 2);
+        }
+
+        .subtitle {
+            font-size: var(--body-size);
+            color: var(--text-secondary);
+            margin-bottom: var(--content-gap);
+        }
+
+        .author {
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+        }
+
+        ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        li {
+            margin-bottom: calc(var(--element-gap) / 2);
+            padding-left: 1.5em;
+            position: relative;
+        }
+
+        li::before {
+            content: '▸';
+            position: absolute;
+            left: 0;
+            color: var(--accent-orange);
+        }
+
+        /* ===========================================
+           TABLE STYLES
+           =========================================== */
+        .table-container {
+            overflow-x: auto;
+            margin-top: var(--content-gap);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: var(--small-size);
+        }
+
+        th, td {
+            padding: clamp(0.5rem, 1.5vw, 1rem);
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        th {
+            background: rgba(255, 87, 34, 0.2);
+            color: var(--accent-orange);
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: clamp(0.6rem, 1vw, 0.75rem);
+            letter-spacing: 0.05em;
+        }
+
+        tr:hover {
+            background: rgba(255, 87, 34, 0.05);
+        }
+
+        .highlight {
+            color: var(--accent-orange);
+            font-weight: 700;
+        }
+
+        /* ===========================================
+           DIAGRAM STYLES
+           =========================================== */
+        .diagram {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: var(--element-gap);
+            margin: var(--content-gap) 0;
+        }
+
+        .diagram-row {
+            display: flex;
+            gap: var(--element-gap);
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .diagram-box {
+            background: rgba(255, 87, 34, 0.15);
+            border: 2px solid var(--accent-orange);
+            padding: clamp(0.75rem, 2vw, 1.5rem);
+            border-radius: 8px;
+            text-align: center;
+            min-width: 120px;
+            font-weight: 500;
+        }
+
+        .diagram-arrow {
+            color: var(--accent-orange);
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .loop-arrow {
+            width: 60px;
+            height: 60px;
+            border: 3px solid var(--accent-orange);
+            border-radius: 50%;
+            border-top-color: transparent;
+            transform: rotate(45deg);
+            margin: var(--element-gap) 0;
+        }
+
+        /* ===========================================
+           NAVIGATION
+           =========================================== */
+        .nav-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: var(--slide-padding);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .nav-container > * {
+            pointer-events: auto;
+        }
+
+        .nav-dots {
+            display: flex;
+            gap: 8px;
+        }
+
+        .nav-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .nav-dot.active {
+            background: var(--accent-orange);
+            transform: scale(1.2);
+        }
+
+        .progress-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.1);
+            z-index: 100;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--accent-orange);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        .keyboard-hint {
+            position: fixed;
+            bottom: var(--slide-padding);
+            right: var(--slide-padding);
+            font-size: var(--small-size);
+            color: var(--text-secondary);
+            opacity: 0.6;
+            z-index: 100;
+        }
+
+        /* ===========================================
+           ANIMATIONS
+           =========================================== */
+        .reveal {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.6s ease, transform 0.6s ease;
+        }
+
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .reveal-delay-1 { transition-delay: 0.1s; }
+        .reveal-delay-2 { transition-delay: 0.2s; }
+        .reveal-delay-3 { transition-delay: 0.3s; }
+        .reveal-delay-4 { transition-delay: 0.4s; }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.8; }
+        }
+
+        .pulse {
+            animation: pulse 2s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <div class="nav-container">
+        <div class="nav-dots" id="navDots"></div>
+    </div>
+    <div class="progress-bar">
+        <div class="progress-fill" id="progressBar"></div>
+    </div>
+    <div class="keyboard-hint">Use arrow keys or scroll</div>
+
+    <!-- SLIDE 1: Title -->
+    <section class="slide" id="slide1">
+        <div class="slide-number">01</div>
+        <div class="slide-content">
+            <div class="card reveal">
+                <h2>GAIA</h2>
+                <p style="font-size: var(--body-size); margin-top: var(--element-gap);">Implementation Plan</p>
+            </div>
+            <div style="margin-top: var(--content-gap);">
+                <p class="subtitle reveal reveal-delay-1">Technical Architecture & Development Roadmap</p>
+                <p class="author reveal reveal-delay-2">Anthony Mikinka | github.com/antmikinka</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 2: Executive Summary -->
+    <section class="slide" id="slide2">
+        <div class="slide-number">02</div>
+        <div class="slide-content">
+            <h2 class="reveal">Executive Summary</h2>
+            <div class="card reveal reveal-delay-1">
+                <ul style="list-style: none;">
+                    <li><strong>GAIA</strong> (Generalized Agent Intelligence Architecture)</li>
+                    <li><strong>MISSION:</strong> Productize 'one prompt → complete feature' capability</li>
+                    <li><strong>PROVEN FOUNDATION:</strong> Safe Haven (8 hooks), 99.8% test pass rate, 41.8K+ BMAD stars</li>
+                    <li><strong>IMPLEMENTATION:</strong> 20-week phased delivery (3 phases)</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 3: Recursive Iterative Pipeline -->
+    <section class="slide" id="slide3">
+        <div class="slide-number">03</div>
+        <div class="slide-content">
+            <h2 class="reveal">Recursive Iterative Pipeline</h2>
+            <div class="diagram reveal reveal-delay-1">
+                <div class="diagram-row">
+                    <div class="diagram-box">USER GOAL</div>
+                    <div class="diagram-arrow">→</div>
+                    <div class="diagram-box">PLANNING</div>
+                    <div class="diagram-arrow">→</div>
+                    <div class="diagram-box">DEVELOPMENT</div>
+                </div>
+                <div class="loop-arrow pulse"></div>
+                <div class="diagram-row">
+                    <div class="diagram-box">DECISION</div>
+                    <div class="diagram-arrow">←</div>
+                    <div class="diagram-box">QUALITY GATE</div>
+                </div>
+            </div>
+            <p class="reveal reveal-delay-2" style="margin-top: var(--content-gap);">
+                <span class="highlight">Key Innovation:</span> No artificial max iterations — loops until quality threshold met
+            </p>
+        </div>
+    </section>
+
+    <!-- SLIDE 4: Pipeline Templates -->
+    <section class="slide" id="slide4">
+        <div class="slide-number">04</div>
+        <div class="slide-content">
+            <h2 class="reveal">Pipeline Templates</h2>
+            <div class="table-container reveal reveal-delay-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Template</th>
+                            <th>Threshold</th>
+                            <th>Quality Weights</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="highlight">STANDARD</td>
+                            <td>90/100</td>
+                            <td>Code 25%, Reqs 25%, Test 20%</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">RAPID</td>
+                            <td>75/100</td>
+                            <td>Code 40%, Reqs 20%, Test 15%</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">ENTERPRISE</td>
+                            <td>95/100</td>
+                            <td>Code 20%, Reqs 25%, Test 25%, Audit 15%</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">DOCUMENTATION</td>
+                            <td>85/100</td>
+                            <td>Docs 35%, Code 25%, Reqs 20%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 5: Agent Categories -->
+    <section class="slide" id="slide5">
+        <div class="slide-number">05</div>
+        <div class="slide-content">
+            <h2 class="reveal">Agent Categories</h2>
+            <div class="grid reveal reveal-delay-1" style="margin-top: var(--content-gap);">
+                <div class="diagram-box">
+                    <h3 style="color: var(--accent-orange);">PLANNING</h3>
+                    <p style="font-size: var(--small-size);">Architecture, requirements, task breakdown</p>
+                </div>
+                <div class="diagram-box">
+                    <h3 style="color: var(--accent-orange);">DEVELOPMENT</h3>
+                    <p style="font-size: var(--small-size);">Implementation, refactoring, fixes</p>
+                </div>
+                <div class="diagram-box">
+                    <h3 style="color: var(--accent-orange);">REVIEW</h3>
+                    <p style="font-size: var(--small-size);">QA, security, performance, best practices</p>
+                </div>
+                <div class="diagram-box">
+                    <h3 style="color: var(--accent-orange);">MANAGEMENT</h3>
+                    <p style="font-size: var(--small-size);">Coordination, state tracking, routing</p>
+                </div>
+            </div>
+            <p class="reveal reveal-delay-2" style="margin-top: var(--content-gap);">
+                <span class="highlight">State-based routing:</span> Pipeline state determines which agent category activates next
+            </p>
+        </div>
+    </section>
+
+    <!-- SLIDE 6: Implementation Phases Overview -->
+    <section class="slide" id="slide6">
+        <div class="slide-number">06</div>
+        <div class="slide-content">
+            <h2 class="reveal">Implementation Phases Overview</h2>
+            <div class="diagram reveal reveal-delay-1">
+                <div class="diagram-row">
+                    <div class="diagram-box" style="width: 200px;">
+                        <h3>Phase 1</h3>
+                        <p style="font-size: var(--small-size);">Weeks 1-4</p>
+                        <p style="font-size: var(--small-size);">Core Pipeline Engine</p>
+                    </div>
+                    <div class="diagram-arrow">→</div>
+                    <div class="diagram-box" style="width: 200px;">
+                        <h3>Phase 2</h3>
+                        <p style="font-size: var(--small-size);">Weeks 5-12</p>
+                        <p style="font-size: var(--small-size);">Productization</p>
+                    </div>
+                    <div class="diagram-arrow">→</div>
+                    <div class="diagram-box" style="width: 200px;">
+                        <h3>Phase 3</h3>
+                        <p style="font-size: var(--small-size);">Weeks 13-20</p>
+                        <p style="font-size: var(--small-size);">AMD Ryzen AI Integration</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 7: Phase 1 Deliverables -->
+    <section class="slide" id="slide7">
+        <div class="slide-number">07</div>
+        <div class="slide-content">
+            <h2 class="reveal">Phase 1: Core Pipeline Engine</h2>
+            <p class="subtitle">Weeks 1-4</p>
+            <div class="table-container reveal reveal-delay-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Deliverable</th>
+                            <th>Success Criteria</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="highlight">Pipeline Engine</td>
+                            <td>Python orchestrator</td>
+                            <td>Handles 5+ concurrent loops</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Quality Scorer</td>
+                            <td>25+ validation categories</td>
+                            <td>95% scoring accuracy</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Agent Registry</td>
+                            <td>Dynamic agent loading</td>
+                            <td>Support 10+ agent types</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Hook System</td>
+                            <td>Pre/post-action hooks</td>
+                            <td>8+ production hooks</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 8: Phase 2 Deliverables -->
+    <section class="slide" id="slide8">
+        <div class="slide-number">08</div>
+        <div class="slide-content">
+            <h2 class="reveal">Phase 2: Productization</h2>
+            <p class="subtitle">Weeks 5-12</p>
+            <div class="table-container reveal reveal-delay-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Deliverable</th>
+                            <th>Success Criteria</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="highlight">Templates</td>
+                            <td>4 pipeline templates</td>
+                            <td>STANDARD/RAPID/ENTERPRISE/DOCS</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Test Suite</td>
+                            <td>1000+ tests</td>
+                            <td>99%+ pass rate</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Documentation</td>
+                            <td>API + user guides</td>
+                            <td>Enterprise-ready</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Packaging</td>
+                            <td>Docker + pip install</td>
+                            <td>One-command deploy</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 9: Phase 3 Deliverables -->
+    <section class="slide" id="slide9">
+        <div class="slide-number">09</div>
+        <div class="slide-content">
+            <h2 class="reveal">Phase 3: AMD Ryzen AI Integration</h2>
+            <p class="subtitle">Weeks 13-20</p>
+            <div class="table-container reveal reveal-delay-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Component</th>
+                            <th>Deliverable</th>
+                            <th>Success Criteria</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="highlight">NPU Optimization</td>
+                            <td>Agent distribution</td>
+                            <td>10x efficiency gain</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">ChromaDB</td>
+                            <td>Vector memory</td>
+                            <td>Long-term context storage</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">MCP Server</td>
+                            <td>Tool integration</td>
+                            <td>Access to external tools</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Enterprise Pilot</td>
+                            <td>First customer deployment</td>
+                            <td>Production validation</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 10: Quality Assurance Plan -->
+    <section class="slide" id="slide10">
+        <div class="slide-number">10</div>
+        <div class="slide-content">
+            <h2 class="reveal">Quality Assurance Plan</h2>
+            <div class="grid reveal reveal-delay-1" style="margin-top: var(--content-gap);">
+                <div class="card">
+                    <h3 style="color: var(--text-on-card);">Testing Pyramid</h3>
+                    <ul style="font-size: var(--small-size);">
+                        <li>Unit Tests (70%)</li>
+                        <li>Integration Tests (20%)</li>
+                        <li>E2E Tests (10%)</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3 style="color: var(--text-on-card);">Quality Gates</h3>
+                    <ul style="font-size: var(--small-size);">
+                        <li>Code Quality: 25%</li>
+                        <li>Requirements: 25%</li>
+                        <li>Testing: 20%</li>
+                        <li>Documentation: 15%</li>
+                        <li>Best Practices: 15%</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 11: Resource Requirements -->
+    <section class="slide" id="slide11">
+        <div class="slide-number">11</div>
+        <div class="slide-content">
+            <h2 class="reveal">Resource Requirements</h2>
+            <div class="table-container reveal reveal-delay-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Phase</th>
+                            <th>Team Size</th>
+                            <th>Key Roles</th>
+                            <th>Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="highlight">Phase 1</td>
+                            <td>3-4 FTE</td>
+                            <td>1 Architect, 2-3 Engineers</td>
+                            <td>4 weeks</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Phase 2</td>
+                            <td>5-6 FTE</td>
+                            <td>+ QA Engineer, Tech Writer</td>
+                            <td>8 weeks</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Phase 3</td>
+                            <td>4-5 FTE</td>
+                            <td>+ AMD Liaison</td>
+                            <td>8 weeks</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Total</td>
+                            <td>10 FTE</td>
+                            <td>Cross-functional team</td>
+                            <td>20 weeks</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 12: Risk Analysis -->
+    <section class="slide" id="slide12">
+        <div class="slide-number">12</div>
+        <div class="slide-content">
+            <h2 class="reveal">Risk Analysis</h2>
+            <div class="table-container reveal reveal-delay-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Risk</th>
+                            <th>Probability</th>
+                            <th>Impact</th>
+                            <th>Mitigation</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Quality gates fail at scale</td>
+                            <td class="highlight">Low</td>
+                            <td class="highlight">High</td>
+                            <td>Continuous validation, enterprise pilots</td>
+                        </tr>
+                        <tr>
+                            <td>Ryzen AI underperforms</td>
+                            <td class="highlight">Low</td>
+                            <td class="highlight">Medium</td>
+                            <td>Multi-hardware support roadmap</td>
+                        </tr>
+                        <tr>
+                            <td>Hook system doesn't generalize</td>
+                            <td class="highlight">Medium</td>
+                            <td class="highlight">High</td>
+                            <td>Document patterns early, test across domains</td>
+                        </tr>
+                        <tr>
+                            <td>Developer resistance to AI</td>
+                            <td class="highlight">Low</td>
+                            <td class="highlight">Medium</td>
+                            <td>Bottom-up adoption (dev-first)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 13: Success Metrics -->
+    <section class="slide" id="slide13">
+        <div class="slide-number">13</div>
+        <div class="slide-content">
+            <h2 class="reveal">Success Metrics (KPIs)</h2>
+            <div class="table-container reveal reveal-delay-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Target</th>
+                            <th>Alert Threshold</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="highlight">Test Pass Rate</td>
+                            <td>99.8%</td>
+                            <td>&lt; 99%</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Quality Score</td>
+                            <td>Template threshold</td>
+                            <td>-10 points</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Pipeline Iterations</td>
+                            <td>&lt; 5 per feature</td>
+                            <td>&gt; 10 iterations</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Hook Execution</td>
+                            <td>100% success</td>
+                            <td>Any failure</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 14: Timeline & Milestones -->
+    <section class="slide" id="slide14">
+        <div class="slide-number">14</div>
+        <div class="slide-content">
+            <h2 class="reveal">Timeline & Milestones</h2>
+            <div class="diagram reveal reveal-delay-1">
+                <div class="diagram-row" style="flex-direction: column; align-items: stretch;">
+                    <div style="display: flex; justify-content: space-between; padding: 1rem; background: rgba(255, 87, 34, 0.1); border-left: 4px solid var(--accent-orange); margin-bottom: 0.5rem;">
+                        <span class="highlight">Week 4:</span>
+                        <span>Phase 1 Complete → Go/No-Go Gate</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 1rem; background: rgba(255, 87, 34, 0.1); border-left: 4px solid var(--accent-orange); margin-bottom: 0.5rem;">
+                        <span class="highlight">Week 8:</span>
+                        <span>Phase 2 Mid-point Review</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 1rem; background: rgba(255, 87, 34, 0.1); border-left: 4px solid var(--accent-orange); margin-bottom: 0.5rem;">
+                        <span class="highlight">Week 12:</span>
+                        <span>Phase 2 Complete → Enterprise Ready</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 1rem; background: rgba(255, 87, 34, 0.1); border-left: 4px solid var(--accent-orange); margin-bottom: 0.5rem;">
+                        <span class="highlight">Week 16:</span>
+                        <span>Phase 3 Mid-point Review</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 1rem; background: rgba(255, 87, 34, 0.1); border-left: 4px solid var(--accent-orange);">
+                        <span class="highlight">Week 20:</span>
+                        <span>Phase 3 Complete → Production Launch</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 15: Recursive Loop Implementation -->
+    <section class="slide" id="slide15">
+        <div class="slide-number">15</div>
+        <div class="slide-content">
+            <h2 class="reveal">Recursive Loop Implementation</h2>
+            <div class="grid reveal reveal-delay-1" style="margin-top: var(--content-gap);">
+                <div class="diagram-box" style="font-size: var(--small-size);">
+                    <h3 style="color: var(--accent-orange);">Loop 1</h3>
+                    <p>Pipeline Engine</p>
+                </div>
+                <div class="diagram-box" style="font-size: var(--small-size);">
+                    <h3 style="color: var(--accent-orange);">Loop 2</h3>
+                    <p>Quality Scorer</p>
+                </div>
+                <div class="diagram-box" style="font-size: var(--small-size);">
+                    <h3 style="color: var(--accent-orange);">Loop 3</h3>
+                    <p>Agent Registry</p>
+                </div>
+                <div class="diagram-box" style="font-size: var(--small-size);">
+                    <h3 style="color: var(--accent-orange);">Loop 4</h3>
+                    <p>Hook System</p>
+                </div>
+                <div class="diagram-box" style="font-size: var(--small-size);">
+                    <h3 style="color: var(--accent-orange);">Loop 5</h3>
+                    <p>Templates</p>
+                </div>
+                <div class="diagram-box" style="font-size: var(--small-size);">
+                    <h3 style="color: var(--accent-orange);">Loop 6</h3>
+                    <p>Test Suite</p>
+                </div>
+            </div>
+            <p class="reveal reveal-delay-2" style="margin-top: var(--content-gap);">
+                Each component goes through: <span class="highlight">Planning → Development → Quality → Decision</span>
+            </p>
+        </div>
+    </section>
+
+    <!-- SLIDE 16: Agent Workflow -->
+    <section class="slide" id="slide16">
+        <div class="slide-number">16</div>
+        <div class="slide-content">
+            <h2 class="reveal">Agent Workflow</h2>
+            <div class="diagram reveal reveal-delay-1">
+                <div class="diagram-row">
+                    <div class="diagram-box" style="width: 180px;">
+                        <h3 style="color: var(--accent-orange);">PLANNING</h3>
+                        <p style="font-size: var(--small-size);">planning-analysis-strategist</p>
+                    </div>
+                    <div class="diagram-arrow">→</div>
+                    <div class="diagram-box" style="width: 180px;">
+                        <h3 style="color: var(--accent-orange);">DEVELOPMENT</h3>
+                        <p style="font-size: var(--small-size);">senior-developer</p>
+                    </div>
+                </div>
+                <div style="font-size: 2rem; color: var(--accent-orange);">↓</div>
+                <div class="diagram-row">
+                    <div class="diagram-box" style="width: 180px;">
+                        <h3 style="color: var(--accent-orange);">REVIEW</h3>
+                        <p style="font-size: var(--small-size);">quality-reviewer</p>
+                    </div>
+                    <div class="diagram-arrow">→</div>
+                    <div class="diagram-box" style="width: 180px;">
+                        <h3 style="color: var(--accent-orange);">DECISION</h3>
+                        <p style="font-size: var(--small-size);">Loop or Complete?</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 17: AMD Partnership Ask -->
+    <section class="slide" id="slide17">
+        <div class="slide-number">17</div>
+        <div class="slide-content">
+            <h2 class="reveal">AMD Partnership Requirements</h2>
+            <div class="table-container reveal reveal-delay-1">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Resource</th>
+                            <th>AMD Support Needed</th>
+                            <th>Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="highlight">Hardware Access</td>
+                            <td>Ryzen AI dev kits</td>
+                            <td>NPU optimization</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Technical Liaison</td>
+                            <td>AMD engineer (part-time)</td>
+                            <td>Architecture guidance</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Marketing Support</td>
+                            <td>Co-marketing budget</td>
+                            <td>Developer outreach</td>
+                        </tr>
+                        <tr>
+                            <td class="highlight">Enterprise Introductions</td>
+                            <td>Customer pilot contacts</td>
+                            <td>First deployments</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 18: Business Case -->
+    <section class="slide" id="slide18">
+        <div class="slide-number">18</div>
+        <div class="slide-content">
+            <h2 class="reveal">Business Case: ROI Analysis</h2>
+            <div class="card reveal reveal-delay-1">
+                <ul style="list-style: none;">
+                    <li><strong class="highlight">$650K+ per year</strong> — Productivity gain per development team</li>
+                    <li><strong class="highlight">10x developer output</strong> — Industry standard by Year 3</li>
+                    <li><strong class="highlight">$8M ARR</strong> — Year 1 revenue target</li>
+                    <li><strong class="highlight">$65M ARR</strong> — Year 3 revenue target</li>
+                    <li><strong class="highlight">$650B annual</strong> — Total economic productivity gain</li>
+                </ul>
+            </div>
+            <p class="reveal reveal-delay-2" style="margin-top: var(--content-gap);">
+                <span class="highlight">Time to market:</span> 6 months → 2 weeks
+            </p>
+        </div>
+    </section>
+
+    <!-- SLIDE 19: Next Steps -->
+    <section class="slide" id="slide19">
+        <div class="slide-number">19</div>
+        <div class="slide-content">
+            <h2 class="reveal">Next Steps: Immediate Actions</h2>
+            <div class="card reveal reveal-delay-1">
+                <ul>
+                    <li><strong class="highlight">Week 1:</strong> Finalize team allocation</li>
+                    <li><strong class="highlight">Week 1-2:</strong> Set up development infrastructure</li>
+                    <li><strong class="highlight">Week 2:</strong> AMD partnership agreement</li>
+                    <li><strong class="highlight">Week 3:</strong> Begin Phase 1 implementation</li>
+                    <li><strong class="highlight">Week 4:</strong> Phase 1 Go/No-Go review</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 20: Summary -->
+    <section class="slide" id="slide20">
+        <div class="slide-number">20</div>
+        <div class="slide-content">
+            <h2 class="reveal">Summary: Key Points</h2>
+            <div class="grid reveal reveal-delay-1" style="margin-top: var(--content-gap);">
+                <div class="card">
+                    <h3 style="color: var(--text-on-card);">Proven Foundation</h3>
+                    <ul style="font-size: var(--small-size);">
+                        <li>8 production hooks</li>
+                        <li>99.8% test pass rate</li>
+                        <li>41.8K+ BMAD stars</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3 style="color: var(--text-on-card);">20-Week Plan</h3>
+                    <ul style="font-size: var(--small-size);">
+                        <li>Phase 1: Core Engine</li>
+                        <li>Phase 2: Productization</li>
+                        <li>Phase 3: AMD Integration</li>
+                    </ul>
+                </div>
+                <div class="card">
+                    <h3 style="color: var(--text-on-card);">High ROI</h3>
+                    <ul style="font-size: var(--small-size);">
+                        <li>$650K/year/team</li>
+                        <li>10x productivity</li>
+                        <li>$65M ARR by Year 3</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 21: Contact -->
+    <section class="slide" id="slide21">
+        <div class="slide-number">21</div>
+        <div class="slide-content">
+            <h2 class="reveal">Contact</h2>
+            <div class="card reveal reveal-delay-1" style="text-align: center;">
+                <h3 style="color: var(--text-on-card); font-size: var(--h2-size);">Anthony Mikinka</h3>
+                <p style="margin-top: var(--element-gap); font-size: var(--body-size);">
+                    <strong>GitHub:</strong> github.com/antmikinka<br>
+                    <strong>Email:</strong> anthony.mikinka@gmail.com<br>
+                    <strong>Location:</strong> Budapest, Hungary
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 22: Approval -->
+    <section class="slide" id="slide22">
+        <div class="slide-number">22</div>
+        <div class="slide-content">
+            <h2 class="reveal">Approval Status</h2>
+            <div class="card reveal reveal-delay-1" style="text-align: center; padding: 3rem;">
+                <div style="font-size: 3rem; color: var(--accent-orange); margin-bottom: 1rem;">⚠️</div>
+                <h3 style="color: var(--text-on-card); font-size: var(--title-size);">APPROVE WITH CONDITIONS</h3>
+                <p style="margin-top: var(--content-gap); font-size: var(--body-size);">
+                    Adrian-Macias Assessment
+                </p>
+                <ul style="text-align: left; margin-top: var(--content-gap); display: inline-block; font-size: var(--small-size);">
+                    <li>✓ Technical architecture validated</li>
+                    <li>✓ Resource requirements reasonable</li>
+                    <li>⚠️ Requires enterprise pilot commitment</li>
+                    <li>⚠️ Requires AMD partnership confirmation</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        // ===========================================
+        // NAVIGATION & PROGRESS
+        // ===========================================
+        const slides = document.querySelectorAll('.slide');
+        const navDots = document.getElementById('navDots');
+        const progressBar = document.getElementById('progressBar');
+
+        // Create navigation dots
+        slides.forEach((_, index) => {
+            const dot = document.createElement('div');
+            dot.className = 'nav-dot' + (index === 0 ? ' active' : '');
+            dot.addEventListener('click', () => scrollToSlide(index));
+            navDots.appendChild(dot);
+        });
+
+        // Scroll to slide
+        function scrollToSlide(index) {
+            slides[index].scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Update active state on scroll
+        function updateActiveSlide() {
+            const scrollPosition = window.scrollY + window.innerHeight / 2;
+            const slideHeight = window.innerHeight;
+            const currentIndex = Math.floor(scrollPosition / slideHeight);
+
+            // Update dots
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                dot.classList.toggle('active', index === currentIndex);
+            });
+
+            // Update progress bar
+            const progress = ((currentIndex + 1) / slides.length) * 100;
+            progressBar.style.width = progress + '%';
+
+            // Trigger reveal animations
+            const currentSlide = slides[currentIndex];
+            currentSlide.querySelectorAll('.reveal').forEach((el, i) => {
+                setTimeout(() => el.classList.add('active'), 100 + (i * 100));
+            });
+        }
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            const currentSlide = Array.from(slides).findIndex(slide =>
+                slide.getBoundingClientRect().top > -100 && slide.getBoundingClientRect().top < 100
+            );
+
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight' || e.key === ' ') {
+                e.preventDefault();
+                if (currentSlide < slides.length - 1) scrollToSlide(currentSlide + 1);
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                e.preventDefault();
+                if (currentSlide > 0) scrollToSlide(currentSlide - 1);
+            }
+        });
+
+        // Touch/swipe navigation
+        let touchStartY = 0;
+        document.addEventListener('touchstart', (e) => {
+            touchStartY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            const touchEndY = e.changedTouches[0].clientY;
+            const diff = touchStartY - touchEndY;
+            const currentSlide = Array.from(slides).findIndex(slide =>
+                slide.getBoundingClientRect().top > -100 && slide.getBoundingClientRect().top < 100
+            );
+
+            if (Math.abs(diff) > 50) {
+                if (diff > 0 && currentSlide < slides.length - 1) {
+                    scrollToSlide(currentSlide + 1);
+                } else if (diff < 0 && currentSlide > 0) {
+                    scrollToSlide(currentSlide - 1);
+                }
+            }
+        });
+
+        // Initialize
+        window.addEventListener('scroll', updateActiveSlide);
+        updateActiveSlide();
+    </script>
+</body>
+</html>
