@@ -1,0 +1,13 @@
+pyyaml>=6.0
+watchdog>=3.0
+aiofiles>=23.0
+pydantic>=2.0
+
+[dev]
+pytest>=7.0
+pytest-asyncio>=0.21
+pytest-cov>=4.0
+pre-commit>=3.0
+black>=23.0
+ruff>=0.1
+mypy>=1.0

@@ -1,0 +1,74 @@
+# GAIA Core Pipeline Engine
+
+**Quality-gated multi-agent orchestration system**
+
+## Overview
+
+GAIA (Generalized Agent Integration Architecture) is a Python-based pipeline orchestration system that enables quality-gated, multi-agent execution with unlimited iterative loops until quality thresholds are met.
+
+## Features
+
+- **Pipeline State Machine**: Thread-safe state management with validated transitions
+- **Loop Management**: Support for 5+ concurrent loops with priority scheduling
+- **Quality Scoring**: 27 validation categories across 6 dimensions
+- **Agent Registry**: Dynamic agent loading with hot-reload support
+- **Hook System**: 8 production hooks for extensibility
+
+## Installation
+
+```bash
+pip install -e .
+```
+
+For development:
+
+```bash
+pip install -r requirements-dev.txt
+```
+
+## Quick Start
+
+```python
+from gaia.src.pipeline.orchestrator import PipelineOrchestrator
+from gaia.src.pipeline.state import PipelineContext
+
+# Create context
+context = PipelineContext(
+    pipeline_id="my-pipeline-001",
+    user_goal="Build a REST API"
+)
+
+# Create and run pipeline
+orchestrator = PipelineOrchestrator(
+    agents_dir="gaia/config/agents",
+    hooks_dir="gaia/src/hooks/production"
+)
+
+await orchestrator.initialize(context, {"template": "STANDARD"})
+result = await orchestrator.start()
+```
+
+## Project Structure
+
+```
+gaia/
+├── src/gaia/
+│   ├── pipeline/          # Pipeline engine (state, loops, decisions)
+│   ├── quality/           # Quality scoring system
+│   ├── agents/            # Agent registry and routing
+│   ├── hooks/             # Hook system
+│   └── utils/             # Utilities
+├── config/                # Configuration files
+├── tests/                 # Test suite
+└── docs/                  # Documentation
+```
+
+## Testing
+
+```bash
+pytest tests/ -v
+```
+
+## License
+
+MIT
