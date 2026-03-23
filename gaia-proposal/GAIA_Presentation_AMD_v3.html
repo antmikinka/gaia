@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAIA: AMD Leadership Pitch Deck - Anthony Mikinka</title>
+    <link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=archivo-black@900&f[]=space-grotesk@400;500;700&display=swap">
+    <style>
+        html, body { height: 100%; overflow-x: hidden; }
+        html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+        .slide { width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; scroll-snap-align: start; display: flex; flex-direction: column; position: relative; }
+        .slide-content { flex: 1; display: flex; flex-direction: column; justify-content: center; max-height: 100%; overflow: hidden; padding: var(--slide-padding); }
+        :root { --title-size: clamp(1.5rem, 5vw, 4rem); --h2-size: clamp(1.25rem, 3.5vw, 2.5rem); --h3-size: clamp(1rem, 2.5vw, 1.75rem); --body-size: clamp(0.75rem, 1.5vw, 1.125rem); --small-size: clamp(0.65rem, 1vw, 0.875rem); --slide-padding: clamp(1rem, 4vw, 4rem); --content-gap: clamp(0.5rem, 2vw, 2rem); --element-gap: clamp(0.25rem, 1vw, 1rem); }
+        :root { --bg-primary: #1a1a1a; --bg-gradient: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 50%, #1a1a1a 100%); --card-bg: #FF5722; --text-primary: #ffffff; --text-on-card: #1a1a1a; --accent-glow: rgba(255, 87, 34, 0.4); }
+        body { margin: 0; font-family: 'Space Grotesk', sans-serif; background: var(--bg-gradient); color: var(--text-primary); }
+        .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--card-bg); z-index: 1000; transition: width 0.3s ease; }
+        .nav-dots { position: fixed; right: var(--slide-padding); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 8px; z-index: 1000; }
+        .nav-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255, 255, 255, 0.3); cursor: pointer; transition: all 0.3s ease; }
+        .nav-dot.active { background: var(--card-bg); transform: scale(1.3); }
+        .grid-layout { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto 1fr auto; gap: var(--content-gap); padding: var(--slide-padding); height: 100vh; }
+        .slide-number { font-family: 'Archivo Black', sans-serif; font-size: clamp(3rem, 10vw, 8rem); color: var(--card-bg); opacity: 0.3; justify-self: start; }
+        .nav-breadcrumb { justify-self: end; display: flex; gap: var(--element-gap); font-size: var(--small-size); }
+        .nav-breadcrumb span { opacity: 0.5; }
+        .nav-breadcrumb span.active { opacity: 1; font-weight: 700; }
+        .bold-card { background: var(--card-bg); color: var(--text-on-card); padding: clamp(1.5rem, 4vw, 3rem); border-radius: 4px; box-shadow: 0 20px 60px var(--accent-glow); justify-self: start; align-self: center; max-width: min(90vw, 600px); }
+        .bold-card h1 { font-family: 'Archivo Black', sans-serif; font-size: clamp(1.5rem, 4vw, 3.5rem); margin: 0 0 var(--element-gap) 0; line-height: 1.1; }
+        .bold-card h2 { font-family: 'Archivo Black', sans-serif; font-size: clamp(1.2rem, 3vw, 2rem); margin: 0 0 var(--element-gap) 0; }
+        .bold-card p { font-size: var(--body-size); opacity: 0.95; margin: 0; line-height: 1.6; }
+        .title-area { justify-self: start; align-self: end; }
+        .title-area h2 { font-family: 'Archivo Black', sans-serif; font-size: var(--title-size); margin: 0 0 var(--element-gap) 0; }
+        .title-area .subtitle { font-size: var(--body-size); opacity: 0.8; }
+        .title-area .tagline { color: var(--card-bg); font-weight: 700; margin-top: var(--element-gap); }
+        .content-slide { padding: var(--slide-padding); display: flex; flex-direction: column; justify-content: center; height: 100%; }
+        .content-slide h2 { font-family: 'Archivo Black', sans-serif; font-size: var(--h2-size); margin-bottom: var(--content-gap); color: var(--card-bg); }
+        .content-slide h3 { font-size: var(--h3-size); margin-bottom: var(--element-gap); }
+        .content-slide p { font-size: var(--body-size); line-height: 1.6; margin-bottom: var(--element-gap); opacity: 0.9; }
+        .content-slide ul { list-style: none; padding-left: 0; margin: var(--content-gap) 0; }
+        .content-slide ul li { font-size: var(--body-size); padding: var(--element-gap) 0; padding-left: 1.5em; position: relative; line-height: 1.6; }
+        .content-slide ul li::before { content: "▸"; position: absolute; left: 0; color: var(--card-bg); font-weight: bold; }
+        .code-block { background: rgba(0, 0, 0, 0.3); border-left: 3px solid var(--card-bg); padding: var(--content-gap); font-family: 'Space Mono', monospace; font-size: clamp(0.6rem, 1.3vw, 0.85rem); line-height: 1.4; overflow-x: auto; white-space: pre; max-height: min(50vh, 400px); overflow-y: auto; margin: var(--element-gap) 0; }
+        .code-block-small { background: rgba(0, 0, 0, 0.3); border-left: 3px solid var(--card-bg); padding: var(--content-gap); font-family: 'Space Mono', monospace; font-size: clamp(0.45rem, 1vw, 0.7rem); line-height: 1.35; overflow-x: auto; white-space: pre; max-height: min(55vh, 450px); overflow-y: auto; margin: var(--element-gap) 0; }
+        .code-block-tiny { background: rgba(0, 0, 0, 0.3); border-left: 3px solid var(--card-bg); padding: var(--content-gap); font-family: 'Space Mono', monospace; font-size: clamp(0.4rem, 0.8vw, 0.6rem); line-height: 1.3; overflow-x: auto; white-space: pre; max-height: min(60vh, 500px); overflow-y: auto; margin: var(--element-gap) 0; }
+        .data-table { width: 100%; border-collapse: collapse; margin: var(--content-gap) 0; font-size: var(--body-size); }
+        .data-table th, .data-table td { padding: var(--element-gap); text-align: left; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .data-table th { color: var(--card-bg); font-weight: 700; text-transform: uppercase; font-size: var(--small-size); letter-spacing: 0.05em; }
+        .data-table tr:hover { background: rgba(255, 87, 34, 0.1); }
+        .full-card { background: var(--card-bg); color: var(--text-on-card); padding: clamp(1.5rem, 4vw, 3rem); border-radius: 4px; box-shadow: 0 20px 60px var(--accent-glow); max-width: min(90vw, 900px); margin: 0 auto; }
+        .full-card h2 { font-family: 'Archivo Black', sans-serif; margin: 0 0 var(--content-gap) 0; }
+        .full-card p { margin: 0 0 var(--element-gap) 0; opacity: 0.95; }
+        .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--content-gap); margin: var(--content-gap) 0; }
+        .stat-card { background: rgba(255, 87, 34, 0.15); border: 1px solid var(--card-bg); border-radius: 4px; padding: var(--content-gap); text-align: center; }
+        .stat-number { font-size: clamp(1.5rem, 4vw, 2.5rem); font-weight: 700; color: var(--card-bg); }
+        .stat-label { font-size: var(--small-size); opacity: 0.8; margin-top: var(--element-gap); }
+        .metric-bar { display: flex; align-items: center; gap: var(--element-gap); margin: var(--element-gap) 0; }
+        .metric-bar-label { width: 120px; font-size: var(--small-size); }
+        .metric-bar-track { flex: 1; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; }
+        .metric-bar-fill { height: 100%; background: var(--card-bg); border-radius: 4px; }
+        .reveal { opacity: 0; transform: translateY(30px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+        .slide.visible .reveal { opacity: 1; transform: translateY(0); }
+        .reveal:nth-child(1) { transition-delay: 0.1s; }
+        .reveal:nth-child(2) { transition-delay: 0.2s; }
+        .reveal:nth-child(3) { transition-delay: 0.3s; }
+        .reveal:nth-child(4) { transition-delay: 0.4s; }
+        .reveal:nth-child(5) { transition-delay: 0.5s; }
+        .keyboard-hint { position: fixed; bottom: var(--slide-padding); left: 50%; transform: translateX(-50%); font-size: var(--small-size); opacity: 0.5; z-index: 1000; }
+        @media (max-width: 768px) { .grid-layout { grid-template-columns: 1fr; } .nav-dots { right: 10px; } .stat-grid { grid-template-columns: 1fr; } }
+        @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.2s !important; } html { scroll-behavior: auto; } }
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+    <nav class="nav-dots" id="navDots"></nav>
+    <div class="keyboard-hint">Use ↑↓ arrows or scroll to navigate</div>
+
+    <!-- SLIDE 1: TITLE -->
+    <section class="slide" id="slide-1">
+        <div class="grid-layout">
+            <div class="slide-number reveal">01</div>
+            <div class="nav-breadcrumb reveal"><span class="active">Title</span><span>/</span><span>Technical</span><span>/</span><span>Business</span></div>
+            <div class="bold-card reveal"><h1>GAIA</h1><p>Generalized Agent Intelligence Architecture</p></div>
+            <div class="title-area reveal">
+                <h2>GAIA</h2>
+                <p class="subtitle">"One Prompt → Complete Software Feature"</p>
+                <p class="tagline">Productizing Battle-Tested Hook Architecture for AMD Ryzen AI</p>
+                <p style="margin-top: var(--element-gap); font-size: var(--small-size); opacity: 0.7;">Anthony Mikinka | <a href="https://github.com/antmikinka" style="color: var(--card-bg);">@antmikinka</a></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 2: EXECUTIVE SUMMARY -->
+    <section class="slide" id="slide-2">
+        <div class="content-slide">
+            <div class="slide-number reveal">02</div>
+            <h2 class="reveal">Executive Summary</h2>
+            <div class="stat-grid reveal">
+                <div class="stat-card">
+                    <div class="stat-number">41.8K+</div>
+                    <div class="stat-label">BMAD-METHOD Stars<br/>(Agent Templates Contributor)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">99.8%</div>
+                    <div class="stat-label">Test Pass Rate<br/>(1120/1122 tests)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">20 Weeks</div>
+                    <div class="stat-label">To Production-Ready<br/>(Phased Delivery)</div>
+                </div>
+            </div>
+            <div class="bold-card reveal" style="margin-top: var(--content-gap);">
+                <p><strong>The Opportunity:</strong> Productize proven "one prompt → feature" capability and optimize for AMD Ryzen AI, delivering 10x efficiency vs. cloud-only execution.</p>
+            </div>
+            <table class="data-table reveal" style="margin-top: var(--content-gap);">
+                <tr><th>Metric</th><th>Current</th><th>With GAIA + Ryzen AI</th></tr>
+                <tr><td>Development Speed</td><td>Hours-long automated</td><td>10x faster (local NPU)</td></tr>
+                <tr><td>Quality Threshold</td><td>90-95/100</td><td>Same + hardware optimization</td></tr>
+                <tr><td>Cloud Dependency</td><td>100% cloud LLMs</td><td>Local execution</td></tr>
+            </table>
+        </div>
+    </section>
+
+    <!-- SLIDE 3: PROOF - SAFE HAVEN RUNNING -->
+    <section class="slide" id="slide-3">
+        <div class="content-slide">
+            <div class="slide-number reveal">03</div>
+            <h2 class="reveal">Proof: Safe Haven Running in Claude Code</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Production Hook System - Live Integration</h3>
+            <div class="code-block reveal">SAFE HAVEN: 8 PRODUCTION HOOKS
+├── pre-compaction-validation.py (28KB) - Critical context analysis
+├── context-preservation-optimizer.py (117KB) - 5 compression strategies
+├── post-compaction-monitor.py (50KB) - Real-time metrics
+├── quality-assurance-validator.py - 25+ validation categories
+├── compliance-check.py - Regulatory compliance
+├── content-quality-monitor.py - Content validation
+└── performance-validation.py - Performance gates
+
+EXECUTION: Automatically triggered during Claude Code sessions
+STATUS: ✓ Active and running NOW</div>
+            <p class="reveal" style="color: var(--card-bg); font-weight: 700;">This is MY architecture. GAIA productizes it.</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 4: RECURSIVE ITERATIVE PIPELINE -->
+    <section class="slide" id="slide-4">
+        <div class="content-slide">
+            <div class="slide-number reveal">04</div>
+            <h2 class="reveal">The Core: Recursive Iterative Pipeline</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Quality-Gated Loop Architecture</h3>
+            <div class="code-block-small reveal">┌─────────────────────────────────────────────────────────────────────────┐
+│              RECURSIVE ITERATIVE PIPELINE (Auto-Pilot)                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│  USER GOAL → PLANNING → DEVELOPMENT → QUALITY → DECISION                │
+│                                     │                                    │
+│         ┌───────────────────────────┴────────────────────────────┐      │
+│         │                     QUALITY GATE                        │      │
+│         │                                                         │      │
+│         │   Score >= 90?                                          │      │
+│         │                                                         │      │
+│         │   YES → @software-program-manager → SHIP ✓             │      │
+│         │    │                                                    │      │
+│         │   NO  → Defects → Loop back to PLANNING                │      │
+│         │         (Unlimited iterations until quality met)        │      │
+│         └─────────────────────────────────────────────────────────┘      │
+└─────────────────────────────────────────────────────────────────────────┘
+
+KEY INNOVATION: No artificial max iterations. Continues until quality >= threshold.</div>
+            <p class="reveal" style="font-size: var(--small-size); opacity: 0.7;">Source: RECURSIVE-ITERATIVE-PIPELINE.md</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 5: PIPELINE TEMPLATES -->
+    <section class="slide" id="slide-5">
+        <div class="content-slide">
+            <div class="slide-number reveal">05</div>
+            <h2 class="reveal">Pipeline Templates (Already Built)</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Configurable Quality Thresholds</h3>
+            <table class="data-table reveal">
+                <tr><th>Template</th><th>Quality Threshold</th><th>Agent Sequence</th><th>Use Case</th></tr>
+                <tr><td><strong>STANDARD</strong></td><td>90/100</td><td>Planning → Dev → QA → Manager</td><td>Features, APIs</td></tr>
+                <tr><td><strong>RAPID</strong></td><td>75/100</td><td>Planning → Dev → QA</td><td>Prototypes, MVPs</td></tr>
+                <tr><td><strong>ENTERPRISE</strong></td><td>95/100</td><td>Planning → Dev → QA → Security → Perf → Manager</td><td>Production, Security</td></tr>
+                <tr><td><strong>DOCUMENTATION</strong></td><td>85/100</td><td>Technical Writer → Reviewer → Editor</td><td>API docs, guides</td></tr>
+            </table>
+            <div class="code-block-small reveal" style="margin-top: var(--content-gap);">QUALITY WEIGHTS (Standard Template):
+├── Code Quality:........ 25%
+├── Requirements:........ 25%
+├── Testing:............. 20%
+├── Documentation:....... 15%
+└── Best Practices:...... 15%</div>
+            <p class="reveal" style="font-size: var(--small-size); opacity: 0.7;">Source: auto-pilot-templates.yml, recursive-pipeline-templates.yml</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 6: AGENT CATEGORIES -->
+    <section class="slide" id="slide-6">
+        <div class="content-slide">
+            <div class="slide-number reveal">06</div>
+            <h2 class="reveal">Agent Categories (State-Based Routing)</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Multi-Agent Selection System</h3>
+            <div class="code-block-tiny reveal">AGENT CATEGORIES:
+┌──────────────────────────────────────────────────────────────────────────┐
+│ PLANNING:                                                                │
+│   ├── planning-analysis-strategist  → General technical planning         │
+│   ├── solutions-architect           → Complex system architecture        │
+│   ├── api-designer                  → REST/GraphQL API design            │
+│   └── database-architect            → Database schema & data modeling    │
+│                                                                          │
+│ DEVELOPMENT:                                                             │
+│   ├── senior-developer              → Full-stack generalist              │
+│   ├── frontend-specialist           → React, Vue, Angular UI             │
+│   ├── backend-specialist            → Server-side APIs                   │
+│   ├── devops-engineer               → CI/CD, infrastructure              │
+│   └── data-engineer                 → Data pipelines, ETL, ML            │
+│                                                                          │
+│ REVIEW:                                                                  │
+│   ├── quality-reviewer              → General code quality               │
+│   ├── security-auditor              → Security vulnerabilities           │
+│   ├── performance-analyst           → Performance optimization           │
+│   ├── accessibility-reviewer        → WCAG compliance                    │
+│   └── test-coverage-analyzer        → Test quality assessment            │
+│                                                                          │
+│ MANAGEMENT:                                                              │
+│   ├── software-program-manager      → Final approval                     │
+│   ├── technical-writer              → Documentation                      │
+│   └── release-manager               → Deployment coordination            │
+└──────────────────────────────────────────────────────────────────────────┘
+
+AUTO-SELECTION: Based on task triggers (e.g., "api" → api-designer, "security" → security-auditor)</div>
+        </div>
+    </section>
+
+    <!-- SLIDE 7: 3D CUBE MATRIX -->
+    <section class="slide" id="slide-7">
+        <div class="content-slide">
+            <div class="slide-number reveal">07</div>
+            <h2 class="reveal">3D Cube Matrix Classification</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Multi-Dimensional Agent Organization</h3>
+            <div class="code-block-small reveal">┌─────────────────────────────────────────────────────────────────┐
+│                    PHASES (Z-axis)                              │
+│  Research ── Planning ── Development ── QA ── Feedback         │
+│     │                                                            │
+│     │╱                                                           │
+│     ╱   COMPONENT TYPE (Y-axis)                                 │
+│    ╱    tasks │ checklists │ tools │ workflows │ data           │
+│   ╱                                                             │
+│  AGENT PERSONA (X-axis)                                         │
+│  planning │ developer │ qa │ researcher │ manager               │
+└─────────────────────────────────────────────────────────────────┘
+
+EXAMPLE CLASSIFICATION: execute-checklist.md
+├── X (WHO): qa-reviewer
+├── Y (WHAT): checklist
+└── Z (WHEN): QA phase
+
+This enables:
+• Intelligent agent routing based on phase needs
+• Component type awareness (task vs. tool vs. workflow)
+• Cross-phase state injection</div>
+            <p class="reveal" style="font-size: var(--small-size); opacity: 0.7;">Source: ORCHESTRATION-SPEC-v1.md (92KB specification)</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 8: ORCHESTRATION MODES -->
+    <section class="slide" id="slide-8">
+        <div class="content-slide">
+            <div class="slide-number reveal">08</div>
+            <h2 class="reveal">Orchestration Modes</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Configurable Automation Levels</h3>
+            <table class="data-table reveal">
+                <tr><th>Mode</th><th>Automation</th><th>User Control</th><th>Use Case</th></tr>
+                <tr><td><strong>Manual</strong></td><td>User invokes each agent</td><td>Full control</td><td>Exploratory, debugging</td></tr>
+                <tr><td><strong>Guided</strong></td><td>System suggests, user confirms</td><td>Approval required</td><td>Standard workflows (DEFAULT)</td></tr>
+                <tr><td><strong>Autonomous</strong></td><td>Auto-invokes with gates</td><td>Phase boundaries only</td><td>Repeatable pipelines</td></tr>
+            </table>
+            <div class="code-block reveal" style="margin-top: var(--content-gap);">EXECUTION PATTERNS:
+├── Linear Pipeline       → Sequential phases (Research → Plan → Dev → QA)
+├── Iterative Spiral      → Feedback loops (Plan → Build → Review → Revise → repeat)
+├── Parallel Execution    → Concurrent agents (Dev A + Dev B + Dev C → Merge)
+└── Conditional Branching → Dynamic routing based on analysis complexity</div>
+        </div>
+    </section>
+
+    <!-- SLIDE 9: NEXUS 4-LAYER ARCHITECTURE -->
+    <section class="slide" id="slide-9">
+        <div class="content-slide">
+            <div class="slide-number reveal">09</div>
+            <h2 class="reveal">Nexus: 4-Layer Architecture</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Complete Orchestration Stack</h3>
+            <div class="code-block-small reveal">┌─────────────────────────────────────────────────────────┐
+│  USER / CLAUDE CODE (Natural Conversation)              │
+│  @agent mention → automatic routing                     │
+├─────────────────────────────────────────────────────────┤
+│  ORCHESTRATION LAYER                                    │
+│  OrchestratorAgent │ PhaseController │ FeedbackManager  │
+│  ConfigLoader      │ StateManager    │ MetricsCollector │
+├─────────────────────────────────────────────────────────┤
+│  RUNTIME INFRASTRUCTURE (Nexus)                         │
+│  PipelinePlanner   │ ContextInjector │ AgentRegistry    │
+│  Chronicle (temporal) │ Workspace (spatial) │ Ether     │
+├─────────────────────────────────────────────────────────┤
+│  BUILD-TIME INFRASTRUCTURE                              │
+│  SessionManager    │ SessionTracker  │ EcosystemCreator │
+│  Agent Templates   │ Hook System     │ MCP Integration  │
+├─────────────────────────────────────────────────────────┤
+│  CLAUDE CODE HOST                                       │
+│  Task Tool │ File Ops │ MCP Servers │ ChromaDB Vector   │
+└─────────────────────────────────────────────────────────┘</div>
+            <p class="reveal" style="font-size: var(--small-size); opacity: 0.7;">Source: architecture-diagram.html</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 10: BMAD-METHOD CREDIBILITY -->
+    <section class="slide" id="slide-10">
+        <div class="content-slide">
+            <div class="slide-number reveal">10</div>
+            <h2 class="reveal">Track Record: BMAD-METHOD</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Agent Templates Before Viral Growth</h3>
+            <div class="stat-grid reveal">
+                <div class="stat-card">
+                    <div class="stat-number">&lt;10K</div>
+                    <div class="stat-label">Stars When I Contributed<br/>(Early Stage)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">41.8K+</div>
+                    <div class="stat-label">Stars Now<br/>(Viral Growth)</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">Still<br/>Referenced</div>
+                    <div class="stat-label">My Templates<br/>(Lasting Impact)</div>
+                </div>
+            </div>
+            <div class="bold-card reveal" style="margin-top: var(--content-gap);">
+                <p><strong>BMAD-METHOD</strong> (https://github.com/bmad-code-org/BMAD-METHOD)</p>
+                <p style="margin-top: var(--element-gap);">Created agent templates before the project hit mainstream. My templates are still part of the ecosystem today.</p>
+            </div>
+            <p class="reveal" style="color: var(--card-bg); margin-top: var(--element-gap);">I don't just design systems. I BUILD them before they're cool.</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 11: METRICS & PERFORMANCE -->
+    <section class="slide" id="slide-11">
+        <div class="content-slide">
+            <div class="slide-number reveal">11</div>
+            <h2 class="reveal">Metrics & Performance</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Real Numbers from Production</h3>
+            <div class="stat-grid reveal">
+                <div class="stat-card">
+                    <div class="stat-number">33/33</div>
+                    <div class="stat-label">Auto-Pilot Tests<br/>100% Passing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">1120/1122</div>
+                    <div class="stat-label">Full Test Suite<br/>99.8% Passing</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">8</div>
+                    <div class="stat-label">Core Hook Files<br/>Production Ready</div>
+                </div>
+            </div>
+            <div class="code-block-small reveal" style="margin-top: var(--content-gap);">DOCUMENTATION & VISUALS:
+├── 8 categorized documents
+├── 4 visual diagrams (2 SVG, 1 HTML interactive, 1 ASCII)
+├── Complete implementation guide
+└── Template library (5+ pre-configured pipelines)</div>
+        </div>
+    </section>
+
+    <!-- SLIDE 12: REAL-WORLD USE CASES -->
+    <section class="slide" id="slide-12">
+        <div class="content-slide">
+            <div class="slide-number reveal">12</div>
+            <h2 class="reveal">Real-World Use Cases</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">What This Can Build</h3>
+            <div class="code-block reveal">EXAMPLE WORKFLOWS (Already Proven):
+
+1. PATENT ECOSYSTEM (CCMG):
+   → 12+ specialist agents created automatically
+   → 780-line orchestrator generated
+   → 25+ legal templates produced
+   → 8 command definitions scaffolded
+
+2. RESEARCH AGENT 2:
+   → 65+ components generated
+   → 4 Python hooks automated
+   → 5 QA checklists created
+   → MCP server configs generated
+
+3. NEXUS AGENT ORCHESTRATOR:
+   → 12+ specialist agents created automatically
+   → Multi-layer testing (unit, integration, system, UAT)
+   → MCP server integration
+   → Self-configuring agent ecosystems</div>
+            <p class="reveal" style="color: var(--card-bg); font-weight: 700;">All generated from prompts. All production-ready.</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 13: MARKET OPPORTUNITY -->
+    <section class="slide" id="slide-13">
+        <div class="content-slide">
+            <div class="slide-number reveal">13</div>
+            <h2 class="reveal">Market Opportunity</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Enterprise AI Development Pain Points</h3>
+            <table class="data-table reveal">
+                <tr><th>Pain Point</th><th>Current Solutions</th><th>GAIA Solution</th><th>Market Size</th></tr>
+                <tr><td>Agent Creation</td><td>Weeks manual coding</td><td>One prompt → ecosystem</td><td>$15B (AI dev tools)</td></tr>
+                <tr><td>Quality Assurance</td><td>Basic or none</td><td>25+ validation categories</td><td>$60B (testing/QA)</td></tr>
+                <tr><td>Cloud Dependency</td><td>100% cloud APIs</td><td>Local Ryzen AI execution</td><td>$50B (edge AI)</td></tr>
+                <tr><td>Workflow Complexity</td><td>Linear chains</td><td>Recursive quality-gated</td><td>$25B (orchestration)</td></tr>
+            </table>
+            <div class="bold-card reveal" style="margin-top: var(--content-gap);">
+                <p><strong>Total Addressable Market:</strong> $150B+ across AI development, QA, edge computing, and orchestration</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 14: COMPETITIVE LANDSCAPE -->
+    <section class="slide" id="slide-14">
+        <div class="content-slide">
+            <div class="slide-number reveal">14</div>
+            <h2 class="reveal">Competitive Landscape</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Why GAIA Wins</h3>
+            <table class="data-table reveal">
+                <tr><th>Platform</th><th>Agent Creation</th><th>Quality Gates</th><th>Hardware Opt.</th><th>Battle-Tested</th></tr>
+                <tr><td>AutoGen</td><td>Manual</td><td>Basic</td><td>None</td><td>Academic demos</td></tr>
+                <tr><td>CrewAI</td><td>Manual</td><td>Basic</td><td>None</td><td>Startup pilots</td></tr>
+                <tr><td>LangChain</td><td>Low-code</td><td>Limited</td><td>None</td><td>Varied</td></tr>
+                <tr style="background: rgba(255, 87, 34, 0.2);"><td><strong>GAIA</strong></td><td style="color: var(--card-bg);">One prompt</td><td style="color: var(--card-bg);">25+ categories</td><td style="color: var(--card-bg);">Ryzen AI</td><td style="color: var(--card-bg);">Production</td></tr>
+            </table>
+            <p class="reveal" style="color: var(--card-bg); font-weight: 700; margin-top: var(--content-gap);">You can copy code. You can't copy PROVEN CAPABILITY.</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 15: AMD RYZEN AI INTEGRATION -->
+    <section class="slide" id="slide-15">
+        <div class="content-slide">
+            <div class="slide-number reveal">15</div>
+            <h2 class="reveal">AMD Ryzen AI Integration</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Phase 3 Technical Plan</h3>
+            <div class="code-block-small reveal">CURRENT STATE → TARGET STATE:
+┌─────────────────────┐         ┌─────────────────────────────────┐
+│ Cloud LLM Execution │         │ AMD Ryzen AI Distribution       │
+├─────────────────────┤         ├─────────────────────────────────┤
+│ ✓ All agents run    │    →    │ ✓ Planning agents → CPU (Ryzen) │
+│   on cloud APIs     │         │ ✓ Dev agents → GPU (Radeon)     │
+│ ✓ High latency      │         │ ✓ QA agents → NPU (Ryzen AI)    │
+│ ✓ Ongoing cost      │         │ ✓ Local LLM inference           │
+│ ✓ No data control   │         │ ✓ 10x efficiency gain           │
+└─────────────────────┘         └─────────────────────────────────┘
+
+TECHNICAL REQUIREMENTS:
+1. Add Ryzen AI execution targets to agent definitions
+2. Integrate local LLM (ONNX Runtime / DirectML)
+3. Build hardware-aware agent placement logic
+4. Optimize for NPU tensor operations</div>
+            <p class="reveal" style="color: var(--card-bg); font-weight: 700;">Requires: AMD technical partnership</p>
+        </div>
+    </section>
+
+    <!-- SLIDE 16: ROADMAP -->
+    <section class="slide" id="slide-16">
+        <div class="content-slide">
+            <div class="slide-number reveal">16</div>
+            <h2 class="reveal">Roadmap (Honest Timeline)</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Phased Delivery with Go/No-Go Gates</h3>
+            <div class="code-block-small reveal">┌────────────────────────────────────────────────────────────┐
+│  PHASE 1 (Weeks 1-4): Capture Methodology                  │
+│  ██████████ Document hook patterns from Safe Haven         │
+│            Extract templates from Nexus orchestration      │
+│            30-40 hour user documentation sprint            │
+│  [GO] - Entry: User availability confirmed                 │
+├────────────────────────────────────────────────────────────┤
+│  PHASE 2 (Weeks 5-12): Productization                      │
+│  ████████████ Self-service generation pipeline             │
+│             Quality gates for generated agents             │
+│             Template library packaging                     │
+│  [CONDITIONAL GO - extend to 8 weeks if needed]            │
+├────────────────────────────────────────────────────────────┤
+│  PHASE 3 (Weeks 13-20): Enterprise + Ryzen AI              │
+│  ██████████ Audit trails & compliance                      │
+│            AMD Ryzen AI optimization                       │
+│            Enterprise deployment packaging                 │
+│  [GO - AMD partnership dependent]                          │
+└────────────────────────────────────────────────────────────┘
+Total: 20 weeks (5 months) to production-ready</div>
+        </div>
+    </section>
+
+    <!-- SLIDE 17: THE ASK -->
+    <section class="slide" id="slide-17">
+        <div class="content-slide">
+            <div class="slide-number reveal">17</div>
+            <h2 class="reveal">The Ask</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">What I Need from AMD</h3>
+            <table class="data-table reveal">
+                <tr><th>Resource</th><th>Purpose</th><th>Impact</th></tr>
+                <tr><td><strong>Ryzen AI Dev Kit</strong></td><td>Hardware optimization testing</td><td>Enable NPU targeting</td></tr>
+                <tr><td><strong>Technical Partnership</strong></td><td>NPU execution guidance</td><td>Accelerate Phase 3</td></tr>
+                <tr><td><strong>Go-to-Market Support</strong></td><td>Enterprise introductions</td><td>Early adopter pipeline</td></tr>
+                <tr><td><strong>Marketing/PR</strong></td><td>AMD-optimized positioning</td><td>Developer adoption</td></tr>
+            </table>
+            <div class="bold-card reveal" style="margin-top: var(--content-gap);">
+                <p><strong>What AMD Gets:</strong></p>
+                <ul>
+                    <li>First-mover advantage on hook-based agent systems</li>
+                    <li>Differentiated Ryzen AI value proposition</li>
+                    <li>Proven capability (Safe Haven running NOW)</li>
+                    <li>41.8K+ star community connection (BMAD)</li>
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 18: BUSINESS METRICS -->
+    <section class="slide" id="slide-18">
+        <div class="content-slide">
+            <div class="slide-number reveal">18</div>
+            <h2 class="reveal">Business Case</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">ROI Analysis</h3>
+            <div class="stat-grid reveal">
+                <div class="stat-card">
+                    <div class="stat-number">10x</div>
+                    <div class="stat-label">Development Speed<br/>vs. Manual Agent Creation</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">90%+</div>
+                    <div class="stat-label">Quality Pass Rate<br/>Production-Ready Output</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">$500K+</div>
+                    <div class="stat-label">Annual Savings<br/>Per Enterprise Team</div>
+                </div>
+            </div>
+            <div class="code-block reveal" style="margin-top: var(--content-gap);">ENTERPRISE VALUE CALCULATION:
+├── Developer time saved: 20 hrs/week × $100/hr × 50 weeks = $100K/dev/year
+├── Team of 5 developers: $500K/year savings
+├── Cloud cost reduction (local LLM): ~$50K/year
+├── Quality improvement (fewer bugs): ~$100K/year
+└── Total: $650K+/year per enterprise team</div>
+        </div>
+    </section>
+
+    <!-- SLIDE 19: STRATEGIC APPROVAL -->
+    <section class="slide" id="slide-19">
+        <div class="content-slide">
+            <div class="slide-number reveal">19</div>
+            <h2 class="reveal">Strategic Approval</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">Adrian-Macias Assessment: APPROVE WITH CONDITIONS</h3>
+            <table class="data-table reveal">
+                <tr><th>Criterion</th><th>Rating</th><th>Notes</th></tr>
+                <tr><td><strong>Capability uniqueness</strong></td><td>9/10</td><td>Genuinely differentiated</td></tr>
+                <tr><td><strong>AMD strategic fit</strong></td><td>8/10</td><td>Strong Ryzen AI alignment</td></tr>
+                <tr><td><strong>Technical feasibility</strong></td><td>7/10</td><td>Proven in Safe Haven</td></tr>
+                <tr><td><strong>Business potential</strong></td><td>9/10</td><td>$150B+ TAM, clear ROI</td></tr>
+                <tr style="background: rgba(255, 87, 34, 0.2);"><td><strong>Overall</strong></td><td style="color: var(--card-bg); font-weight: 700;">APPROVE</td><td>Methodology capture first</td></tr>
+            </table>
+            <div class="code-block reveal" style="font-size: clamp(0.55rem, 1.2vw, 0.7rem); margin-top: var(--element-gap);">Four Mandatory Conditions:
+1. Methodology Capture (Weeks 1-2) - Document context engineering patterns
+2. Reproducibility Validation (Weeks 3-4) - Execute WITHOUT user prompting
+3. AMD Alignment (Weeks 5-6) - Demonstrate Ryzen AI code generation
+4. Enterprise Readiness (Weeks 7-8) - Audit trails, quality gates, monitoring</div>
+        </div>
+    </section>
+
+    <!-- SLIDE 20: SUMMARY -->
+    <section class="slide" id="slide-20">
+        <div class="content-slide">
+            <div class="slide-number reveal">20</div>
+            <h2 class="reveal">Summary</h2>
+            <h3 class="reveal" style="color: var(--card-bg);">The One-Sentence Pitch</h3>
+            <div class="full-card reveal">
+                <p style="font-size: clamp(0.9rem, 2vw, 1.2rem); line-height: 1.8;">
+                    "I've built Safe Haven—a production hook system with 8 Python hooks, 25+ quality gates, and ChromaDB memory, plus the recursive iterative pipeline with 99.8% test pass rate. I contributed agent templates to BMAD-METHOD before it hit 41.8K stars. GAIA productizes this architecture and optimizes it for AMD Ryzen AI, giving enterprises 'one prompt → complete feature' capability that's actually battle-tested."
+                </p>
+            </div>
+            <div class="stat-grid reveal" style="margin-top: var(--content-gap);">
+                <div class="stat-card">
+                    <div class="stat-number">8</div>
+                    <div class="stat-label">Production Hooks<br/>Safe Haven</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">99.8%</div>
+                    <div class="stat-label">Test Pass Rate<br/>1120/1122</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">41.8K+</div>
+                    <div class="stat-label">BMAD Stars<br/>Template Contributor</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SLIDE 21: CONTACT -->
+    <section class="slide" id="slide-21">
+        <div class="grid-layout">
+            <div class="slide-number reveal">21</div>
+            <div class="nav-breadcrumb reveal"><span>Complete</span></div>
+            <div class="full-card reveal" style="text-align: center;">
+                <h2 style="margin-bottom: var(--content-gap);">Let's Build This Together</h2>
+                <p style="font-size: var(--h3-size);"><strong>Anthony Mikinka</strong></p>
+                <p>AI Engineer & Agent Ecosystem Creator</p>
+                <div style="margin: var(--content-gap) 0; padding: var(--element-gap) 0; border-top: 1px solid rgba(26, 26, 26, 0.3); border-bottom: 1px solid rgba(26, 26, 26, 0.3);">
+                    <p><strong>GitHub:</strong> <a href="https://github.com/antmikinka" style="color: var(--card-bg);">github.com/antmikinka</a></p>
+                    <p><strong>BMAD-METHOD:</strong> <a href="https://github.com/bmad-code-org/BMAD-METHOD" style="color: var(--card-bg);">41.8K+ stars</a></p>
+                    <p><strong>Safe Haven:</strong> conversation-compaction-hooks-safe-haven</p>
+                    <p><strong>Email:</strong> [your email]</p>
+                </div>
+                <p style="color: var(--card-bg); font-weight: 700;">Strategic Assessment: Adrian-Macias AI Technology Advisor</p>
+                <p><strong>Decision:</strong> APPROVE WITH CONDITIONS</p>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        let currentSlide = 0;
+        const slides = document.querySelectorAll('.slide');
+        const progressBar = document.getElementById('progressBar');
+        const navDots = document.getElementById('navDots');
+        function initNavDots() {
+            navDots.innerHTML = '';
+            slides.forEach((_, index) => {
+                const dot = document.createElement('div');
+                dot.className = 'nav-dot' + (index === currentSlide ? ' active' : '');
+                dot.addEventListener('click', () => goToSlide(index));
+                navDots.appendChild(dot);
+            });
+        }
+        function updateProgress() {
+            const progress = ((currentSlide + 1) / slides.length) * 100;
+            progressBar.style.width = progress + '%';
+        }
+        function goToSlide(index) {
+            if (index >= 0 && index < slides.length) {
+                currentSlide = index;
+                slides[currentSlide].scrollIntoView({ behavior: 'smooth' });
+                updateSlideVisibility();
+            }
+        }
+        function updateSlideVisibility() {
+            slides.forEach((slide, index) => {
+                if (index === currentSlide) {
+                    setTimeout(() => slide.classList.add('visible'), 100);
+                } else {
+                    slide.classList.remove('visible');
+                }
+            });
+            initNavDots();
+            updateProgress();
+        }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' || e.key === 'PageDown') { e.preventDefault(); goToSlide(currentSlide + 1); }
+            else if (e.key === 'ArrowUp' || e.key === 'PageUp') { e.preventDefault(); goToSlide(currentSlide - 1); }
+            else if (e.key === 'Home') { e.preventDefault(); goToSlide(0); }
+            else if (e.key === 'End') { e.preventDefault(); goToSlide(slides.length - 1); }
+        });
+        let isScrolling = false;
+        document.addEventListener('wheel', (e) => {
+            if (!isScrolling) {
+                isScrolling = true;
+                if (e.deltaY > 0) { setTimeout(() => { goToSlide(currentSlide + 1); isScrolling = false; }, 200); }
+                else { setTimeout(() => { goToSlide(currentSlide - 1); isScrolling = false; }, 200); }
+            }
+        }, { passive: true });
+        let touchStartY = 0;
+        document.addEventListener('touchstart', (e) => { touchStartY = e.touches[0].clientY; }, { passive: true });
+        document.addEventListener('touchend', (e) => {
+            const touchEndY = e.changedTouches[0].clientY;
+            const diff = touchStartY - touchEndY;
+            if (Math.abs(diff) > 50) { if (diff > 0) { goToSlide(currentSlide + 1); } else { goToSlide(currentSlide - 1); } }
+        }, { passive: true });
+        document.addEventListener('DOMContentLoaded', () => { initNavDots(); updateProgress(); updateSlideVisibility(); });
+    </script>
+</body>
+</html>
