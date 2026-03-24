@@ -8,12 +8,26 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 from gaia.pipeline.state import PipelineContext, PipelineStateMachine, PipelineState
-from gaia.pipeline.loop_manager import LoopManager, LoopConfig
 from gaia.pipeline.decision_engine import DecisionEngine, DecisionType
 from gaia.quality.scorer import QualityScorer
-from gaia.agents.registry import AgentRegistry
 from gaia.hooks.registry import HookRegistry, HookExecutor
 from gaia.hooks.base import HookContext
+
+
+# Lazy imports for components with complex dependencies
+def _get_loop_manager():
+    from gaia.pipeline.loop_manager import LoopManager
+    return LoopManager
+
+
+def _get_loop_config():
+    from gaia.pipeline.loop_manager import LoopConfig
+    return LoopConfig
+
+
+def _get_agent_registry():
+    from gaia.agents.registry import AgentRegistry
+    return AgentRegistry
 
 
 @pytest.fixture
@@ -44,8 +58,9 @@ def sample_state_machine(sample_context: PipelineContext) -> PipelineStateMachin
 
 
 @pytest.fixture
-def sample_loop_config() -> LoopConfig:
+def sample_loop_config() -> "LoopConfig":
     """Create a sample loop configuration for testing."""
+    LoopConfig = _get_loop_config()
     return LoopConfig(
         loop_id="test-loop-001",
         phase_name="DEVELOPMENT",
@@ -58,8 +73,9 @@ def sample_loop_config() -> LoopConfig:
 
 
 @pytest.fixture
-def sample_loop_manager() -> LoopManager:
+def sample_loop_manager() -> "LoopManager":
     """Create a sample loop manager for testing."""
+    LoopManager = _get_loop_manager()
     return LoopManager(max_concurrent=5)
 
 
@@ -80,8 +96,9 @@ def sample_quality_scorer() -> QualityScorer:
 
 
 @pytest.fixture
-def sample_agent_registry(tmp_path) -> AgentRegistry:
+def sample_agent_registry(tmp_path) -> "AgentRegistry":
     """Create a sample agent registry for testing."""
+    AgentRegistry = _get_agent_registry()
     agents_dir = tmp_path / "agents"
     agents_dir.mkdir()
     return AgentRegistry(agents_dir=str(agents_dir), auto_reload=False)
