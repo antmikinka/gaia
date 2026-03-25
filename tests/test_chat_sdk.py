@@ -322,8 +322,8 @@ class TestChatSDKIntegration(unittest.TestCase):
 
         messages = [
             "I have a pet dog named Max.",
-            "What is my pet's name?",
-            "What kind of animal is Max?",
+            "Based on what I just told you, what is my dog's name?",
+            "What type of animal is my pet?",
         ]
 
         responses = []
