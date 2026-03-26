@@ -1,0 +1,108 @@
+{
+  "export_timestamp": "2026-03-26T01:02:02.691842+00:00",
+  "p31_baseline_reference": {
+    "throughput_100_loops": 157,
+    "single_exec_latency": 62,
+    "memory_peak": 6.2
+  },
+  "results": [
+    {
+      "concurrency_level": 10,
+      "timestamp": "2026-03-26T01:02:01.892128+00:00",
+      "total_duration_ms": 194.84221110340312,
+      "avg_latency_ms": 58.452663331020936,
+      "p50_latency_ms": 62.92445000144653,
+      "p95_latency_ms": 63.031995002529584,
+      "p99_latency_ms": 63.03957299271133,
+      "min_latency_ms": 49.35200000181794,
+      "max_latency_ms": 63.041399989742786,
+      "throughput_loops_per_sec": 51.32358098057603,
+      "memory_peak_mb": 0.021026611328125,
+      "memory_baseline_mb": 42.903645833333336,
+      "memory_delta_mb": -42.88261922200521,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "success_rate": 1.0
+    },
+    {
+      "concurrency_level": 100,
+      "timestamp": "2026-03-26T01:02:02.078261+00:00",
+      "total_duration_ms": 2022.2498555603022,
+      "avg_latency_ms": 60.66749566680907,
+      "p50_latency_ms": 59.97210000350606,
+      "p95_latency_ms": 62.311065015092026,
+      "p99_latency_ms": 62.715919982874766,
+      "min_latency_ms": 59.13670000154525,
+      "max_latency_ms": 62.91090001468547,
+      "throughput_loops_per_sec": 49.44987372605999,
+      "memory_peak_mb": 0.18911107381184897,
+      "memory_baseline_mb": 43.122395833333336,
+      "memory_delta_mb": -42.933284759521484,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "success_rate": 1.0
+    },
+    {
+      "concurrency_level": 500,
+      "timestamp": "2026-03-26T01:02:02.339057+00:00",
+      "total_duration_ms": 12966.334411124182,
+      "avg_latency_ms": 77.7980064667451,
+      "p50_latency_ms": 69.7568999894429,
+      "p95_latency_ms": 106.80460498551838,
+      "p99_latency_ms": 106.8342000071425,
+      "min_latency_ms": 53.39420001837425,
+      "max_latency_ms": 110.38219998590648,
+      "throughput_loops_per_sec": 38.5613994014404,
+      "memory_peak_mb": 0.988366444905599,
+      "memory_baseline_mb": 44.084635416666664,
+      "memory_delta_mb": -43.09626897176106,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "success_rate": 1.0
+    },
+    {
+      "concurrency_level": 1000,
+      "timestamp": "2026-03-26T01:02:02.688287+00:00",
+      "total_duration_ms": 31748.787033226108,
+      "avg_latency_ms": 95.24636109967832,
+      "p50_latency_ms": 93.50930000073276,
+      "p95_latency_ms": 109.48099999222904,
+      "p99_latency_ms": 112.49155897967286,
+      "min_latency_ms": 78.19510000990704,
+      "max_latency_ms": 113.79849998047575,
+      "throughput_loops_per_sec": 31.49726630354314,
+      "memory_peak_mb": 2.0528246561686196,
+      "memory_baseline_mb": 45.807291666666664,
+      "memory_delta_mb": -43.75446701049805,
+      "error_count": 0,
+      "error_rate": 0.0,
+      "success_rate": 1.0
+    }
+  ],
+  "bottlenecks": [
+    {
+      "scale_level": 100,
+      "bottleneck_type": "Scale Efficiency",
+      "severity": "high",
+      "description": "Scale efficiency drops to 9.6% at 100 concurrent loops",
+      "impact": "Expected 513.2 loops/sec, achieved 49.4 loops/sec",
+      "recommendation": "Reduce contention in concurrent execution paths"
+    },
+    {
+      "scale_level": 500,
+      "bottleneck_type": "Scale Efficiency",
+      "severity": "high",
+      "description": "Scale efficiency drops to 1.5% at 500 concurrent loops",
+      "impact": "Expected 2566.2 loops/sec, achieved 38.6 loops/sec",
+      "recommendation": "Reduce contention in concurrent execution paths"
+    },
+    {
+      "scale_level": 1000,
+      "bottleneck_type": "Scale Efficiency",
+      "severity": "high",
+      "description": "Scale efficiency drops to 0.6% at 1000 concurrent loops",
+      "impact": "Expected 5132.4 loops/sec, achieved 31.5 loops/sec",
+      "recommendation": "Reduce contention in concurrent execution paths"
+    }
+  ]
+}

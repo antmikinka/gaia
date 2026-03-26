@@ -1,0 +1,293 @@
+{
+  "export_timestamp": "2026-03-25T19:46:53.442100+00:00",
+  "results": [
+    {
+      "benchmark_type": "LATENCY",
+      "timestamp": "2026-03-25T19:46:22.772454+00:00",
+      "duration_ms": 62.25329999870155,
+      "memory_peak_mb": 0.00154876708984375,
+      "memory_current_mb": 0.0,
+      "metrics": {
+        "iterations": 5,
+        "min_ms": 57.311500000650994,
+        "max_ms": 63.96049998875242,
+        "std_dev_ms": 2.719331823420204,
+        "all_durations_ms": [
+          57.311500000650994,
+          62.25329999870155,
+          63.96049998875242,
+          63.930500007700175,
+          61.65030000556726
+        ]
+      },
+      "metadata": {
+        "test_type": "single_execution"
+      }
+    },
+    {
+      "benchmark_type": "THROUGHPUT",
+      "timestamp": "2026-03-25T19:46:22.834194+00:00",
+      "duration_ms": 61.73849999322556,
+      "memory_peak_mb": 0.01770782470703125,
+      "memory_current_mb": 0.0,
+      "metrics": {
+        "concurrent_executions": 10,
+        "executions_per_second": 161.97348495828825,
+        "throughput_per_hour": 583104.5458498377,
+        "avg_duration_per_execution_ms": 6.173849999322556
+      },
+      "metadata": {
+        "test_type": "concurrent_throughput"
+      }
+    },
+    {
+      "benchmark_type": "MEMORY",
+      "timestamp": "2026-03-25T19:46:23.023326+00:00",
+      "duration_ms": 0,
+      "memory_peak_mb": 0.0014546712239583333,
+      "memory_current_mb": 0.0005137125651041666,
+      "metrics": {
+        "iterations": 3,
+        "peak_memory_mb": [
+          0.0014190673828125,
+          0.00139617919921875,
+          0.00154876708984375
+        ],
+        "current_memory_mb": [
+          0.000579833984375,
+          0.00040435791015625,
+          0.00055694580078125
+        ],
+        "peak_max_mb": 0.00154876708984375,
+        "peak_min_mb": 0.00139617919921875
+      },
+      "metadata": {
+        "test_type": "memory_footprint"
+      }
+    },
+    {
+      "benchmark_type": "TOKEN_EFFICIENCY",
+      "timestamp": "2026-03-25T19:46:23.211112+00:00",
+      "duration_ms": 62.4,
+      "memory_peak_mb": 0.0,
+      "memory_current_mb": 0.0,
+      "metrics": {
+        "iterations": 3,
+        "avg_tokens_per_execution": 624,
+        "token_usage_samples": [
+          609,
+          632,
+          631
+        ],
+        "estimated_tokens_per_feature": 624
+      },
+      "metadata": {
+        "test_type": "token_efficiency",
+        "estimation_method": "time_based"
+      }
+    },
+    {
+      "benchmark_type": "SCALE",
+      "timestamp": "2026-03-25T19:46:23.274161+00:00",
+      "duration_ms": 62.71150000975467,
+      "memory_peak_mb": 0.014007568359375,
+      "memory_current_mb": 0.0,
+      "metrics": {
+        "concurrent_loops": 10,
+        "total_duration_ms": 62.71150000975467,
+        "avg_duration_per_loop_ms": 6.271150000975467,
+        "loops_per_second": 159.46038602879082
+      },
+      "metadata": {
+        "test_type": "scale",
+        "scale_level": 10
+      }
+    },
+    {
+      "benchmark_type": "SCALE",
+      "timestamp": "2026-03-25T19:46:23.336993+00:00",
+      "duration_ms": 62.81669999589212,
+      "memory_peak_mb": 0.0865478515625,
+      "memory_current_mb": 0.0,
+      "metrics": {
+        "concurrent_loops": 50,
+        "total_duration_ms": 62.81669999589212,
+        "avg_duration_per_loop_ms": 1.2563339999178424,
+        "loops_per_second": 795.9666777030588
+      },
+      "metadata": {
+        "test_type": "scale",
+        "scale_level": 50
+      }
+    },
+    {
+      "benchmark_type": "SCALE",
+      "timestamp": "2026-03-25T19:46:23.398460+00:00",
+      "duration_ms": 61.60709999676328,
+      "memory_peak_mb": 0.1693572998046875,
+      "memory_current_mb": 0.0,
+      "metrics": {
+        "concurrent_loops": 100,
+        "total_duration_ms": 61.60709999676328,
+        "avg_duration_per_loop_ms": 0.6160709999676328,
+        "loops_per_second": 1623.1895350577095
+      },
+      "metadata": {
+        "test_type": "scale",
+        "scale_level": 100
+      }
+    },
+    {
+      "benchmark_type": "ENDURANCE",
+      "timestamp": "2026-03-25T19:46:53.439102+00:00",
+      "duration_ms": 30039.809199995943,
+      "memory_peak_mb": 0.00208282470703125,
+      "memory_current_mb": 0.00109100341796875,
+      "metrics": {
+        "target_duration_s": 30,
+        "actual_duration_ms": 30039.809199995943,
+        "iterations_completed": 481,
+        "iterations_per_second": 16.0120857225706,
+        "error_count": 0,
+        "memory_samples_mb": [
+          0.0006103515625,
+          0.00069427490234375,
+          0.00069427490234375,
+          0.00069427490234375,
+          0.00069427490234375,
+          0.00072479248046875,
+          0.00072479248046875,
+          0.00072479248046875,
+          0.00072479248046875,
+          0.00078582763671875,
+          0.00078582763671875,
+          0.00078582763671875,
+          0.00078582763671875,
+          0.00078582763671875,
+          0.00078582763671875,
+          0.00078582763671875,
+          0.00078582763671875,
+          0.00084686279296875,
+          0.00084686279296875,
+          0.00084686279296875,
+          0.00084686279296875,
+          0.00084686279296875,
+          0.00084686279296875,
+          0.00084686279296875,
+          0.00084686279296875,
+          0.00093841552734375,
+          0.00093841552734375,
+          0.00093841552734375,
+          0.00093841552734375,
+          0.00093841552734375,
+          0.00093841552734375,
+          0.00093841552734375,
+          0.00093841552734375,
+          0.00099945068359375,
+          0.00099945068359375,
+          0.00099945068359375,
+          0.00099945068359375,
+          0.00099945068359375,
+          0.00099945068359375,
+          0.00099945068359375,
+          0.00099945068359375,
+          0.00109100341796875,
+          0.00109100341796875,
+          0.00109100341796875,
+          0.00109100341796875,
+          0.00109100341796875,
+          0.00109100341796875,
+          0.00109100341796875
+        ],
+        "memory_leak_detected": true
+      },
+      "metadata": {
+        "test_type": "endurance"
+      }
+    }
+  ],
+  "statistics": {
+    "latency": {
+      "benchmark_type": "LATENCY",
+      "count": 1,
+      "mean_ms": 62.25329999870155,
+      "median_ms": 62.25329999870155,
+      "std_dev_ms": 0.0,
+      "min_ms": 62.25329999870155,
+      "max_ms": 62.25329999870155,
+      "p95_ms": 62.25329999870155,
+      "p99_ms": 62.25329999870155,
+      "memory_peak_avg_mb": 0.00154876708984375,
+      "throughput_per_hour": 57828.2597079205
+    },
+    "throughput": {
+      "benchmark_type": "THROUGHPUT",
+      "count": 1,
+      "mean_ms": 61.73849999322556,
+      "median_ms": 61.73849999322556,
+      "std_dev_ms": 0.0,
+      "min_ms": 61.73849999322556,
+      "max_ms": 61.73849999322556,
+      "p95_ms": 61.73849999322556,
+      "p99_ms": 61.73849999322556,
+      "memory_peak_avg_mb": 0.01770782470703125,
+      "throughput_per_hour": 58310.454584983774
+    },
+    "memory": {
+      "benchmark_type": "MEMORY",
+      "count": 1,
+      "mean_ms": 0,
+      "median_ms": 0,
+      "std_dev_ms": 0.0,
+      "min_ms": 0,
+      "max_ms": 0,
+      "p95_ms": 0,
+      "p99_ms": 0,
+      "memory_peak_avg_mb": 0.0014546712239583333,
+      "throughput_per_hour": 0
+    },
+    "token_efficiency": {
+      "benchmark_type": "TOKEN_EFFICIENCY",
+      "count": 1,
+      "mean_ms": 62.4,
+      "median_ms": 62.4,
+      "std_dev_ms": 0.0,
+      "min_ms": 62.4,
+      "max_ms": 62.4,
+      "p95_ms": 62.4,
+      "p99_ms": 62.4,
+      "memory_peak_avg_mb": 0.0,
+      "throughput_per_hour": 57692.307692307695,
+      "avg_tokens": 624
+    },
+    "scale": {
+      "benchmark_type": "SCALE",
+      "count": 3,
+      "mean_ms": 62.378433334136695,
+      "median_ms": 62.71150000975467,
+      "std_dev_ms": 0.6700620100248429,
+      "min_ms": 61.60709999676328,
+      "max_ms": 62.81669999589212,
+      "p95_ms": 62.80617999727838,
+      "p99_ms": 62.81459599616937,
+      "memory_peak_avg_mb": 0.08997090657552083,
+      "throughput_per_hour": 57712.25418112408,
+      "loops_per_second": 159.46038602879082
+    },
+    "endurance": {
+      "benchmark_type": "ENDURANCE",
+      "count": 1,
+      "mean_ms": 30039.809199995943,
+      "median_ms": 30039.809199995943,
+      "std_dev_ms": 0.0,
+      "min_ms": 30039.809199995943,
+      "max_ms": 30039.809199995943,
+      "p95_ms": 30039.809199995943,
+      "p99_ms": 30039.809199995943,
+      "memory_peak_avg_mb": 0.00208282470703125,
+      "throughput_per_hour": 119.84097422298161,
+      "iterations_per_second": 16.0120857225706
+    }
+  },
+  "bottlenecks": []
+}
