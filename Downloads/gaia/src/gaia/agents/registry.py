@@ -17,6 +17,7 @@ except ImportError:
 from gaia.agents.base import AgentDefinition, AgentTriggers, AgentCapabilities, AgentConstraints
 from gaia.exceptions import AgentLoadError
 from gaia.utils.logging import get_logger
+from gaia.pipeline.defect_types import DEFECT_SPECIALISTS, DefectType
 
 
 logger = get_logger(__name__)
@@ -589,10 +590,10 @@ class AgentRegistry:
         """
         Get specialist agent for a defect type.
 
-        Uses keyword matching to find agents with relevant capabilities
-        for handling specific defect types.
+        Uses the centralized DEFECT_SPECIALISTS mapping from defect_types module
+        for consistent specialist routing across the GAIA pipeline.
 
-        Specialist Mapping:
+        Specialist Mapping (from defect_types.DEFECT_SPECIALISTS):
         - SECURITY -> security-auditor
         - PERFORMANCE -> performance-analyst
         - TESTING -> test-coverage-analyzer, quality-reviewer
@@ -615,22 +616,15 @@ class AgentRegistry:
             >>> agent_id = registry.get_specialist_agent("SECURITY")
             >>> print(agent_id)  # security-auditor
         """
-        # Specialist mapping
-        specialist_map = {
-            "SECURITY": ["security-auditor", "senior-developer"],
-            "PERFORMANCE": ["performance-analyst", "senior-developer"],
-            "TESTING": ["test-coverage-analyzer", "quality-reviewer"],
-            "DOCUMENTATION": ["technical-writer", "senior-developer"],
-            "CODE_QUALITY": ["quality-reviewer", "senior-developer"],
-            "REQUIREMENTS": ["software-program-manager", "planning-analysis-strategist"],
-            "ARCHITECTURE": ["solutions-architect", "senior-developer"],
-            "ACCESSIBILITY": ["accessibility-reviewer", "frontend-specialist"],
-            "COMPATIBILITY": ["frontend-specialist", "backend-specialist"],
-            "DATA_INTEGRITY": ["backend-specialist", "data-engineer", "senior-developer"],
-        }
-
+        # Convert string defect type to DefectType enum
         defect_type_upper = defect_type.upper() if isinstance(defect_type, str) else ""
-        candidates = specialist_map.get(defect_type_upper, [])
+        try:
+            defect_enum = DefectType[defect_type_upper]
+        except KeyError:
+            defect_enum = DefectType.UNKNOWN
+
+        # Use centralized DEFECT_SPECIALISTS mapping from defect_types module
+        candidates = DEFECT_SPECIALISTS.get(defect_enum, [])
 
         # Try to find available agent
         for candidate_id in candidates:
@@ -639,7 +633,7 @@ class AgentRegistry:
                 return candidate_id
 
         # Fall back to specified fallback
-        if fallback and fallback != candidate_id:
+        if fallback and fallback not in candidates:
             agent = self.get_agent(fallback)
             if agent and agent.enabled:
                 return fallback

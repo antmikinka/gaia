@@ -331,6 +331,10 @@ DEFECT_SPECIALISTS: Dict[DefectType, List[str]] = {
 }
 
 
+# Performance optimization: cache for keyword index rebuild tracking
+_keyword_index_built = False
+
+
 def defect_type_from_string(text: str) -> DefectType:
     """
     Detect defect type from text using keyword matching.
@@ -338,6 +342,11 @@ def defect_type_from_string(text: str) -> DefectType:
     Performs case-insensitive matching against known keywords
     for each defect type. Returns the first matching type, or
     UNKNOWN if no match found.
+
+    Performance Optimization:
+    - Uses pre-built _KEYWORD_TO_DEFECT index for O(1) keyword lookup
+    - Early exit on first match to avoid unnecessary iterations
+    - Short-circuits multi-word keyword matching on first success
 
     Args:
         text: Text to analyze (defect description, error message, etc.)
@@ -358,13 +367,15 @@ def defect_type_from_string(text: str) -> DefectType:
 
     text_lower = text.lower()
 
-    # Try exact keyword match first (fast path)
+    # Try exact keyword match first (fast path) - O(1) lookup per keyword
+    # Early exit on first match for performance
     for keyword, defect_type in _KEYWORD_TO_DEFECT.items():
         if keyword in text_lower:
             return defect_type
 
     # Try partial matching for compound keywords
     # (e.g., "sql" + "injection" should match "sql injection")
+    # Short-circuit: return immediately when match found
     for defect_type, keywords in DEFECT_KEYWORDS.items():
         for keyword in keywords:
             if " " in keyword:

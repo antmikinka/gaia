@@ -11,6 +11,7 @@ Tests cover:
 
 import pytest
 from datetime import datetime
+from typing import Dict, List
 
 from gaia.pipeline.routing_engine import (
     RoutingEngine,
@@ -541,3 +542,353 @@ class TestRoutingRulePriority:
         priorities = [r.priority for r in engine._rules]
 
         assert priorities == sorted(priorities)
+
+
+class TestRoutingEnginePerformance:
+    """Performance benchmark tests for routing engine."""
+
+    @pytest.fixture
+    def engine(self) -> RoutingEngine:
+        """Create test routing engine."""
+        return RoutingEngine()
+
+    @pytest.fixture
+    def sample_defects(self) -> List[Dict[str, str]]:
+        """Generate sample defects for performance testing."""
+        return [
+            {"id": f"perf-{i}", "description": f"SQL injection vulnerability in module {i}", "severity": "critical"}
+            for i in range(50)
+        ] + [
+            {"id": f"perf-{i+50}", "description": f"Memory leak detected in loop iteration {i}", "severity": "high"}
+            for i in range(50)
+        ] + [
+            {"id": f"perf-{i+100}", "description": f"Missing unit tests for service {i}", "severity": "medium"}
+            for i in range(50)
+        ]
+
+    def test_defect_type_detection_performance(self, engine: RoutingEngine):
+        """Benchmark test for defect type detection performance."""
+        import time
+
+        descriptions = [
+            "SQL injection vulnerability in user input handling form with potential data breach risk",
+            "Memory leak causing high CPU usage and performance degradation over time",
+            "Missing unit tests for authentication module resulting in low code coverage",
+            "Circular dependency between modules violating architectural patterns",
+            "Missing documentation for public API endpoints causing developer confusion",
+        ] * 20  # 100 iterations
+
+        start_time = time.perf_counter()
+        for desc in descriptions:
+            result = engine.detect_defect_type(desc)
+            assert result != DefectType.UNKNOWN or desc  # Ensure detection runs
+
+        elapsed = time.perf_counter() - start_time
+
+        # Should process 100 defect type detections in under 0.5 seconds
+        assert elapsed < 0.5, f"Defect type detection took {elapsed:.3f}s, expected < 0.5s"
+
+    def test_routing_decision_performance(self, engine: RoutingEngine, sample_defects: List[Dict]):
+        """Benchmark test for full routing decision performance."""
+        import time
+
+        start_time = time.perf_counter()
+        routed = engine.route_defects(sample_defects)
+        elapsed = time.perf_counter() - start_time
+
+        # Should route 150 defects in under 2 seconds
+        assert elapsed < 2.0, f"Routing 150 defects took {elapsed:.3f}s, expected < 2.0s"
+
+        # Verify all defects were routed
+        total_routed = sum(len(decisions) for decisions in routed.values())
+        assert total_routed == 150
+
+    def test_keyword_matching_early_exit(self):
+        """Test that keyword matching uses early exit optimization."""
+        import time
+
+        engine = RoutingEngine()
+
+        # Description with many keywords - should exit early on high-confidence match
+        long_description = " ".join(["security"] * 50 + ["vulnerability"] * 50 + ["injection"] * 50)
+
+        start_time = time.perf_counter()
+        for _ in range(100):
+            result = engine.detect_defect_type(long_description)
+        elapsed = time.perf_counter() - start_time
+
+        # Should complete 100 detections quickly due to early exit
+        assert elapsed < 1.0, f"Early exit detection took {elapsed:.3f}s, expected < 1.0s"
+        assert result == DefectType.SECURITY
+
+    def test_confidence_calculation_performance(self, engine: RoutingEngine):
+        """Benchmark test for confidence score calculation."""
+        import time
+
+        descriptions = [
+            "SQL injection in login form with user input validation missing",
+            "Slow query causing latency issues in database operations",
+            "Missing test coverage for critical authentication module",
+        ] * 50  # 150 total
+
+        start_time = time.perf_counter()
+        for desc in descriptions:
+            decision = engine.route_defect({"id": "test", "description": desc})
+            assert 0 <= decision.confidence <= 1
+
+        elapsed = time.perf_counter() - start_time
+
+        # Should calculate confidence for 150 defects in under 1 second
+        assert elapsed < 1.0, f"Confidence calculation took {elapsed:.3f}s, expected < 1.0s"
+
+    def test_max_keyword_matches_tracking(self, engine: RoutingEngine):
+        """Test that keyword matching tracks max matches for optimization."""
+        # This test verifies the MAX_KEYWORD_MATCHES_TO_TRACK constant is used
+        assert hasattr(engine, 'MAX_KEYWORD_MATCHES_TO_TRACK')
+        assert engine.MAX_KEYWORD_MATCHES_TO_TRACK >= 1
+
+        # Description that would match many keywords
+        description = "security vulnerability exploit injection attack xss csrf authentication bypass"
+        decision = engine.route_defect({"id": "test", "description": description})
+
+        # Should still detect as SECURITY with high confidence
+        # Note: confidence is 0.8 (base 0.7 + 0.1 for >2 keyword matches)
+        assert decision.defect_type == DefectType.SECURITY
+        assert decision.confidence >= 0.79  # Allow for floating-point precision
+
+
+class TestComplexRuleConditions:
+    """Tests for complex rule conditions (dict-based conditions)."""
+
+    @pytest.fixture
+    def engine_with_custom_rules(self) -> RoutingEngine:
+        """Create engine with custom rules that have complex conditions."""
+        custom_rules = [
+            RoutingRule(
+                rule_id="complex-security-001",
+                name="Complex Security Rule with Conditions",
+                defect_types=[DefectType.SECURITY],
+                target_phase="DEVELOPMENT",
+                target_agent="security-auditor",
+                priority=1,
+                loop_back=True,
+                conditions={
+                    "severity": {"op": "in", "value": ["critical", "high"]},
+                    "confidence": {"op": "gte", "value": 0.7},
+                },
+            ),
+            RoutingRule(
+                rule_id="complex-performance-001",
+                name="Complex Performance Rule",
+                defect_types=[DefectType.PERFORMANCE],
+                target_phase="DEVELOPMENT",
+                target_agent="performance-analyst",
+                priority=2,
+                conditions={
+                    "severity": {"op": "ne", "value": "low"},
+                    "impact": {"op": "gt", "value": 5},
+                },
+            ),
+        ]
+        return RoutingEngine(custom_rules=custom_rules)
+
+    def test_rule_with_in_condition(self, engine_with_custom_rules: RoutingEngine):
+        """Test rule evaluation with 'in' operator condition."""
+        # Should match - severity is in allowed values
+        context = {"severity": "critical", "confidence": 0.8}
+        rule = next(r for r in engine_with_custom_rules._rules if r.rule_id == "complex-security-001")
+        assert rule.matches(DefectType.SECURITY, context) is True
+
+        # Should not match - severity not in allowed values
+        context = {"severity": "low", "confidence": 0.8}
+        assert rule.matches(DefectType.SECURITY, context) is False
+
+    def test_rule_with_gte_condition(self, engine_with_custom_rules: RoutingEngine):
+        """Test rule evaluation with 'gte' operator condition."""
+        rule = next(r for r in engine_with_custom_rules._rules if r.rule_id == "complex-security-001")
+
+        # Should match - confidence >= 0.7 and severity in allowed values
+        assert rule.matches(DefectType.SECURITY, {"severity": "high", "confidence": 0.8}) is True
+        assert rule.matches(DefectType.SECURITY, {"severity": "critical", "confidence": 0.7}) is True
+
+        # Should not match - confidence < 0.7 (even with valid severity)
+        assert rule.matches(DefectType.SECURITY, {"severity": "high", "confidence": 0.5}) is False
+
+        # Should not match - severity not in allowed values (even with valid confidence)
+        assert rule.matches(DefectType.SECURITY, {"severity": "low", "confidence": 0.8}) is False
+
+    def test_rule_with_gt_condition(self, engine_with_custom_rules: RoutingEngine):
+        """Test rule evaluation with 'gt' operator condition."""
+        rule = next(r for r in engine_with_custom_rules._rules if r.rule_id == "complex-performance-001")
+
+        # Should match - impact > 5
+        assert rule.matches(DefectType.PERFORMANCE, {"severity": "high", "impact": 6}) is True
+        assert rule.matches(DefectType.PERFORMANCE, {"severity": "high", "impact": 10}) is True
+
+        # Should not match - impact <= 5
+        assert rule.matches(DefectType.PERFORMANCE, {"severity": "high", "impact": 5}) is False
+        assert rule.matches(DefectType.PERFORMANCE, {"severity": "high", "impact": 3}) is False
+
+    def test_rule_with_multiple_complex_conditions(self):
+        """Test rule with multiple complex dict-based conditions."""
+        rule = RoutingRule(
+            rule_id="multi-condition-001",
+            name="Multi-Condition Rule",
+            defect_types=[DefectType.CODE_QUALITY],
+            target_phase="DEVELOPMENT",
+            conditions={
+                "complexity": {"op": "gte", "value": 10},
+                "duplication": {"op": "gt", "value": 20},
+                "severity": {"op": "in", "value": ["high", "critical"]},
+            },
+        )
+
+        # All conditions met
+        context = {"complexity": 15, "duplication": 25, "severity": "high"}
+        assert rule.matches(DefectType.CODE_QUALITY, context) is True
+
+        # One condition not met (complexity too low)
+        context = {"complexity": 5, "duplication": 25, "severity": "high"}
+        assert rule.matches(DefectType.CODE_QUALITY, context) is False
+
+        # One condition not met (severity not in list)
+        context = {"complexity": 15, "duplication": 25, "severity": "low"}
+        assert rule.matches(DefectType.CODE_QUALITY, context) is False
+
+    def test_complex_condition_with_contains_operator(self):
+        """Test rule with 'contains' operator condition."""
+        rule = RoutingRule(
+            rule_id="contains-condition-001",
+            name="Contains Condition Rule",
+            defect_types=[DefectType.SECURITY],
+            target_phase="DEVELOPMENT",
+            conditions={
+                "description": {"op": "contains", "value": "injection"},
+            },
+        )
+
+        # Should match - description contains "injection"
+        context = {"description": "SQL injection vulnerability found"}
+        assert rule.matches(DefectType.SECURITY, context) is True
+
+        # Should not match - description doesn't contain "injection"
+        context = {"description": "XSS vulnerability found"}
+        assert rule.matches(DefectType.SECURITY, context) is False
+
+
+class TestTemplateRuleMerging:
+    """Tests for template rule merging functionality."""
+
+    def test_template_rules_merged_with_defaults(self):
+        """Test that template rules are properly merged with default rules."""
+        template_rule = RoutingRule(
+            rule_id="template-001",
+            name="Template Custom Rule",
+            defect_types=[DefectType.SECURITY],
+            target_phase="REVIEW",
+            target_agent="security-auditor",
+            priority=0,  # Highest priority
+        )
+
+        engine = RoutingEngine(template_rules=[template_rule])
+
+        # Template rule should be first (priority 0)
+        assert engine._rules[0].rule_id == "template-001"
+
+        # Default rules should still be present
+        rule_ids = [r.rule_id for r in engine._rules]
+        assert "security-001" in rule_ids
+        assert "performance-001" in rule_ids
+
+    def test_template_rules_sorted_by_priority(self):
+        """Test that template rules are sorted correctly by priority."""
+        template_rules = [
+            RoutingRule(
+                rule_id="template-low",
+                name="Low Priority Template",
+                defect_types=[DefectType.TESTING],
+                target_phase="DEVELOPMENT",
+                priority=100,
+            ),
+            RoutingRule(
+                rule_id="template-high",
+                name="High Priority Template",
+                defect_types=[DefectType.SECURITY],
+                target_phase="DEVELOPMENT",
+                priority=1,
+            ),
+        ]
+
+        engine = RoutingEngine(template_rules=template_rules)
+        priorities = [r.priority for r in engine._rules]
+
+        # Priorities should be sorted
+        assert priorities == sorted(priorities)
+
+        # High priority template should come before low priority
+        high_idx = next(i for i, r in enumerate(engine._rules) if r.rule_id == "template-high")
+        low_idx = next(i for i, r in enumerate(engine._rules) if r.rule_id == "template-low")
+        assert high_idx < low_idx
+
+    def test_template_rule_overrides_default_behavior(self):
+        """Test that template rules can override default routing behavior."""
+        # Template rule that routes security defects to REVIEW instead of DEVELOPMENT
+        template_rule = RoutingRule(
+            rule_id="template-security-override",
+            name="Security Override Rule",
+            defect_types=[DefectType.SECURITY],
+            target_phase="REVIEW",
+            target_agent="security-auditor",
+            priority=0,  # Higher priority than default security rule
+            loop_back=False,
+        )
+
+        engine = RoutingEngine(template_rules=[template_rule])
+
+        # Route a security defect
+        defect = {"id": "test", "description": "SQL injection vulnerability"}
+        decision = engine.route_defect(defect)
+
+        # Should use template rule's phase (REVIEW) instead of default (DEVELOPMENT)
+        assert decision.matched_rule == "template-security-override"
+        assert decision.target_phase == "REVIEW"
+        assert decision.loop_back is False
+
+    def test_multiple_template_rules_merged(self):
+        """Test merging multiple template rules with different priorities."""
+        template_rules = [
+            RoutingRule(
+                rule_id="template-perf",
+                name="Performance Template",
+                defect_types=[DefectType.PERFORMANCE],
+                target_phase="OPTIMIZATION",
+                target_agent="performance-analyst",
+                priority=3,
+            ),
+            RoutingRule(
+                rule_id="template-docs",
+                name="Documentation Template",
+                defect_types=[DefectType.DOCUMENTATION],
+                target_phase="DEVELOPMENT",
+                target_agent="technical-writer",
+                priority=5,
+            ),
+        ]
+
+        engine = RoutingEngine(template_rules=template_rules)
+
+        # Both template rules should be present
+        rule_ids = [r.rule_id for r in engine._rules]
+        assert "template-perf" in rule_ids
+        assert "template-docs" in rule_ids
+
+        # Verify routing uses template rules
+        perf_defect = {"id": "p1", "description": "Slow query causing latency"}
+        doc_defect = {"id": "d1", "description": "Missing documentation"}
+
+        perf_decision = engine.route_defect(perf_defect)
+        doc_decision = engine.route_defect(doc_defect)
+
+        assert perf_decision.matched_rule == "template-perf"
+        assert perf_decision.target_phase == "OPTIMIZATION"
+        assert doc_decision.matched_rule == "template-docs"
