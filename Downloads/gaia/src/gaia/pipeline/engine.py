@@ -40,7 +40,7 @@ from gaia.pipeline.recursive_template import (
     PhaseConfig,
     AgentCategory,
 )
-from gaia.pipeline.template_loader import TemplateLoader
+from gaia.pipeline.template_loader import TemplateLoader, TemplateValidationError
 from gaia.utils.logging import get_logger, setup_logging
 from gaia.utils.id_generator import generate_loop_id
 from gaia.exceptions import (
@@ -266,9 +266,9 @@ class PipelineEngine:
                 self._agent_registry,
             )
             if validation_errors:
-                logger.warning(
-                    f"Template validation warnings: {validation_errors}",
-                    extra={"validation_errors": validation_errors},
+                raise TemplateValidationError(
+                    f"Template validation failed with {len(validation_errors)} error(s): "
+                    f"{'; '.join(validation_errors)}"
                 )
 
         # Initialize hook system

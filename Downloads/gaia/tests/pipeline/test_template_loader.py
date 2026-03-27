@@ -381,6 +381,123 @@ templates:
         with pytest.raises(FileNotFoundError):
             template_loader.load_from_file("/nonexistent/path/templates.yml")
 
+    def test_load_template_by_name(self, template_loader, sample_yaml_template, tmp_path):
+        """Test loading a single template by name."""
+        # Create temporary file
+        yaml_file = tmp_path / "test_templates.yml"
+        yaml_file.write_text(sample_yaml_template)
+
+        # Load specific template by name
+        template = template_loader.load_template("test-template", yaml_file)
+
+        assert template.name == "test-template"
+        assert template.description == "A test template for unit tests"
+        assert template.quality_threshold == 0.85
+
+    def test_load_template_cache_hit(self, template_loader, sample_yaml_template, tmp_path):
+        """Test that load_template uses cache when available."""
+        yaml_file = tmp_path / "test_templates.yml"
+        yaml_file.write_text(sample_yaml_template)
+
+        # First load - populates cache
+        template1 = template_loader.load_template("test-template", yaml_file)
+
+        # Modify the file to verify cache is used
+        yaml_file.write_text("""
+templates:
+  test-template:
+    name: "Modified Template"
+    configuration:
+      quality_threshold: 99
+""")
+
+        # Second load - should use cache
+        template2 = template_loader.load_template("test-template", yaml_file)
+
+        # Should still have original values from cache
+        assert template2.name == "test-template"
+
+    def test_load_template_not_found(self, template_loader, tmp_path):
+        """Test loading non-existent template raises KeyError."""
+        yaml_file = tmp_path / "test_templates.yml"
+        yaml_file.write_text("""
+templates:
+  existing-template:
+    name: "Existing"
+    configuration:
+      quality_threshold: 90
+""")
+
+        with pytest.raises(KeyError, match="Template 'non-existent' not found"):
+            template_loader.load_template("non-existent", yaml_file)
+
+    def test_quality_threshold_already_normalized(self, template_loader):
+        """Test that quality threshold in 0-1 scale is not divided."""
+        yaml_content = """
+templates:
+  test:
+    name: "Test"
+    configuration:
+      quality_threshold: 0.85  # Already in 0-1 scale
+"""
+        data = yaml.safe_load(yaml_content)
+        templates = template_loader._parse_yaml(data)
+
+        # Should remain 0.85, not become 0.0085
+        assert templates["test"].quality_threshold == 0.85
+
+    def test_quality_threshold_percentage(self, template_loader):
+        """Test that quality threshold in percentage scale is converted."""
+        yaml_content = """
+templates:
+  test:
+    name: "Test"
+    configuration:
+      quality_threshold: 85  # Percentage scale
+"""
+        data = yaml.safe_load(yaml_content)
+        templates = template_loader._parse_yaml(data)
+
+        # Should be converted to 0.85
+        assert templates["test"].quality_threshold == 0.85
+
+    def test_agent_categories_from_top_level_def(self, template_loader):
+        """Test that agent_categories_def is properly used."""
+        yaml_content = """
+agent_categories:
+  PLANNING:
+    - planner-agent-1
+    - planner-agent-2
+  DEVELOPMENT:
+    - developer-agent-1
+
+templates:
+  test:
+    name: "Test"
+    configuration:
+      quality_threshold: 90
+    phases:
+      - category: PLANNING
+        agents:
+          - phase-specific-agent
+        output: output
+"""
+        data = yaml.safe_load(yaml_content)
+        templates = template_loader._parse_yaml(data)
+        template = templates["test"]
+
+        # Should include agents from top-level definition
+        assert "planning" in template.agent_categories
+        assert "planner-agent-1" in template.agent_categories["planning"]
+        assert "planner-agent-2" in template.agent_categories["planning"]
+
+        # Should also merge phase-specific agents
+        assert "phase-specific-agent" in template.agent_categories["planning"]
+
+        # Should include development category from top-level
+        assert "development" in template.agent_categories
+        assert "developer-agent-1" in template.agent_categories["development"]
+
 
 class TestTemplateLoaderIntegration:
     """Integration tests for TemplateLoader with real agent registry."""

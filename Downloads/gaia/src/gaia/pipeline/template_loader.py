@@ -59,7 +59,7 @@ class TemplateLoader:
     # Default template path - can be overridden
     DEFAULT_TEMPLATE_DIR = Path(__file__).parent.parent.parent / "templates"
 
-    def __init__(self, template_dir: Optional[str] = None):
+    def __init__(self, template_dir: Optional[Union[str, Path]] = None):
         """
         Initialize template loader.
 
@@ -254,7 +254,10 @@ class TemplateLoader:
         """
         # Extract configuration
         configuration = config.get("configuration", {})
-        quality_threshold = configuration.get("quality_threshold", 90) / 100.0  # Convert to 0-1
+        quality_threshold = configuration.get("quality_threshold", 0.90)
+        # Only divide by 100 if value is in percentage scale (> 1.0)
+        if quality_threshold > 1.0:
+            quality_threshold = quality_threshold / 100.0
         max_iterations = configuration.get("max_iterations", 10)
 
         # Extract description
@@ -299,21 +302,57 @@ class TemplateLoader:
 
         Args:
             phases: Phase configurations
-            agent_categories_def: Agent category definitions
+            agent_categories_def: Agent category definitions from top-level YAML
 
         Returns:
             Dictionary mapping category name to agent IDs
         """
         categories = {}
 
+        # First, populate categories from agent_categories_def (top-level definition)
+        # This supports both simple list format and detailed object format
+        for category_name, category_config in agent_categories_def.items():
+            cat_lower = category_name.lower()
+            if isinstance(category_config, list):
+                # Simple format: list of agent IDs
+                categories[cat_lower] = [str(a) for a in category_config if a]
+            elif isinstance(category_config, dict):
+                # Detailed format: dict with 'agents' key or list of objects with 'id' key
+                if "agents" in category_config:
+                    categories[cat_lower] = [
+                        str(a) for a in category_config["agents"] if a
+                    ]
+                else:
+                    # List of objects with 'id' field
+                    agents = category_config.get("items", category_config.get("agents_list", []))
+                    if isinstance(agents, list) and len(agents) > 0 and isinstance(agents[0], dict):
+                        categories[cat_lower] = [
+                            str(agent.get("id", "")) for agent in agents if agent.get("id")
+                        ]
+                    else:
+                        categories[cat_lower] = [str(a) for a in agents if a]
+
+        # Then, merge/override with phase-based categories
+        # Phases can add agents to existing categories or create new ones
         for phase in phases:
             category = phase.get("category", "")
             agents = phase.get("agents", [])
 
             if category and agents:
                 cat_lower = category.lower()
-                # Filter out None values and ensure string type
-                categories[cat_lower] = [str(a) for a in agents if a]
+                phase_agents = [str(a) for a in agents if a]
+
+                # Merge with existing category if present, otherwise create new
+                if cat_lower in categories:
+                    # Merge unique agents from both sources
+                    existing = set(categories[cat_lower])
+                    merged = list(existing)
+                    for agent in phase_agents:
+                        if agent not in existing:
+                            merged.append(agent)
+                    categories[cat_lower] = merged
+                else:
+                    categories[cat_lower] = phase_agents
 
         return categories
 
