@@ -327,3 +327,108 @@ class QualityReport:
             f"  Tests: {self.tests_passed}/{self.tests_run} passed "
             f"({(self.tests_passed / self.tests_run) * 100:.1f}%)"
         )
+
+
+@dataclass
+class QualityWeightConfig:
+    """
+    Configuration for quality dimension weights.
+
+    QualityWeightConfig defines how much each quality dimension
+    contributes to the overall score. Weights must sum to 1.0.
+
+    Attributes:
+        name: Configuration profile name
+        weights: Dictionary mapping dimension names to weights (must sum to 1.0)
+        category_overrides: Optional per-category weight overrides
+        description: Human-readable description
+    """
+
+    name: str
+    weights: Dict[str, float]
+    category_overrides: Dict[str, Dict[str, float]] = field(default_factory=dict)
+    description: str = ""
+
+    def validate(self, tolerance: float = 0.01) -> bool:
+        """
+        Validate that weights sum to 1.0 within tolerance.
+
+        Args:
+            tolerance: Acceptable deviation from 1.0 (default: ±0.01)
+
+        Returns:
+            True if weights are valid
+
+        Raises:
+            ValueError: If weights don't sum to 1.0 within tolerance
+        """
+        total = sum(self.weights.values())
+        if abs(total - 1.0) > tolerance:
+            raise ValueError(
+                f"Weights for profile '{self.name}' sum to {total}, "
+                f"not 1.0 (tolerance: {tolerance})"
+            )
+        return True
+
+    def get_weight(self, dimension: str) -> float:
+        """
+        Get weight for a specific dimension.
+
+        Args:
+            dimension: Dimension name
+
+        Returns:
+            Weight value (0-1) or 0.0 if dimension not found
+        """
+        return self.weights.get(dimension, 0.0)
+
+    def get_category_weight(
+        self,
+        dimension: str,
+        category_id: str,
+        default_weight: float
+    ) -> float:
+        """
+        Get weight for a specific category with override support.
+
+        Args:
+            dimension: Dimension name
+            category_id: Category ID (e.g., "CQ-01")
+            default_weight: Default weight for this category
+
+        Returns:
+            Overridden weight if category override exists, otherwise default_weight
+        """
+        if dimension in self.category_overrides:
+            overrides = self.category_overrides[dimension]
+            if category_id in overrides:
+                return overrides[category_id]
+        return default_weight
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "name": self.name,
+            "weights": self.weights,
+            "category_overrides": self.category_overrides,
+            "description": self.description,
+            "total_weight": sum(self.weights.values()),
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "QualityWeightConfig":
+        """
+        Create QualityWeightConfig from dictionary.
+
+        Args:
+            data: Dictionary with config data
+
+        Returns:
+            QualityWeightConfig instance
+        """
+        return cls(
+            name=data.get("name", "custom"),
+            weights=data.get("weights", {}),
+            category_overrides=data.get("category_overrides", {}),
+            description=data.get("description", ""),
+        )

@@ -15,6 +15,7 @@ from gaia.pipeline.recursive_template import (
     SelectionMode,
     RoutingRule,
 )
+from gaia.quality.models import QualityWeightConfig
 from gaia.agents.registry import AgentRegistry
 from gaia.exceptions import AgentLoadError
 from gaia.utils.logging import get_logger
@@ -278,8 +279,32 @@ class TemplateLoader:
             agent_categories_def=agent_categories_def,
         )
 
-        # Extract quality weights
-        quality_weights = config.get("quality_weights", {})
+        # Extract quality weights and build QualityWeightConfig
+        quality_weights_data = config.get("quality_weights", {})
+        weight_config = None
+        quality_weights = {}
+
+        if quality_weights_data:
+            # Handle both simple dict format and full QualityWeightConfig format
+            if isinstance(quality_weights_data, dict):
+                if "weights" in quality_weights_data:
+                    # Full format with name, weights, category_overrides
+                    weight_config = QualityWeightConfig(
+                        name=quality_weights_data.get("name", f"{name}_weights"),
+                        weights=quality_weights_data.get("weights", {}),
+                        category_overrides=quality_weights_data.get("category_overrides", {}),
+                        description=quality_weights_data.get("description", ""),
+                    )
+                    weight_config.validate()
+                    quality_weights = weight_config.weights.copy()
+                else:
+                    # Simple format - just weights dict
+                    quality_weights = quality_weights_data
+                    weight_config = QualityWeightConfig(
+                        name=f"{name}_weights",
+                        weights=quality_weights,
+                        description=f"Weight config for template {name}",
+                    )
 
         return RecursivePipelineTemplate(
             name=name,
@@ -290,6 +315,7 @@ class TemplateLoader:
             phases=phases,
             routing_rules=routing_rules,
             quality_weights=quality_weights,
+            weight_config=weight_config,
         )
 
     def _build_agent_categories(

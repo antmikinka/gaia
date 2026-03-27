@@ -22,7 +22,10 @@ Usage:
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Dict, List, Optional, Any, Callable
+from typing import Dict, List, Optional, Any, Callable, Union
+
+from gaia.quality.models import QualityWeightConfig
+from gaia.quality.weight_config import get_profile as get_weight_profile
 
 
 class SelectionMode(Enum):
@@ -139,6 +142,7 @@ class RecursivePipelineTemplate:
         phases: Ordered list of phase configurations
         routing_rules: Conditional routing rules
         quality_weights: Weights for quality scoring dimensions
+        weight_config: QualityWeightConfig object for advanced weight management
     """
 
     name: str
@@ -149,6 +153,7 @@ class RecursivePipelineTemplate:
     phases: List[PhaseConfig] = field(default_factory=list)
     routing_rules: List[RoutingRule] = field(default_factory=list)
     quality_weights: Dict[str, float] = field(default_factory=dict)
+    weight_config: Optional[QualityWeightConfig] = None
 
     def __post_init__(self):
         """Validate template configuration."""
@@ -161,8 +166,13 @@ class RecursivePipelineTemplate:
         if not self.phases:
             self.phases = self._create_default_phases()
 
-        # Default quality weights if not provided
-        if not self.quality_weights:
+        # Handle quality weights and weight_config
+        if self.weight_config is not None:
+            # Use weight_config if provided, validate and extract weights
+            self.weight_config.validate()
+            self.quality_weights = self.weight_config.weights.copy()
+        elif not self.quality_weights:
+            # Default quality weights if not provided
             self.quality_weights = {
                 "code_quality": 0.25,
                 "requirements_coverage": 0.25,
@@ -271,6 +281,71 @@ class RecursivePipelineTemplate:
             return True
 
         return False
+
+    def set_weight_profile(self, profile_name: str) -> None:
+        """
+        Set quality weights from a pre-defined profile.
+
+        Args:
+            profile_name: Profile name (balanced, security_heavy, speed_heavy, documentation_heavy)
+
+        Raises:
+            KeyError: If profile not found
+        """
+        profile = get_weight_profile(profile_name)
+        self.quality_weights = profile.weights.copy()
+        self.weight_config = profile
+
+    def get_weight_config(self) -> QualityWeightConfig:
+        """
+        Get or create QualityWeightConfig from current weights.
+
+        Returns:
+            QualityWeightConfig instance
+        """
+        if self.weight_config is not None:
+            return self.weight_config
+
+        return QualityWeightConfig(
+            name=f"{self.name}_weights",
+            weights=self.quality_weights.copy(),
+            description=f"Weight config for template {self.name}",
+        )
+
+    def apply_weight_overrides(self, overrides: Dict[str, float]) -> None:
+        """
+        Apply weight overrides to current configuration.
+
+        Args:
+            overrides: Dictionary of dimension -> new weight
+        """
+        from gaia.quality.weight_config import get_manager
+
+        manager = get_manager()
+        base_config = self.get_weight_config()
+        merged = manager.merge_weights(base_config, overrides)
+        self.quality_weights = merged.weights.copy()
+        self.weight_config = merged
+
+    def validate_weights(self, tolerance: float = 0.01) -> bool:
+        """
+        Validate that quality weights sum to 1.0.
+
+        Args:
+            tolerance: Acceptable deviation from 1.0
+
+        Returns:
+            True if valid
+
+        Raises:
+            ValueError: If weights don't sum to 1.0 within tolerance
+        """
+        total = sum(self.quality_weights.values())
+        if abs(total - 1.0) > tolerance:
+            raise ValueError(
+                f"Template '{self.name}' weights sum to {total}, not 1.0"
+            )
+        return True
 
 
 # Pre-built template instances
