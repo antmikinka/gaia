@@ -17,6 +17,7 @@ from gaia.pipeline.state import (
 )
 from gaia.pipeline.loop_manager import LoopManager, LoopConfig
 from gaia.pipeline.decision_engine import DecisionEngine, DecisionType
+from gaia.pipeline.routing_engine import RoutingEngine, RoutingDecision
 from gaia.quality.scorer import QualityScorer
 from gaia.agents.registry import AgentRegistry
 from gaia.hooks.base import HookContext
@@ -161,6 +162,7 @@ class PipelineEngine:
         self._state_machine: Optional[PipelineStateMachine] = None
         self._loop_manager: Optional[LoopManager] = None
         self._decision_engine: Optional[DecisionEngine] = None
+        self._routing_engine: Optional[RoutingEngine] = None
         self._quality_scorer: Optional[QualityScorer] = None
         self._agent_registry: Optional[AgentRegistry] = None
         self._hook_registry: Optional[HookRegistry] = None
@@ -251,6 +253,9 @@ class PipelineEngine:
             "max_iterations": self._config.max_iterations,
         })
 
+        # Initialize routing engine (for defect-based routing)
+        self._routing_engine = RoutingEngine(agent_registry=self._agent_registry)
+
         # Initialize quality scorer
         self._quality_scorer = QualityScorer()
 
@@ -258,6 +263,10 @@ class PipelineEngine:
         agents_dir = self._config.agents_dir or self._agents_dir
         self._agent_registry = AgentRegistry(agents_dir=agents_dir)
         await self._agent_registry.initialize()
+
+        # Update routing engine with initialized registry
+        if self._routing_engine:
+            self._routing_engine.set_agent_registry(self._agent_registry)
 
         # Validate template against agent registry if loaded
         if self._current_template and self._agent_registry:
@@ -596,6 +605,7 @@ class PipelineEngine:
         Execute decision phase using template configuration.
 
         Uses template quality threshold for decision evaluation.
+        Integrates routing engine for defect-based routing decisions.
         """
         logger.info("Executing DECISION phase")
 
@@ -607,16 +617,54 @@ class PipelineEngine:
         if self._current_template:
             quality_threshold = self._current_template.quality_threshold
 
+        # Get defects from snapshot
+        defects = self._state_machine.snapshot.defects
+
+        # Route defects using routing engine if available
+        routing_decisions = []
+        if self._routing_engine and defects:
+            context = {
+                "current_phase": PipelinePhase.DECISION,
+                "iteration": iteration,
+                "quality_score": quality_score,
+            }
+            for defect in defects:
+                try:
+                    decision = self._routing_engine.route_defect(defect, context)
+                    routing_decisions.append(decision)
+                    # Update defect with routing information
+                    defect["target_phase"] = decision.target_phase
+                    defect["target_agent"] = decision.target_agent
+                    defect["routing"] = decision.to_dict()
+                except Exception as e:
+                    logger.warning(f"Failed to route defect: {e}")
+
         # Make decision
         decision = self._decision_engine.evaluate(
             phase_name=PipelinePhase.DECISION,
             quality_score=quality_score,
             quality_threshold=quality_threshold,
-            defects=self._state_machine.snapshot.defects,
+            defects=defects,
             iteration=iteration,
             max_iterations=self._context.max_iterations,
             is_final_phase=True,
         )
+
+        # Prepare decision metadata with routing information
+        decision_metadata = {
+            "quality_score": quality_score,
+            "quality_threshold": quality_threshold,
+            "iteration": iteration,
+            "routing_decisions_count": len(routing_decisions),
+            "routing_decisions": [rd.to_dict() for rd in routing_decisions],
+        }
+
+        # Add routing decisions to decision metadata
+        if routing_decisions:
+            decision.metadata["routing"] = {
+                "decisions": [rd.to_dict() for rd in routing_decisions],
+                "phases": list(set(rd.target_phase for rd in routing_decisions)),
+            }
 
         self._state_machine.add_artifact("decision", decision.to_dict())
 
@@ -625,6 +673,7 @@ class PipelineEngine:
             extra={
                 "decision_type": decision.decision_type.name,
                 "quality_threshold": quality_threshold,
+                "routing_decisions": len(routing_decisions),
             },
         )
 
@@ -632,6 +681,19 @@ class PipelineEngine:
         if decision.decision_type == DecisionType.FAIL:
             self._state_machine.set_error(decision.reason)
             return False
+
+        # Handle loop back with routing information
+        if decision.decision_type == DecisionType.LOOP_BACK:
+            # Store routing decisions for loop manager to use
+            if routing_decisions:
+                self._state_machine.add_artifact(
+                    "routing_decisions",
+                    [rd.to_dict() for rd in routing_decisions],
+                )
+                logger.info(
+                    f"Loop back with {len(routing_decisions)} routed defects",
+                    extra={"routing_count": len(routing_decisions)},
+                )
 
         return True
 

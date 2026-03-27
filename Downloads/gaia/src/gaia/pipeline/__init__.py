@@ -46,6 +46,17 @@ from gaia.pipeline.phase_contract import (
     create_decision_contract,
     validate_defect_routing,
 )
+from gaia.pipeline.defect_types import (
+    DefectType as NewDefectType,
+    defect_type_from_string,
+    get_defect_specialists,
+    DEFECT_KEYWORDS,
+)
+from gaia.pipeline.routing_engine import (
+    RoutingEngine,
+    RoutingDecision,
+    RoutingRule as EngineRoutingRule,
+)
 from gaia.pipeline.audit_logger import (
     AuditLogger,
     AuditEvent,
@@ -114,6 +125,15 @@ __all__ = [
     "create_development_contract",
     "create_quality_contract",
     "create_decision_contract",
+    # Defect types (new taxonomy)
+    "NewDefectType",
+    "defect_type_from_string",
+    "get_defect_specialists",
+    "DEFECT_KEYWORDS",
+    # Routing engine
+    "RoutingEngine",
+    "RoutingDecision",
+    "EngineRoutingRule",
     # Defect routing and remediation
     "DefectRouter",
     "Defect",
