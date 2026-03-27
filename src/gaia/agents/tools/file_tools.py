@@ -414,7 +414,68 @@ class FileSearchToolsMixin:
             """
             try:
                 if not os.path.exists(file_path):
-                    return {"status": "error", "error": f"File not found: {file_path}"}
+                    # Check if parent directory exists to give a more helpful error
+                    parent_dir = os.path.dirname(file_path)
+                    parent_exists = os.path.exists(parent_dir) if parent_dir else False
+                    file_name = os.path.basename(file_path)
+                    hint = (
+                        f" The parent directory '{parent_dir}' also does not exist."
+                        if parent_dir and not parent_exists
+                        else (
+                            f" The directory '{parent_dir}' exists but the file is not in it."
+                            if parent_dir
+                            else ""
+                        )
+                    )
+                    return {
+                        "status": "error",
+                        "error": (
+                            f"File not found: {file_path}.{hint}"
+                            f" Try using search_file with pattern '{file_name}'"
+                            " to locate it elsewhere."
+                        ),
+                    }
+
+                # Document formats must be indexed via index_document, not read directly.
+                # The tool docstring explicitly scopes read_file to text files (Python,
+                # Markdown, etc.); binary document types are not supported.  Returning
+                # a clear error here stops the LLM from spinning on a useless
+                # "[Binary file, X bytes]" success response.
+                doc_ext = os.path.splitext(file_path)[1].lower()
+                if doc_ext in {
+                    ".pdf",
+                    ".docx",
+                    ".doc",
+                    ".pptx",
+                    ".ppt",
+                    ".xlsx",
+                    ".xls",
+                    ".odt",
+                    ".ods",
+                    ".odp",
+                    ".epub",
+                }:
+                    return {
+                        "status": "error",
+                        "error": (
+                            f"Cannot read {doc_ext} files directly — they are binary document formats. "
+                            f"Call index_document('{file_path}') to index it, "
+                            "then use query_specific_file or query_documents to retrieve content. "
+                            "If index_document returns 'Access denied', ask the user to index the "
+                            "file via the Document Library (attachment icon in the UI)."
+                        ),
+                    }
+
+                # Guard against reading very large files into memory
+                file_size = os.path.getsize(file_path)
+                if file_size > 10_000_000:  # 10 MB
+                    return {
+                        "status": "error",
+                        "error": (
+                            f"File too large ({file_size:,} bytes). "
+                            "Use search_file_content for large files."
+                        ),
+                    }
 
                 # Read file content
                 try:
