@@ -70,7 +70,8 @@
                   "guides/docker",
                   "guides/routing",
                   "guides/mcp/client",
-                  "guides/mcp/windows-system-health"
+                  "guides/mcp/windows-system-health",
+                  "guides/pipeline"
                 ]
               },
               {
@@ -142,7 +143,8 @@
                     "group": "Infrastructure",
                     "pages": [
                       "sdk/infrastructure/api-server",
-                      "sdk/infrastructure/mcp"
+                      "sdk/infrastructure/mcp",
+                      "sdk/infrastructure/pipeline"
                     ]
                   },
                   {
@@ -221,7 +223,8 @@
               "spec/plugin-registry",
               "spec/test-utilities",
               "spec/api-agent",
-              "spec/api-server"
+              "spec/api-server",
+              "spec/pipeline-engine"
             ]
           },
           {
