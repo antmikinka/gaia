@@ -23,11 +23,19 @@ To add new fixtures for other test suites, define them in this file and they'll
 be automatically available to all test files.
 """
 
-import subprocess
-import time
+import asyncio
+from datetime import datetime
+from typing import Any, Dict, Optional
 
 import pytest
-import requests
+
+from gaia.agents.registry import AgentRegistry
+from gaia.hooks.base import HookContext
+from gaia.hooks.registry import HookExecutor, HookRegistry
+from gaia.pipeline.decision_engine import DecisionEngine, DecisionType
+from gaia.pipeline.loop_manager import LoopConfig, LoopManager
+from gaia.pipeline.state import PipelineContext, PipelineState, PipelineStateMachine
+from gaia.quality.scorer import QualityScorer
 
 
 def pytest_addoption(parser):
@@ -248,5 +256,132 @@ def api_client(api_server):
     session.headers.update(
         {"Content-Type": "application/json", "Accept": "application/json"}
     )
-    yield session
-    session.close()
+
+
+@pytest.fixture
+def sample_loop_manager() -> LoopManager:
+    """Create a sample loop manager for testing."""
+    return LoopManager(max_concurrent=5)
+
+
+@pytest.fixture
+def sample_decision_engine() -> DecisionEngine:
+    """Create a sample decision engine for testing."""
+    return DecisionEngine(
+        config={"critical_patterns": ["security", "data loss", "breaking change"]}
+    )
+
+
+@pytest.fixture
+def sample_quality_scorer() -> QualityScorer:
+    """Create a sample quality scorer for testing."""
+    return QualityScorer()
+
+
+@pytest.fixture
+def sample_agent_registry(tmp_path) -> AgentRegistry:
+    """Create a sample agent registry for testing."""
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    return AgentRegistry(agents_dir=str(agents_dir), auto_reload=False)
+
+
+@pytest.fixture
+def sample_hook_registry() -> HookRegistry:
+    """Create a sample hook registry for testing."""
+    return HookRegistry()
+
+
+@pytest.fixture
+def sample_hook_executor(sample_hook_registry: HookRegistry) -> HookExecutor:
+    """Create a sample hook executor for testing."""
+    return HookExecutor(sample_hook_registry)
+
+
+@pytest.fixture
+def sample_hook_context() -> HookContext:
+    """Create a sample hook context for testing."""
+    return HookContext(
+        event="TEST_EVENT",
+        pipeline_id="test-pipeline-001",
+        phase="DEVELOPMENT",
+        agent_id="test-agent",
+        state={"key": "value"},
+        data={"test_data": "test"},
+    )
+
+
+@pytest.fixture
+def sample_code() -> str:
+    """Sample Python code for testing."""
+    return """
+def add(a: int, b: int) -> int:
+    '''Add two numbers.'''
+    return a + b
+
+def multiply(a: int, b: int) -> int:
+    '''Multiply two numbers.'''
+    return a * b
+
+class Calculator:
+    '''Simple calculator class.'''
+
+    def __init__(self):
+        self.result = 0
+
+    def calculate(self, operation: str, a: int, b: int) -> int:
+        '''Perform a calculation.'''
+        if operation == 'add':
+            self.result = add(a, b)
+        elif operation == 'multiply':
+            self.result = multiply(a, b)
+        return self.result
+"""
+
+
+@pytest.fixture
+def sample_code_with_issues() -> str:
+    """Sample Python code with quality issues for testing."""
+    return """
+def add(a,b):
+    return a+b
+
+def multiply(a,b):
+    return a*b
+
+# No docstrings
+# No type hints
+# Inconsistent spacing
+
+class Calculator:
+    def __init__(self):
+        self.result=0
+
+    def calculate(self,operation,a,b):
+        if operation=='add':
+            self.result=add(a,b)
+        elif operation=='multiply':
+            self.result=multiply(a,b)
+        return self.result
+"""
+
+
+@pytest.fixture
+def sample_requirements() -> list:
+    """Sample requirements for testing."""
+    return [
+        "Create a REST API endpoint for user management",
+        "Implement CRUD operations for users",
+        "Add input validation for user data",
+        "Include error handling for all endpoints",
+    ]
+
+
+@pytest.fixture
+def sample_quality_context() -> Dict[str, Any]:
+    """Sample context for quality evaluation."""
+    return {
+        "requirements": ["Build a REST API"],
+        "language": "python",
+        "template": "STANDARD",
+    }
