@@ -273,6 +273,16 @@
               "spec/summarizer-app",
               "spec/component-status"
             ]
+          },
+          {
+            "group": "Evaluation",
+            "pages": [
+              "spec/agent-ui-eval-kpis",
+              "spec/agent-ui-eval-kpi-slides",
+              "spec/pipeline-metrics-kpi-reference",
+              "spec/pipeline-metrics-competitive-analysis",
+              "spec/gaia-loom-architecture"
+            ]
           }
         ]
       },

@@ -248,5 +248,170 @@ def api_client(api_server):
     session.headers.update(
         {"Content-Type": "application/json", "Accept": "application/json"}
     )
-    yield session
-    session.close()
+
+
+@pytest.fixture
+def sample_loop_manager() -> LoopManager:
+    """Create a sample loop manager for testing."""
+    return LoopManager(max_concurrent=5)
+
+
+@pytest.fixture
+def sample_decision_engine() -> DecisionEngine:
+    """Create a sample decision engine for testing."""
+    return DecisionEngine(
+        config={"critical_patterns": ["security", "data loss", "breaking change"]}
+    )
+
+
+@pytest.fixture
+def sample_quality_scorer() -> QualityScorer:
+    """Create a sample quality scorer for testing."""
+    return QualityScorer()
+
+
+@pytest.fixture
+def sample_agent_registry(tmp_path) -> AgentRegistry:
+    """Create a sample agent registry for testing."""
+    agents_dir = tmp_path / "agents"
+    agents_dir.mkdir()
+    return AgentRegistry(agents_dir=str(agents_dir), auto_reload=False)
+
+
+@pytest.fixture
+def sample_hook_registry() -> HookRegistry:
+    """Create a sample hook registry for testing."""
+    return HookRegistry()
+
+
+@pytest.fixture
+def sample_hook_executor(sample_hook_registry: HookRegistry) -> HookExecutor:
+    """Create a sample hook executor for testing."""
+    return HookExecutor(sample_hook_registry)
+
+
+@pytest.fixture
+def sample_hook_context() -> HookContext:
+    """Create a sample hook context for testing."""
+    return HookContext(
+        event="TEST_EVENT",
+        pipeline_id="test-pipeline-001",
+        phase="DEVELOPMENT",
+        agent_id="test-agent",
+        state={"key": "value"},
+        data={"test_data": "test"},
+    )
+
+
+@pytest.fixture
+def sample_code() -> str:
+    """Sample Python code for testing."""
+    return """
+def add(a: int, b: int) -> int:
+    '''Add two numbers.'''
+    return a + b
+
+def multiply(a: int, b: int) -> int:
+    '''Multiply two numbers.'''
+    return a * b
+
+class Calculator:
+    '''Simple calculator class.'''
+
+    def __init__(self):
+        self.result = 0
+
+    def calculate(self, operation: str, a: int, b: int) -> int:
+        '''Perform a calculation.'''
+        if operation == 'add':
+            self.result = add(a, b)
+        elif operation == 'multiply':
+            self.result = multiply(a, b)
+        return self.result
+"""
+
+
+@pytest.fixture
+def sample_code_with_issues() -> str:
+    """Sample Python code with quality issues for testing."""
+    return """
+def add(a,b):
+    return a+b
+
+def multiply(a,b):
+    return a*b
+
+# No docstrings
+# No type hints
+# Inconsistent spacing
+
+class Calculator:
+    def __init__(self):
+        self.result=0
+
+    def calculate(self,operation,a,b):
+        if operation=='add':
+            self.result=add(a,b)
+        elif operation=='multiply':
+            self.result=multiply(a,b)
+        return self.result
+"""
+
+
+@pytest.fixture
+def sample_requirements() -> list:
+    """Sample requirements for testing."""
+    return [
+        "Create a REST API endpoint for user management",
+        "Implement CRUD operations for users",
+        "Add input validation for user data",
+        "Include error handling for all endpoints",
+    ]
+
+
+@pytest.fixture
+def sample_quality_context() -> Dict[str, Any]:
+    """Sample context for quality evaluation."""
+    return {
+        "requirements": ["Build a REST API"],
+        "language": "python",
+        "template": "STANDARD",
+    }
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--model-id",
+        action="store",
+        default="Qwen3-0.6B-GGUF",
+        help="Lemonade model ID to use for integration tests",
+    )
+    parser.addoption(
+        "--lemonade-url",
+        action="store",
+        default="http://localhost:11434",
+        help="Lemonade server base URL",
+    )
+
+
+@pytest.fixture(scope="session")
+def lemonade_config(request):
+    return {
+        "model_id": request.config.getoption("--model-id"),
+        "lemonade_url": request.config.getoption("--lemonade-url"),
+    }
+
+
+@pytest.fixture(scope="session")
+def require_lemonade(lemonade_config):
+    """Skip test if Lemonade server is not running."""
+    import requests
+
+    url = lemonade_config["lemonade_url"]
+    try:
+        resp = requests.get(f"{url}/api/tags", timeout=5)
+        if resp.status_code != 200:
+            pytest.skip(f"Lemonade server not available at {url}")
+    except Exception:
+        pytest.skip(f"Lemonade server not running at {url}")
+    return lemonade_config
