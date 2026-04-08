@@ -3,6 +3,7 @@
 
 """GAIA utilities."""
 
+from gaia.utils.component_loader import ComponentLoader, ComponentLoaderError
 from gaia.utils.file_watcher import (
     FileChangeHandler,
     FileWatcher,
@@ -18,6 +19,9 @@ from gaia.utils.parsing import (
 )
 
 __all__ = [
+    # Component loading
+    "ComponentLoader",
+    "ComponentLoaderError",
     # File watching
     "FileChangeHandler",
     "FileWatcher",
