@@ -32,10 +32,16 @@ import requests
 
 def pytest_addoption(parser):
     parser.addoption(
-        "--hybrid",
-        action="store_true",
-        default=False,
-        help="Run with hybrid configuration (default: False)",
+        "--model-id",
+        action="store",
+        default="Qwen3-0.6B-GGUF",
+        help="Lemonade model ID to use for integration tests",
+    )
+    parser.addoption(
+        "--lemonade-url",
+        action="store",
+        default="http://localhost:8000",
+        help="Lemonade server base URL",
     )
 
 

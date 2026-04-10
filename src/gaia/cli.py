@@ -148,6 +148,7 @@ def initialize_lemonade_for_agent(
         "mcp": 4096,
         "minimal": 4096,
         "vlm": 8192,
+        "pipeline": 32768,
     }
     required_ctx = agent_context_sizes.get(agent.lower(), 32768)
 
@@ -2151,6 +2152,33 @@ Examples:
     )
     cache_clear_parser.add_argument(
         "--all", action="store_true", help="Clear all caches"
+    )
+
+    # Pipeline command — five-stage auto-spawn orchestration engine
+    pipeline_parser = subparsers.add_parser(
+        "pipeline",
+        help="Run the five-stage auto-spawn pipeline orchestration engine",
+    )
+    pipeline_parser.add_argument(
+        "task",
+        nargs="?",
+        default=None,
+        help="Task description to execute through the pipeline",
+    )
+    pipeline_parser.add_argument(
+        "--model",
+        default="Qwen3.5-35B-A3B-GGUF",
+        help="Model ID for all pipeline stages (default: Qwen3.5-35B-A3B-GGUF)",
+    )
+    pipeline_parser.add_argument(
+        "--no-spawn",
+        action="store_true",
+        help="Disable automatic agent spawning when gaps are detected",
+    )
+    pipeline_parser.add_argument(
+        "--info",
+        action="store_true",
+        help="Show pipeline engine information and documentation links",
     )
 
     # Init command (one-stop GAIA setup)
@@ -4205,6 +4233,59 @@ Let me know your answer!
     # Handle Cache command
     if args.action == "cache":
         handle_cache_command(args)
+        return
+
+    # Handle Pipeline command
+    if args.action == "pipeline":
+        if getattr(args, "info", False) or not getattr(args, "task", None):
+            print("GAIA Pipeline Orchestration Engine")
+            print("")
+            print("Five-stage auto-spawn pipeline:")
+            print("  Stage 1: DomainAnalyzer   — identify knowledge domains")
+            print("  Stage 2: WorkflowModeler  — design agentic workflow")
+            print("  Stage 3: LoomBuilder      — build agent topology")
+            print("  Stage 4: GapDetector      — detect + auto-spawn missing agents")
+            print("  Stage 5: PipelineExecutor — execute the assembled pipeline")
+            print("")
+            print("Usage:")
+            print('  gaia pipeline "Build a data analysis pipeline for CSV files"')
+            print("  gaia pipeline --model Qwen3.5-9B-GGUF \"Your task here\"")
+            print("  gaia pipeline --no-spawn \"Task (skip auto agent generation)\"")
+            print("")
+            print("Python SDK:")
+            print("  from gaia.pipeline.orchestrator import run_pipeline")
+            print('  result = run_pipeline("Your task description")')
+            if not getattr(args, "task", None):
+                return
+        task_description = args.task
+        model_id = getattr(args, "model", "Qwen3.5-35B-A3B-GGUF")
+        auto_spawn = not getattr(args, "no_spawn", False)
+        print(f"Running pipeline: {task_description!r}")
+        print(f"Model: {model_id}  |  auto_spawn: {auto_spawn}")
+        print("")
+        success, base_url = initialize_lemonade_for_agent("pipeline")
+        if not success:
+            raise SystemExit(1)
+        try:
+            from gaia.pipeline.orchestrator import run_pipeline as _run_pipeline
+
+            result = _run_pipeline(
+                task_description=task_description,
+                auto_spawn=auto_spawn,
+                model_id=model_id,
+            )
+            status = result.get("pipeline_status", "unknown")
+            print(f"Pipeline status: {status}")
+            if status == "failed":
+                error = result.get("error", "unknown error")
+                print(f"Error: {error}")
+            else:
+                import json as _json
+
+                print(_json.dumps(result, indent=2, default=str))
+        except Exception as e:
+            print(f"Pipeline error: {e}")
+            raise SystemExit(1)
         return
 
     # Handle Blender command
