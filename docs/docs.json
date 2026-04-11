@@ -221,7 +221,10 @@
               "spec/plugin-registry",
               "spec/test-utilities",
               "spec/api-agent",
-              "spec/api-server"
+              "spec/api-server",
+              "spec/pipeline-engine",
+              "spec/phase5_multi_stage_pipeline",
+              "spec/component-framework-design-spec"
             ]
           },
           {
@@ -271,7 +274,8 @@
               "spec/jira-agent",
               "spec/blender-agent",
               "spec/summarizer-app",
-              "spec/component-status"
+              "spec/component-status",
+              "spec/unified-capability-model"
             ]
           }
         ]
