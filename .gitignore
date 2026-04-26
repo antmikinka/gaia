@@ -228,3 +228,29 @@ docs/playbooks/sd-agent/index-backup.mdx
 
 # Custom util scripts
 util/custom/*
+
+# Real-world eval corpus documents (sourced from public web, not committed)
+eval/corpus/real_world/
+# Component Framework runtime files
+component-framework/**/*.lock
+component-framework/**/.lock
+component-framework/memory/working-memory.md.lock
+
+# Chroma vector DB runtime data (empty until collections are created)
+chroma_data/chroma.sqlite3
+chroma_data/**
+
+# Pipeline runtime screenshots and test artifacts
+*.png
+pipeline-canvas-*.png
+gaia-ui-*.png
+test-ui-*.png
+
+# Agent test scripts
+test-gaia.mjs
+
+# Working documents
+docs/working/
+
+# Runtime component artifacts
+component-framework/development/
