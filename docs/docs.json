@@ -70,7 +70,9 @@
                   "guides/docker",
                   "guides/routing",
                   "guides/mcp/client",
-                  "guides/mcp/windows-system-health"
+                  "guides/mcp/windows-system-health",
+                  "guides/pipeline",
+                  "guides/orchestration"
                 ]
               },
               {
