@@ -212,6 +212,7 @@ if(GAIA_BUILD_TESTS)
         tests/test_decision.cpp
         tests/test_security.cpp
         tests/test_sse_parser.cpp
+        tests/test_orchestrator_types.cpp
     )
 
     target_link_libraries(tests_mock PRIVATE
