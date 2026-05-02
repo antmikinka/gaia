@@ -5,6 +5,7 @@
 // Ported from Python: src/gaia/orchestration/engine.py
 
 #include "gaia/orchestrator_engine.h"
+#include "gaia/orchestrator_api_types.h"
 
 #include <algorithm>
 #include <fstream>
@@ -268,6 +269,11 @@ void OrchestratorEngine::setLogCallback(LogCallback callback) {
     logCallback_ = std::move(callback);
 }
 
+void OrchestratorEngine::setStateChangeCallback(StateChangeCallback callback) {
+    std::lock_guard<std::mutex> lock(callbackMutex_);
+    stateChangeCallback_ = std::move(callback);
+}
+
 void OrchestratorEngine::loadObjectives(const std::string& path) {
     std::string filePath = path.empty() ? config_.objectivesPath : path;
 
@@ -293,11 +299,46 @@ const OrchestratorState& OrchestratorEngine::run() {
         loadObjectives();
     }
 
+    running_.store(true);
+    // Preserve pre-existing cancelled state (e.g., cancel() called before run())
+    if (!cancelled_.load()) {
+        cancelled_.store(false);
+    }
+
     log("Starting orchestrator dispatch loop");
 
+    // Emit start event
+    json startData;
+    startData["state"] = "running";
+    startData["cycle_count"] = state_.cycleCount;
+    startData["timestamp"] = getCurrentTimestamp();
+    emitStateChange(EVENT_ORCHESTRATOR_STATE, startData);
+
     while (state_.cycleCount < config_.maxCycleIterations) {
+        // Check cancel flag
+        if (cancelled_.load()) {
+            log("Orchestrator cancelled");
+            json cancelData;
+            cancelData["state"] = "cancelled";
+            cancelData["cycle_count"] = state_.cycleCount;
+            cancelData["timestamp"] = getCurrentTimestamp();
+            emitStateChange(EVENT_ORCHESTRATOR_STATE, cancelData);
+            running_.store(false);
+            return state_;
+        }
+
         // Check pause state
         while (state_.paused) {
+            if (cancelled_.load()) {
+                log("Orchestrator cancelled while paused");
+                json cancelData;
+                cancelData["state"] = "cancelled";
+                cancelData["cycle_count"] = state_.cycleCount;
+                cancelData["timestamp"] = getCurrentTimestamp();
+                emitStateChange(EVENT_ORCHESTRATOR_STATE, cancelData);
+                running_.store(false);
+                return state_;
+            }
             log("Orchestrator paused, waiting...");
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
@@ -362,6 +403,15 @@ const OrchestratorState& OrchestratorEngine::run() {
         }
 
         // Dispatch to executor
+        // Emit objective_start event
+        json startObjData;
+        startObjData["objective_id"] = objective->objectiveId;
+        startObjData["title"] = objective->title;
+        startObjData["priority"] = objective->priority;
+        startObjData["phase"] = objective->phase;
+        startObjData["timestamp"] = getCurrentTimestamp();
+        emitStateChange(EVENT_OBJECTIVE_START, startObjData);
+
         ExecutionResult result = executeObjective(*objective);
 
         // Update objective status based on result
@@ -370,9 +420,29 @@ const OrchestratorState& OrchestratorEngine::run() {
             for (const auto& artifact : result.artifacts) {
                 objective->addArtifact(artifact);
             }
+
+            // Emit objective_complete event
+            json completeData;
+            completeData["objective_id"] = objective->objectiveId;
+            completeData["success"] = true;
+            if (result.qualityScore.has_value()) {
+                completeData["quality_score"] = result.qualityScore.value();
+            }
+            completeData["timestamp"] = getCurrentTimestamp();
+            emitStateChange(EVENT_OBJECTIVE_COMPLETE, completeData);
         } else {
             applyStatusTransition(*objective, ObjectiveStatus::Blocked);
             objective->errorMessage = result.errorMessage;
+
+            // Emit objective_failed event
+            json failData;
+            failData["objective_id"] = objective->objectiveId;
+            failData["success"] = false;
+            if (result.errorMessage.has_value()) {
+                failData["error_message"] = result.errorMessage.value();
+            }
+            failData["timestamp"] = getCurrentTimestamp();
+            emitStateChange(EVENT_OBJECTIVE_FAILED, failData);
 
             // Propagate failure to dependent objectives that are still queued
             std::unordered_set<std::string> failedIds;
@@ -420,6 +490,17 @@ const OrchestratorState& OrchestratorEngine::run() {
         ", processed: " + std::to_string(state_.objectivesProcessed) +
         ", failed: " + std::to_string(state_.objectivesFailed));
 
+    // Emit done event
+    json doneData;
+    doneData["state"] = "done";
+    doneData["cycle_count"] = state_.cycleCount;
+    doneData["objectives_processed"] = state_.objectivesProcessed;
+    doneData["objectives_failed"] = state_.objectivesFailed;
+    doneData["timestamp"] = getCurrentTimestamp();
+    emitStateChange(EVENT_ORCHESTRATOR_STATE, doneData);
+
+    running_.store(false);
+
     return state_;
 }
 
@@ -431,6 +512,31 @@ void OrchestratorEngine::pause(const std::string& reason) {
 void OrchestratorEngine::resume() {
     state_.paused = false;
     log("Orchestrator resumed");
+}
+
+void OrchestratorEngine::cancel() {
+    cancelled_.store(true);
+    log("Cancellation requested");
+}
+
+bool OrchestratorEngine::isRunning() const {
+    return running_.load();
+}
+
+void OrchestratorEngine::emitStateChange(const std::string& eventType,
+                                          const json& data) {
+    StateChangeCallback cb;
+    {
+        std::lock_guard<std::mutex> lock(callbackMutex_);
+        cb = stateChangeCallback_;
+    }
+    if (cb) {
+        try {
+            cb(eventType, data);
+        } catch (const std::exception& e) {
+            log("State change callback exception: " + std::string(e.what()));
+        }
+    }
 }
 
 Objective* OrchestratorEngine::findNextReadyObjective() {

@@ -61,14 +61,15 @@ else()
     set(GAIA_JSON_FETCHED FALSE)
 endif()
 
-# cpp-httplib (private dependency -- implementation detail)
+# cpp-httplib (private dependency -- header-only)
+# v0.19.0+ includes SSE (Server-Sent Events) support.
 find_package(httplib QUIET)
 if(NOT httplib_FOUND)
     message(STATUS "cpp-httplib not found -- fetching via FetchContent")
     FetchContent_Declare(
         httplib
         GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-        GIT_TAG        v0.15.3
+        GIT_TAG        v0.19.0
     )
     FetchContent_MakeAvailable(httplib)
 endif()
@@ -103,6 +104,9 @@ add_library(gaia_core
     src/security.cpp
     src/sse_parser.cpp
     src/orchestrator_engine.cpp
+    src/orchestrator_api.cpp
+    src/orchestrator_git.cpp
+    src/orchestrator_supervisor.cpp
 )
 
 add_library(gaia::gaia_core ALIAS gaia_core)
@@ -215,12 +219,22 @@ if(GAIA_BUILD_TESTS)
         tests/test_sse_parser.cpp
         tests/test_orchestrator_types.cpp
         tests/test_orchestrator_engine.cpp
+        tests/test_orchestrator_api.cpp
+        tests/test_sse_event_broker.cpp
     )
 
     target_link_libraries(tests_mock PRIVATE
         gaia::gaia_core
         GTest::gtest_main
     )
+
+    # httplib is PRIVATE to gaia_core but leaked via public header orchestrator_api.h
+    if(htplib_FOUND)
+        target_link_libraries(tests_mock PRIVATE httplib::httplib)
+    else()
+        target_include_directories(tests_mock SYSTEM PRIVATE
+            $<TARGET_PROPERTY:httplib::httplib,INTERFACE_INCLUDE_DIRECTORIES>)
+    endif()
 
     include(GoogleTest)
     gtest_discover_tests(tests_mock)

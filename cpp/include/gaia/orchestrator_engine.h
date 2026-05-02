@@ -9,7 +9,9 @@
 
 #pragma once
 
+#include <atomic>
 #include <functional>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -75,6 +77,17 @@ using ObjectiveExecutor = std::function<ExecutionResult(Objective&)>;
 
 /// Optional logging callback. If not set, log messages are discarded.
 using LogCallback = std::function<void(const std::string& message)>;
+
+// ---------------------------------------------------------------------------
+// StateChangeCallback
+// ---------------------------------------------------------------------------
+
+/// Callback for state change notifications.
+/// Called at key lifecycle points: start, objective_start,
+/// objective_complete, objective_failed, pause, resume, done, cancel.
+/// The json payload is event-specific (see event payload examples).
+using StateChangeCallback = std::function<void(const std::string& eventType,
+                                                const json& data)>;
 
 // ---------------------------------------------------------------------------
 // OrchestratorConfig
@@ -202,6 +215,14 @@ public:
     const OrchestratorState& state() const { return state_; }
     OrchestratorState& mutableState() { return state_; }
 
+    /// Thread-safe snapshot of the current state.
+    /// Preferred over state() when reading from a different thread
+    /// (e.g., HTTP status endpoint during execution).
+    OrchestratorState getStateSnapshot() const {
+        std::lock_guard<std::mutex> lock(stateMutex_);
+        return state_;
+    }
+
     // ---- Project access ----
 
     const std::optional<ProjectObjectives>& project() const { return project_; }
@@ -218,6 +239,13 @@ public:
 
     /// Set the logging callback. Optional.
     void setLogCallback(LogCallback callback);
+
+    /// Set the state change callback for SSE event broadcasting.
+    void setStateChangeCallback(StateChangeCallback callback);
+
+    /// Emit a state change event via the callback.
+    /// Exposed publicly for use by adapters, test code, and SSE bridge.
+    void emitStateChange(const std::string& eventType, const json& data);
 
     // ---- Lifecycle ----
 
@@ -238,6 +266,13 @@ public:
 
     /// Resume the orchestrator.
     void resume();
+
+    /// Signal the engine to cancel the current execution.
+    /// Thread-safe: can be called from any thread.
+    void cancel();
+
+    /// Check if the engine is currently executing run().
+    bool isRunning() const;
 
     // ---- Evaluation ----
 
@@ -276,10 +311,15 @@ private:
 
     OrchestratorConfig config_;
     OrchestratorState state_;
+    mutable std::mutex stateMutex_;       // Protects state_ and project_
     std::optional<ProjectObjectives> project_;
     DependencyGraph depGraph_;
     ObjectiveExecutor executor_;
     LogCallback logCallback_;
+    StateChangeCallback stateChangeCallback_;
+    std::mutex callbackMutex_;            // Protects stateChangeCallback_
+    std::atomic<bool> running_ = false;
+    std::atomic<bool> cancelled_ = false;
 };
 
 } // namespace gaia
