@@ -7,6 +7,37 @@ Produces CSV/JSON/JSONL output compatible with openclaw-eval's
 inbox_zero benchmarks, with +/- variance analysis across runs.
 """
 
+from gaia.agents.email.bench.compare import (
+    ModeComparison,
+    compare_modes,
+    print_mode_comparison,
+    save_mode_comparison,
+)
+from gaia.agents.email.bench.output import (
+    load_jsonl,
+    print_summary,
+    save_csv,
+    save_json,
+    save_jsonl,
+    save_summary_csv,
+    to_csv,
+    to_json,
+)
+from gaia.agents.email.bench.runner import (
+    BatchResult,
+    EmailResult,
+    RunResult,
+    StepResult,
+    TurnResult,
+    run_heuristic_benchmark,
+    run_interactive_benchmark,
+)
+from gaia.agents.email.bench.variance import (
+    ComparisonReport,
+    VarianceSummary,
+    compare_runs,
+    to_dict,
+)
 from gaia.agents.email.bench.visualize import (
     generate_charts,
     plot_category_distribution,
@@ -21,6 +52,34 @@ from gaia.agents.email.bench.visualize import (
 )
 
 __all__ = [
+    # Runner
+    "BatchResult",
+    "EmailResult",
+    "RunResult",
+    "StepResult",
+    "TurnResult",
+    "run_heuristic_benchmark",
+    "run_interactive_benchmark",
+    # Output
+    "load_jsonl",
+    "print_summary",
+    "save_csv",
+    "save_json",
+    "save_jsonl",
+    "save_summary_csv",
+    "to_csv",
+    "to_json",
+    # Variance
+    "ComparisonReport",
+    "VarianceSummary",
+    "compare_runs",
+    "to_dict",
+    # Compare
+    "ModeComparison",
+    "compare_modes",
+    "print_mode_comparison",
+    "save_mode_comparison",
+    # Visualize
     "generate_charts",
     "plot_category_distribution",
     "plot_category_stability",

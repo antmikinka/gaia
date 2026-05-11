@@ -33,6 +33,7 @@ class ModeComparison:
     delta_duration_ms: int  # full - heuristic
     delta_input_tokens: int
     delta_output_tokens: int
+    delta_reasoning_tokens: int
     delta_total_tokens: int
 
     # Category overlap
@@ -51,9 +52,11 @@ class ModeComparison:
     full_duration_ms: int = 0
     heuristic_input_tokens: int = 0
     heuristic_output_tokens: int = 0
+    heuristic_reasoning_tokens: int = 0
     heuristic_total_tokens: int = 0
     full_input_tokens: int = 0
     full_output_tokens: int = 0
+    full_reasoning_tokens: int = 0
     full_total_tokens: int = 0
 
     # Derived metrics
@@ -136,8 +139,10 @@ def compare_modes(heuristic: dict, full: dict) -> ModeComparison:
     f_tok = full.get("total_tokens", 0)
     h_in = heuristic.get("total_input_tokens", 0)
     h_out = heuristic.get("total_output_tokens", 0)
+    h_reason = heuristic.get("total_reasoning_tokens", 0)
     f_in = full.get("total_input_tokens", 0)
     f_out = full.get("total_output_tokens", 0)
+    f_reason = full.get("total_reasoning_tokens", 0)
 
     h_avg = round(h_dur / max(h_emails, 1), 1)
     f_avg = round(f_dur / max(f_emails, 1), 1)
@@ -155,6 +160,7 @@ def compare_modes(heuristic: dict, full: dict) -> ModeComparison:
         delta_duration_ms=f_dur - h_dur,
         delta_input_tokens=f_in - h_in,
         delta_output_tokens=f_out - h_out,
+        delta_reasoning_tokens=f_reason - h_reason,
         delta_total_tokens=f_tok - h_tok,
         heuristic_categories=heuristic.get("category_counts", {}),
         full_categories=full.get("category_counts", {}),
@@ -167,9 +173,11 @@ def compare_modes(heuristic: dict, full: dict) -> ModeComparison:
         full_duration_ms=f_dur,
         heuristic_input_tokens=h_in,
         heuristic_output_tokens=h_out,
+        heuristic_reasoning_tokens=h_reason,
         heuristic_total_tokens=h_tok,
         full_input_tokens=f_in,
         full_output_tokens=f_out,
+        full_reasoning_tokens=f_reason,
         full_total_tokens=f_tok,
         heuristic_avg_ms_per_email=h_avg,
         full_avg_ms_per_email=f_avg,
@@ -209,6 +217,7 @@ def print_mode_comparison(heuristic: dict, full: dict) -> ModeComparison:
         ("Duration (ms)", c.heuristic_duration_ms, c.full_duration_ms),
         ("Duration (s)", round(c.heuristic_duration_ms / 1000, 1), round(c.full_duration_ms / 1000, 1)),
         ("Input tokens", c.heuristic_input_tokens, c.full_input_tokens),
+        ("Reasoning tokens", c.heuristic_reasoning_tokens, c.full_reasoning_tokens),
         ("Output tokens", c.heuristic_output_tokens, c.full_output_tokens),
         ("Total tokens", c.heuristic_total_tokens, c.full_total_tokens),
     ]
@@ -302,18 +311,21 @@ def save_mode_comparison(report: ModeComparison, path: Path) -> Path:
                 "duration_ms": report.heuristic_duration_ms,
                 "input_tokens": report.heuristic_input_tokens,
                 "output_tokens": report.heuristic_output_tokens,
+                "reasoning_tokens": report.heuristic_reasoning_tokens,
                 "total_tokens": report.heuristic_total_tokens,
             },
             "full": {
                 "duration_ms": report.full_duration_ms,
                 "input_tokens": report.full_input_tokens,
                 "output_tokens": report.full_output_tokens,
+                "reasoning_tokens": report.full_reasoning_tokens,
                 "total_tokens": report.full_total_tokens,
             },
             "deltas": {
                 "duration_ms": report.delta_duration_ms,
                 "input_tokens": report.delta_input_tokens,
                 "output_tokens": report.delta_output_tokens,
+                "reasoning_tokens": report.delta_reasoning_tokens,
                 "total_tokens": report.delta_total_tokens,
             },
         },

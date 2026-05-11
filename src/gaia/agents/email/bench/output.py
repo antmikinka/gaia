@@ -62,10 +62,13 @@ CSV_COLUMNS = [
     "tool_output",
     "turn_input_tokens",
     "turn_output_tokens",
+    "turn_reasoning_tokens",
     "cumulative_input_tokens",
     "cumulative_output_tokens",
+    "cumulative_reasoning_tokens",
     "total_input_tokens",
     "total_output_tokens",
+    "total_reasoning_tokens",
     "total_tokens",
     "total_steps",
     "total_duration_ms",
@@ -121,10 +124,13 @@ def _run_to_csv_rows(run: RunResult) -> list[dict[str, Any]]:
                 "tool_output": f"{len(batch.email_results)} emails fetched, categories: {', '.join(batch.categories)}",
                 "turn_input_tokens": email.input_tokens,
                 "turn_output_tokens": email.output_tokens,
+                "turn_reasoning_tokens": email.reasoning_tokens,
                 "cumulative_input_tokens": cumulative_input,
                 "cumulative_output_tokens": cumulative_output,
+                "cumulative_reasoning_tokens": cumulative_input,  # reasoning is part of output
                 "total_input_tokens": run.total_input_tokens,
                 "total_output_tokens": run.total_output_tokens,
+                "total_reasoning_tokens": run.total_reasoning_tokens,
                 "total_tokens": run.total_tokens,
                 "total_steps": 0,
                 "total_duration_ms": run.total_duration_ms,
@@ -167,10 +173,13 @@ def _run_to_csv_rows(run: RunResult) -> list[dict[str, Any]]:
             "tool_output": "",
             "turn_input_tokens": run.total_input_tokens,
             "turn_output_tokens": run.total_output_tokens,
+            "turn_reasoning_tokens": run.total_reasoning_tokens,
             "cumulative_input_tokens": run.total_input_tokens,
             "cumulative_output_tokens": run.total_output_tokens,
+            "cumulative_reasoning_tokens": run.total_reasoning_tokens,
             "total_input_tokens": run.total_input_tokens,
             "total_output_tokens": run.total_output_tokens,
+            "total_reasoning_tokens": run.total_reasoning_tokens,
             "total_tokens": run.total_tokens,
             "total_steps": 0,
             "total_duration_ms": run.total_duration_ms,
@@ -255,6 +264,7 @@ def _email_result_to_dict(er: EmailResult) -> dict[str, Any]:
         "duration_ms": er.duration_ms,
         "input_tokens": er.input_tokens,
         "output_tokens": er.output_tokens,
+        "reasoning_tokens": er.reasoning_tokens,
         "total_tokens": er.total_tokens,
         "status": er.status,
         "error": er.error,
@@ -269,6 +279,7 @@ def _batch_result_to_dict(br: BatchResult) -> dict[str, Any]:
         "duration_ms": br.duration_ms,
         "total_input_tokens": br.total_input_tokens,
         "total_output_tokens": br.total_output_tokens,
+        "total_reasoning_tokens": br.total_reasoning_tokens,
         "total_tokens": br.total_tokens,
         "categories": br.categories,
         "openclaw_categories": [map_category(c, "openclaw") for c in br.categories],
@@ -292,9 +303,11 @@ def _run_result_to_dict(run: RunResult) -> dict[str, Any]:
         "avg_duration_per_email_ms": round(run.total_duration_ms / n, 1),
         "total_input_tokens": run.total_input_tokens,
         "total_output_tokens": run.total_output_tokens,
+        "total_reasoning_tokens": run.total_reasoning_tokens,
         "total_tokens": run.total_tokens,
         "avg_input_tokens_per_email": round(run.total_input_tokens / n, 1),
         "avg_output_tokens_per_email": round(run.total_output_tokens / n, 1),
+        "avg_reasoning_tokens_per_email": round(run.total_reasoning_tokens / n, 1),
         "avg_total_tokens_per_email": round(run.total_tokens / n, 1),
         "category_counts": run.category_counts,
         "openclaw_category_counts": {
@@ -310,6 +323,7 @@ def _run_result_to_dict(run: RunResult) -> dict[str, Any]:
                 "tool_name": s.tool_name,
                 "input_tokens": s.input_tokens,
                 "output_tokens": s.output_tokens,
+                "reasoning_tokens": s.reasoning_tokens,
                 "total_tokens": s.total_tokens,
                 "duration_ms": s.duration_ms,
             }
@@ -383,19 +397,22 @@ def print_summary(run: RunResult) -> None:
         print("  Tokens:     N/A (heuristic)")
     else:
         print(f"  Total tokens: {run.total_tokens:,}")
+        print(f"    Input:      {run.total_input_tokens:,}")
+        print(f"    Output:     {run.total_output_tokens:,}")
+        print(f"    Reasoning:  {run.total_reasoning_tokens:,}")
         # Per-step breakdown for full mode.
         if run.step_results:
             print(f"\n  Per-Step Token Breakdown:")
-            print(f"  {'─'*66}")
-            print(f"  {'Step':<6}  {'Action':<12}  {'Input':>8}  {'Output':>8}  {'Total':>8}  {'Time':>8}")
-            print(f"  {'─'*66}")
+            print(f"  {'─'*78}")
+            print(f"  {'Step':<6}  {'Action':<12}  {'Input':>8}  {'Output':>8}  {'Reason':>8}  {'Total':>8}  {'Time':>8}")
+            print(f"  {'─'*78}")
             for s in run.step_results:
                 time_str = f"{s.duration_ms}ms" if s.duration_ms < 1000 else f"{s.duration_ms/1000:.1f}s"
                 print(
                     f"    {s.step_number:<4}  {s.action:<12}  {s.input_tokens:>8}  "
-                    f"{s.output_tokens:>8}  {s.total_tokens:>8}  {time_str:>8}"
+                    f"{s.output_tokens:>8}  {s.reasoning_tokens:>8}  {s.total_tokens:>8}  {time_str:>8}"
                 )
-            print(f"  {'─'*66}")
+            print(f"  {'─'*78}")
     print(f"  Status:       {run.status}")
 
     if run.category_counts:
@@ -429,6 +446,7 @@ SUMMARY_ROW_DEFS = [
     ("Cost Per Turn", "", "{cost_per_turn}", "{cost_per_turn}"),
     ("Avg Input Tokens Per Turn", "", "{avg_input_tokens}", "{avg_input_tokens}"),
     ("Avg Output Tokens Per Turn", "", "{avg_output_tokens}", "{avg_output_tokens}"),
+    ("Avg Reasoning Tokens Per Turn", "", "{avg_reasoning_tokens}", "{avg_reasoning_tokens}"),
     ("Avg Time Per Batch (mins)", "", "{avg_time_per_batch_mins}", "{avg_time_per_batch_mins}"),
     ("Quality Per Turn", "", "{quality_per_turn}", "{quality_per_turn}"),
     ("", "", "", ""),
@@ -436,6 +454,7 @@ SUMMARY_ROW_DEFS = [
     ("Total Cost", "", "{total_cost}", "{total_cost}"),
     ("Total Input Tokens", "", "{total_input_tokens}", "{total_input_tokens}"),
     ("Total Output Tokens", "", "{total_output_tokens}", "{total_output_tokens}"),
+    ("Total Reasoning Tokens", "", "{total_reasoning_tokens}", "{total_reasoning_tokens}"),
     ("Total Time (mins)", "", "{total_time_mins}", "{total_time_mins}"),
     ("Total Quality", "", "{total_quality}", "{total_quality}"),
 ]
@@ -507,6 +526,7 @@ def to_summary_csv(
     avg_time_per_batch_mins = round(total_time_mins / max(num_batches, 1), 2)
     avg_input_tokens = round(run.total_input_tokens / max(num_batches, 1), 0) if run.total_input_tokens else 0
     avg_output_tokens = round(run.total_output_tokens / max(num_batches, 1), 0) if run.total_output_tokens else 0
+    avg_reasoning_tokens = round(run.total_reasoning_tokens / max(num_batches, 1), 0) if run.total_reasoning_tokens else 0
 
     fmt = {
         "provider": run.provider,
@@ -515,12 +535,14 @@ def to_summary_csv(
         "cost_per_turn": f"${cost:.4f}" if cost > 0 else "$0.00",
         "avg_input_tokens": int(avg_input_tokens),
         "avg_output_tokens": int(avg_output_tokens),
+        "avg_reasoning_tokens": int(avg_reasoning_tokens),
         "avg_time_per_batch_mins": avg_time_per_batch_mins,
         "quality_per_turn": f"{quality:.2%}" if quality > 0 else "N/A",
         "total_emails": run.total_emails,
         "total_cost": f"${cost:.4f}" if cost > 0 else "$0.00",
         "total_input_tokens": run.total_input_tokens,
         "total_output_tokens": run.total_output_tokens,
+        "total_reasoning_tokens": run.total_reasoning_tokens,
         "total_time_mins": total_time_mins,
         "total_quality": f"{quality:.2%}" if quality > 0 else "N/A",
     }

@@ -41,6 +41,7 @@ COLORS = {
     "low priority": "#718096",
     "input": "#3182CE",
     "output": "#DD6B20",
+    "reasoning": "#9B59B6",
     "heuristic": "#718096",
     "full": "#3182CE",
     "duration": "#DD6B20",
@@ -78,7 +79,7 @@ def _compute_stats(values: list[float]) -> dict[str, float]:
     """Compute mean, stdev, min, max, CV% for a list of values."""
     n = len(values)
     if n == 0:
-        return {"mean": 0, "stdev": 0, "min": 0, "max": 0, "cv_pct": 0}
+        return {"mean": 0.0, "stdev": 0.0, "min": 0.0, "max": 0.0, "cv_pct": 0.0}
     mean = sum(values) / n
     if n < 2:
         stdev = 0.0
@@ -92,9 +93,18 @@ def _compute_stats(values: list[float]) -> dict[str, float]:
 
 
 def _add_consistency_box(ax, stats: dict[str, float], unit: str = "",
-                         label: str = "LLM Non-Determinism", n_runs: int = 1) -> None:
-    """Add a consistency report text box to the upper-right of an axis."""
-    plt_mod = _require_matplotlib()
+                         label: str = "LLM Non-Determinism", n_runs: int = 1,
+                         y_pos: float = 0.97) -> None:
+    """Add a consistency report text box to the upper-right of an axis.
+
+    Args:
+        ax: Matplotlib axis to annotate.
+        stats: Dict with mean, stdev, min, max, cv_pct keys.
+        unit: Unit label (e.g., 'min', 'tokens').
+        label: Short heading for the box.
+        n_runs: Number of runs for the 'n =' line.
+        y_pos: Vertical position in axes coordinates (0-1).
+    """
     text = (
         f"{label}\n"
         f"n = {n_runs} runs\n"
@@ -104,14 +114,14 @@ def _add_consistency_box(ax, stats: dict[str, float], unit: str = "",
     )
     props = dict(boxstyle="round,pad=0.4", facecolor="#F7FAFC",
                  edgecolor="#CBD5E0", alpha=0.9)
-    ax.text(0.98, 0.97, text, transform=ax.transAxes, fontsize=8,
+    ax.text(0.98, y_pos, text, transform=ax.transAxes, fontsize=8,
             verticalalignment="top", horizontalalignment="right",
             fontfamily="monospace", bbox=props)
 
 
 def _add_subtitle(fig, text: str, y_offset: float = 0.02) -> None:
     """Add a subtitle below the main title."""
-    plt_mod = _require_matplotlib()
+    pass  # fig.text() is always available once figure exists
     fig.text(0.5, y_offset, text, ha="center", va="bottom",
              fontsize=8, color="#718096", style="italic")
 
@@ -148,17 +158,28 @@ def plot_category_distribution(run: dict[str, Any], output_dir: Path) -> Path | 
 # ---------------------------------------------------------------------------
 
 def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None:
-    """Donut chart showing input vs output token split."""
+    """Donut chart showing input / reasoning / output token split."""
     plt_mod = _require_matplotlib()
     in_tok = run.get("total_input_tokens", 0)
     out_tok = run.get("total_output_tokens", 0)
+    reasoning_tok = run.get("total_reasoning_tokens", 0)
     if in_tok == 0 and out_tok == 0:
         return None
 
     fig, ax = plt_mod.subplots(figsize=(5, 5))
-    sizes = [in_tok, out_tok]
-    labels = [f"Input ({in_tok:,})", f"Output ({out_tok:,})"]
-    colors = [COLORS["input"], COLORS["output"]]
+
+    if reasoning_tok > 0:
+        sizes = [in_tok, reasoning_tok, out_tok]
+        labels = [
+            f"Input ({in_tok:,})",
+            f"Reasoning ({reasoning_tok:,})",
+            f"Output ({out_tok:,})",
+        ]
+        colors = [COLORS["input"], COLORS["reasoning"], COLORS["output"]]
+    else:
+        sizes = [in_tok, out_tok]
+        labels = [f"Input ({in_tok:,})", f"Output ({out_tok:,})"]
+        colors = [COLORS["input"], COLORS["output"]]
 
     wedges, texts, autotexts = ax.pie(
         sizes, labels=labels, colors=colors, autopct="%1.1f%%",
@@ -167,7 +188,7 @@ def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None
     for t in autotexts:
         t.set_fontsize(10)
         t.set_fontweight("bold")
-    total = in_tok + out_tok
+    total = sum(sizes)
     ax.text(0, 0, f"Total\n{total:,}", ha="center", va="center",
             fontsize=11, fontweight="bold")
     ax.set_title("Token Composition", fontweight="bold", fontsize=12)
@@ -298,6 +319,14 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         # Mean reference line
         ax.axhline(tok_stats["mean"], color=COLORS["tokens"], linestyle="--",
                    alpha=0.4, linewidth=1)
+        # Reasoning token overlay if present
+        reasoning_vals = [r.get("total_reasoning_tokens", 0) for r in runs]
+        if any(v > 0 for v in reasoning_vals):
+            ax.plot(x, reasoning_vals, marker="^", linestyle="-", linewidth=1.5,
+                    color=COLORS["reasoning"], label="Reasoning tokens")
+            reason_stats = _compute_stats([float(v) for v in reasoning_vals])
+            ax.axhline(reason_stats["mean"], color=COLORS["reasoning"], linestyle="--",
+                       alpha=0.3, linewidth=1)
         for i, v in enumerate(tok_vals):
             ax.annotate(f"{v:,}", (x[i], v), textcoords="offset points",
                         xytext=(0, 10), ha="center", fontsize=8)
@@ -305,6 +334,7 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         ax.set_ylabel("Total tokens")
         ax.set_title("LLM Token Consumption Variance Across Runs", fontweight="bold", fontsize=12)
         ax.set_xticks(x)
+        ax.legend(fontsize=9)
         ax.grid(True, linestyle="--", alpha=0.3)
         _add_consistency_box(ax, tok_stats, unit="tokens", label="Token Variance", n_runs=n)
         fig.tight_layout(rect=[0, 0.06, 1, 1])
@@ -339,14 +369,7 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         ax1.grid(True, linestyle="--", alpha=0.3)
         # Dual consistency boxes
         _add_consistency_box(ax1, avg_dur_stats, unit="ms", label="Duration/Email", n_runs=n)
-        # Shift the second box to avoid overlap
-        plt_mod.text(0.98, 0.82,
-                     f"Tokens/Email\n  μ = {avg_tok_stats['mean']:.1f}\n  σ = {avg_tok_stats['stdev']:.1f}\n  CV = {avg_tok_stats['cv_pct']:.1f}%",
-                     transform=ax1.transAxes, fontsize=8,
-                     verticalalignment="top", horizontalalignment="right",
-                     fontfamily="monospace",
-                     bbox=dict(boxstyle="round,pad=0.4", facecolor="#EBF8FF",
-                               edgecolor="#90CDF4", alpha=0.9))
+        _add_consistency_box(ax1, avg_tok_stats, unit="tokens", label="Tokens/Email", n_runs=n, y_pos=0.78)
         fig.tight_layout(rect=[0, 0.06, 1, 1])
         _add_subtitle(fig, "Per-email granularity of LLM cost variance — range shows min to max across runs")
         paths.append(_save_chart(fig, output_dir, "05c_per_email_trend"))
@@ -368,21 +391,35 @@ def plot_interactive_turns(interactive: dict[str, Any], output_dir: Path) -> Pat
     turn_labels = [f"T{i['turn_number']}" for i in turns]
     dur_vals = [t.get("duration_ms", 0) / 1000 for t in turns]
     tok_vals = [t.get("total_tokens", 0) for t in turns]
+    reasoning_vals = [t.get("total_reasoning_tokens", 0) for t in turns]
+    has_reasoning = any(v > 0 for v in reasoning_vals)
 
     fig, ax1 = plt_mod.subplots(figsize=(8, 4))
     x = list(range(len(turns)))
-    width = 0.35
 
-    bars1 = ax1.bar([i - width / 2 for i in x], dur_vals, width,
-                    label="Duration (s)", color=COLORS["duration"], alpha=0.85)
+    if has_reasoning:
+        width = 0.25
+        bars1 = ax1.bar([i - width for i in x], dur_vals, width,
+                        label="Duration (s)", color=COLORS["duration"], alpha=0.85)
+        ax1.bar([i for i in x], reasoning_vals, width,
+                label="Reasoning tokens", color=COLORS["reasoning"], alpha=0.85)
+        ax2 = ax1.twinx()
+        ax2.bar([i + width for i in x], tok_vals, width,
+                label="Total tokens", color=COLORS["tokens"], alpha=0.85)
+        ax2.set_ylabel("Tokens", color=COLORS["tokens"])
+        ax2.tick_params(axis="y", labelcolor=COLORS["tokens"])
+    else:
+        width = 0.35
+        bars1 = ax1.bar([i - width / 2 for i in x], dur_vals, width,
+                        label="Duration (s)", color=COLORS["duration"], alpha=0.85)
+        ax2 = ax1.twinx()
+        ax2.bar([i + width / 2 for i in x], tok_vals, width,
+                label="Tokens", color=COLORS["tokens"], alpha=0.85)
+        ax2.set_ylabel("Tokens", color=COLORS["tokens"])
+        ax2.tick_params(axis="y", labelcolor=COLORS["tokens"])
+
     ax1.set_ylabel("Duration (seconds)", color=COLORS["duration"])
     ax1.tick_params(axis="y", labelcolor=COLORS["duration"])
-
-    ax2 = ax1.twinx()
-    bars2 = ax2.bar([i + width / 2 for i in x], tok_vals, width,
-                    label="Tokens", color=COLORS["tokens"], alpha=0.85)
-    ax2.set_ylabel("Tokens", color=COLORS["tokens"])
-    ax2.tick_params(axis="y", labelcolor=COLORS["tokens"])
 
     ax1.set_xticks(x)
     ax1.set_xticklabels(turn_labels)
@@ -572,7 +609,7 @@ def generate_charts(
             p = plot_token_composition(run, output_dir)
             if p:
                 paths.append(p)
-                charts_index.append((p.name, "Token Composition — Donut chart of input vs output tokens"))
+                charts_index.append((p.name, "Token Composition — Donut chart of input, reasoning, and output tokens"))
 
             # Chart 3: Duration vs tokens (full/interactive only)
             p = plot_duration_vs_tokens(run, output_dir)

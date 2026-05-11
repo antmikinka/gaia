@@ -28,6 +28,7 @@ class RunDelta:
     delta_duration_ms: int  # B - A
     delta_input_tokens: int
     delta_output_tokens: int
+    delta_reasoning_tokens: int
     delta_total_tokens: int
     delta_total_emails: int
     category_deltas: dict[str, int] = field(default_factory=dict)
@@ -44,6 +45,7 @@ class BatchDelta:
     delta_duration_ms: int
     delta_input_tokens: int
     delta_output_tokens: int
+    delta_reasoning_tokens: int
     delta_email_count: int
 
 
@@ -143,6 +145,8 @@ def _compute_run_delta(run_a: dict, run_b: dict) -> RunDelta:
         - run_a.get("total_input_tokens", 0),
         delta_output_tokens=run_b.get("total_output_tokens", 0)
         - run_a.get("total_output_tokens", 0),
+        delta_reasoning_tokens=run_b.get("total_reasoning_tokens", 0)
+        - run_a.get("total_reasoning_tokens", 0),
         delta_total_tokens=run_b.get("total_tokens", 0) - run_a.get("total_tokens", 0),
         delta_total_emails=run_b.get("total_emails", 0) - run_a.get("total_emails", 0),
         category_deltas=category_deltas,
@@ -169,6 +173,8 @@ def _compute_batch_deltas(run_a: dict, run_b: dict) -> list[BatchDelta]:
                 - ba.get("total_input_tokens", 0),
                 delta_output_tokens=bb.get("total_output_tokens", 0)
                 - ba.get("total_output_tokens", 0),
+                delta_reasoning_tokens=bb.get("total_reasoning_tokens", 0)
+                - ba.get("total_reasoning_tokens", 0),
                 delta_email_count=len(bb.get("email_results", []))
                 - len(ba.get("email_results", [])),
             )

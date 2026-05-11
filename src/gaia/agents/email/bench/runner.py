@@ -35,6 +35,7 @@ class StepResult:
     tool_name: str = ""
     input_tokens: int = 0
     output_tokens: int = 0
+    reasoning_tokens: int = 0  # tokens in <thinking> blocks (estimated)
     total_tokens: int = 0
     duration_ms: int = 0
     status: str = "ok"
@@ -52,6 +53,7 @@ class TurnResult:
     duration_ms: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    reasoning_tokens: int = 0
     total_tokens: int = 0
     final_answer: str = ""
     status: str = "ok"
@@ -74,6 +76,7 @@ class EmailResult:
     duration_ms: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
+    reasoning_tokens: int = 0
     total_tokens: int = 0
     status: str = "ok"
     error: str = ""
@@ -90,6 +93,7 @@ class BatchResult:
     duration_ms: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    total_reasoning_tokens: int = 0
     total_tokens: int = 0
     categories: list[str] = field(default_factory=list)
     status: str = "ok"
@@ -112,6 +116,7 @@ class RunResult:
     total_duration_ms: int = 0
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    total_reasoning_tokens: int = 0
     total_tokens: int = 0
     category_counts: dict[str, int] = field(default_factory=dict)
     status: str = "ok"
@@ -130,6 +135,36 @@ def _extract_headers(payload: dict) -> dict[str, str]:
         name = (h.get("name") or "").lower()
         out[name] = h.get("value", "")
     return out
+
+
+def _last_assistant_text(conversation: list, stats_msg: dict) -> str:
+    """Find the last assistant message before a system stats message."""
+    for i in range(conversation.index(stats_msg) - 1, -1, -1):
+        msg = conversation[i]
+        if msg.get("role") == "assistant":
+            text = msg.get("content", "")
+            if isinstance(text, str):
+                return text
+            if isinstance(text, list):
+                return "".join(b.get("text", "") for b in text if isinstance(b, dict))
+    return ""
+
+
+def _extract_reasoning_tokens(text: str) -> int:
+    """Estimate reasoning tokens from <thinking> blocks in assistant text.
+
+    The Lemonade /stats endpoint does not report reasoning tokens separately.
+    We approximate by counting characters inside <thinking>...</thinking>
+    blocks and using a 1 token ≈ 4 character ratio (standard BPE estimate).
+    Returns 0 if no thinking blocks are found.
+    """
+    import re
+
+    thinking_blocks = re.findall(r"<thinking>(.*?)</thinking>", text, re.DOTALL)
+    if not thinking_blocks:
+        return 0
+    total_chars = sum(len(b.strip()) for b in thinking_blocks)
+    return max(1, total_chars // 4)
 
 
 def load_emails_from_mbox(
@@ -330,8 +365,17 @@ def _run_full_agent(
     step_results: list[StepResult] = []
     conversation = agent_result.get("conversation", [])
     step_num = 0
+    total_reasoning_tokens = 0
     for msg in conversation:
         role = msg.get("role", "")
+
+        # Extract reasoning tokens from assistant response text.
+        if role == "assistant":
+            assistant_text = msg.get("content", "")
+            if isinstance(assistant_text, str) and assistant_text:
+                reasoning = _extract_reasoning_tokens(assistant_text)
+                if reasoning > 0:
+                    total_reasoning_tokens += reasoning
 
         # Extract per-step stats from system entries.
         if role == "system" and isinstance(msg.get("content"), dict):
@@ -345,6 +389,9 @@ def _run_full_agent(
                         action="llm_call",
                         input_tokens=stats.get("input_tokens", 0) or 0,
                         output_tokens=stats.get("output_tokens", 0) or 0,
+                        reasoning_tokens=_extract_reasoning_tokens(
+                            _last_assistant_text(conversation, msg)
+                        ),
                         total_tokens=stats.get("total_tokens", 0) or 0,
                         duration_ms=int(stats.get("duration", 0) * 1000),
                     )
@@ -394,6 +441,7 @@ def _run_full_agent(
             total_duration_ms=total_duration_ms,
             total_input_tokens=input_tokens,
             total_output_tokens=output_tokens,
+            total_reasoning_tokens=total_reasoning_tokens,
             total_tokens=total_tokens,
             category_counts={},
             status="error",
@@ -429,6 +477,7 @@ def _run_full_agent(
         duration_ms=total_duration_ms,
         total_input_tokens=input_tokens,
         total_output_tokens=output_tokens,
+        total_reasoning_tokens=total_reasoning_tokens,
         total_tokens=total_tokens,
         categories=sorted(category_counts.keys()),
         status="completed" if email_results else "error",
@@ -448,6 +497,7 @@ def _run_full_agent(
         total_duration_ms=total_duration_ms,
         total_input_tokens=input_tokens,
         total_output_tokens=output_tokens,
+        total_reasoning_tokens=total_reasoning_tokens,
         total_tokens=total_tokens,
         category_counts=category_counts,
         status="completed" if email_results else "error",
@@ -475,7 +525,8 @@ def _extract_steps_from_result(agent_result: dict) -> list[StepResult]:
     """Extract per-step token/duration stats from an agent result."""
     steps = []
     step_num = 0
-    for msg in agent_result.get("conversation", []):
+    conversation = agent_result.get("conversation", [])
+    for msg in conversation:
         if msg.get("role") == "system" and isinstance(msg.get("content"), dict):
             content = msg["content"]
             if content.get("type") == "stats" and "performance_stats" in content:
@@ -487,6 +538,9 @@ def _extract_steps_from_result(agent_result: dict) -> list[StepResult]:
                         action="llm_call",
                         input_tokens=stats.get("input_tokens", 0) or 0,
                         output_tokens=stats.get("output_tokens", 0) or 0,
+                        reasoning_tokens=_extract_reasoning_tokens(
+                            _last_assistant_text(conversation, msg)
+                        ),
                         total_tokens=stats.get("total_tokens", 0) or 0,
                         duration_ms=int(stats.get("duration", 0) * 1000),
                     )
@@ -638,6 +692,7 @@ def run_interactive_benchmark(
             duration_ms=turn_duration,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
+            reasoning_tokens=sum(s.reasoning_tokens for s in steps),
             total_tokens=total_tokens,
             final_answer=str(final)[:500] if final else "",
             status="ok",
@@ -647,18 +702,19 @@ def run_interactive_benchmark(
         # Print per-turn summary.
         tool_str = ", ".join(tools) if tools else "(no tools)"
         print(f"  Duration: {turn_duration/1000:.1f}s")
-        print(f"  Tokens:   {total_tokens:,} (in={input_tokens}, out={output_tokens})")
+        print(f"  Tokens:   {total_tokens:,} (in={input_tokens}, out={output_tokens}, reasoning={turn.reasoning_tokens})")
         print(f"  Tools:    {tool_str}")
         print(f"  Emails:   {len(email_ids)} affected")
         if steps:
             for s in steps:
                 time_str = f"{s.duration_ms}ms" if s.duration_ms < 1000 else f"{s.duration_ms/1000:.1f}s"
-                print(f"    Step {s.step_number}: {s.input_tokens} in / {s.output_tokens} out / {s.total_tokens} total / {time_str}")
+                print(f"    Step {s.step_number}: {s.input_tokens} in / {s.output_tokens} out / {s.reasoning_tokens} reasoning / {s.total_tokens} total / {time_str}")
 
     total_duration_ms = int((time.monotonic() - total_start) * 1000)
     total_tokens = sum(t.total_tokens for t in turns)
     total_input = sum(t.input_tokens for t in turns)
     total_output = sum(t.output_tokens for t in turns)
+    total_reasoning = sum(t.reasoning_tokens for t in turns)
     all_emails = set()
     all_tools = []
     for t in turns:
@@ -680,6 +736,7 @@ def run_interactive_benchmark(
         "total_duration_ms": total_duration_ms,
         "total_input_tokens": total_input,
         "total_output_tokens": total_output,
+        "total_reasoning_tokens": total_reasoning,
         "total_tokens": total_tokens,
         "avg_tokens_per_turn": round(total_tokens / max(len(turns), 1), 1),
         "avg_duration_per_turn_ms": round(total_duration_ms / max(len(turns), 1), 0),
@@ -694,8 +751,9 @@ def run_interactive_benchmark(
     print(f"  Turns:     {summary['total_turns']}")
     print(f"  Duration:  {total_duration_ms/1000:.1f}s total")
     print(f"  Tokens:    {total_tokens:,} total")
-    print(f"    Input:   {total_input:,}")
-    print(f"    Output:  {total_output:,}")
+    print(f"    Input:    {total_input:,}")
+    print(f"    Output:   {total_output:,}")
+    print(f"    Reasoning: {total_reasoning:,}")
     print(f"  Avg/turn:  {summary['avg_tokens_per_turn']} tokens, {summary['avg_duration_per_turn_ms']}ms")
     print(f"  Tools:     {', '.join(all_tools)}")
     print(f"  Emails:    {len(all_emails)} unique emails affected")
