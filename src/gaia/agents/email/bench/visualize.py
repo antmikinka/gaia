@@ -374,6 +374,50 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         _add_subtitle(fig, "Per-email granularity of LLM cost variance — range shows min to max across runs")
         paths.append(_save_chart(fig, output_dir, "05c_per_email_trend"))
 
+    # 5d: TTFT trend — model load/prefill latency consistency
+    ttft_vals = [r.get("avg_time_to_first_token_ms", 0) for r in runs]
+    if any(v > 0 for v in ttft_vals):
+        ttft_stats = _compute_stats([float(v) for v in ttft_vals])
+        fig, ax = plt_mod.subplots(figsize=(8, 4))
+        ax.plot(x, ttft_vals, marker="D", linestyle="-", linewidth=2,
+                color="#E53E3E", label="Avg TTFT (ms)")
+        ax.axhline(ttft_stats["mean"], color="#E53E3E", linestyle="--",
+                   alpha=0.4, linewidth=1)
+        for i, v in enumerate(ttft_vals):
+            ax.annotate(f"{v:.0f}", (x[i], v), textcoords="offset points",
+                        xytext=(0, 10), ha="center", fontsize=8)
+        ax.set_xlabel("Run iteration")
+        ax.set_ylabel("Avg TTFT (ms)")
+        ax.set_title("TTFT Consistency Across Runs", fontweight="bold", fontsize=12)
+        ax.set_xticks(x)
+        ax.grid(True, linestyle="--", alpha=0.3)
+        _add_consistency_box(ax, ttft_stats, unit="ms", label="TTFT Variance", n_runs=n)
+        fig.tight_layout(rect=[0, 0.06, 1, 1])
+        _add_subtitle(fig, "Model load + prefill latency — high variance indicates cold-start instability")
+        paths.append(_save_chart(fig, output_dir, "05d_ttft_trend"))
+
+    # 5e: TPS trend — throughput consistency
+    tps_vals = [r.get("avg_tokens_per_second", 0) for r in runs]
+    if any(v > 0 for v in tps_vals):
+        tps_stats = _compute_stats([float(v) for v in tps_vals])
+        fig, ax = plt_mod.subplots(figsize=(8, 4))
+        ax.plot(x, tps_vals, marker="^", linestyle="-", linewidth=2,
+                color="#38A169", label="Avg TPS (tokens/s)")
+        ax.axhline(tps_stats["mean"], color="#38A169", linestyle="--",
+                   alpha=0.4, linewidth=1)
+        for i, v in enumerate(tps_vals):
+            ax.annotate(f"{v:.1f}", (x[i], v), textcoords="offset points",
+                        xytext=(0, 10), ha="center", fontsize=8)
+        ax.set_xlabel("Run iteration")
+        ax.set_ylabel("Avg Tokens Per Second")
+        ax.set_title("Throughput Consistency Across Runs", fontweight="bold", fontsize=12)
+        ax.set_xticks(x)
+        ax.grid(True, linestyle="--", alpha=0.3)
+        _add_consistency_box(ax, tps_stats, unit="tok/s", label="TPS Variance", n_runs=n)
+        fig.tight_layout(rect=[0, 0.06, 1, 1])
+        _add_subtitle(fig, "Inference throughput — lower variance = predictable throughput")
+        paths.append(_save_chart(fig, output_dir, "05e_tps_trend"))
+
     return paths
 
 
@@ -570,6 +614,48 @@ def plot_token_duration_scatter(run: dict[str, Any], output_dir: Path) -> Path |
 
 
 # ---------------------------------------------------------------------------
+# Chart 10: Per-Step TTFT & TPS (Comparison — Dual-Axis Line)
+# ---------------------------------------------------------------------------
+
+def plot_step_performance(run: dict[str, Any], output_dir: Path) -> Path | None:
+    """Dual-axis line chart: per-step TTFT and TPS."""
+    plt_mod = _require_matplotlib()
+    steps = run.get("step_results", [])
+    if not steps:
+        return None
+
+    ttft_vals = [s.get("time_to_first_token_ms", 0) for s in steps]
+    tps_vals = [s.get("tokens_per_second", 0) for s in steps]
+    if not any(v > 0 for v in ttft_vals) and not any(v > 0 for v in tps_vals):
+        return None
+
+    fig, ax1 = plt_mod.subplots(figsize=(8, 4))
+    x = list(range(1, len(steps) + 1))
+
+    ax1.plot(x, ttft_vals, marker="o", linestyle="-", linewidth=2,
+             color="#E53E3E", label="TTFT (ms)")
+    ax1.set_ylabel("Time to First Token (ms)", color="#E53E3E")
+    ax1.tick_params(axis="y", labelcolor="#E53E3E")
+
+    ax2 = ax1.twinx()
+    ax2.plot(x, tps_vals, marker="s", linestyle="-", linewidth=2,
+             color="#38A169", label="TPS (tokens/s)")
+    ax2.set_ylabel("Tokens Per Second", color="#38A169")
+    ax2.tick_params(axis="y", labelcolor="#38A169")
+
+    ax1.set_xlabel("Step")
+    ax1.set_xticks(x)
+    ax1.set_title("Per-Step TTFT & Throughput", fontweight="bold", fontsize=12)
+
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
+    ax1.grid(True, linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "10_step_ttft_tps")
+
+
+# ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
 
@@ -628,6 +714,13 @@ def generate_charts(
         if p:
             paths.append(p)
             charts_index.append((p.name, "Token vs Duration Relationship — Scatter plot with trend line"))
+
+        # Chart 10: Per-step TTFT & TPS (full mode only)
+        if mode in ("full", "interactive"):
+            p = plot_step_performance(run, output_dir)
+            if p:
+                paths.append(p)
+                charts_index.append((p.name, "Per-Step TTFT & TPS — Dual-axis line chart of latency and throughput per LLM call"))
 
     # --- Variance trend charts (multi-iteration) ---
     if jsonl_path and jsonl_path.exists():

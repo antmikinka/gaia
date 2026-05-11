@@ -38,6 +38,8 @@ class StepResult:
     reasoning_tokens: int = 0  # tokens in <thinking> blocks (estimated)
     total_tokens: int = 0
     duration_ms: int = 0
+    time_to_first_token_ms: float = 0.0  # TTFT: time from prompt send to first token
+    tokens_per_second: float = 0.0       # TPS: inference throughput
     status: str = "ok"
 
 
@@ -55,6 +57,8 @@ class TurnResult:
     output_tokens: int = 0
     reasoning_tokens: int = 0
     total_tokens: int = 0
+    time_to_first_token_ms: float = 0.0
+    tokens_per_second: float = 0.0
     final_answer: str = ""
     status: str = "ok"
     error: str = ""
@@ -78,6 +82,8 @@ class EmailResult:
     output_tokens: int = 0
     reasoning_tokens: int = 0
     total_tokens: int = 0
+    time_to_first_token_ms: float = 0.0
+    tokens_per_second: float = 0.0
     status: str = "ok"
     error: str = ""
 
@@ -95,6 +101,8 @@ class BatchResult:
     total_output_tokens: int = 0
     total_reasoning_tokens: int = 0
     total_tokens: int = 0
+    avg_time_to_first_token_ms: float = 0.0
+    avg_tokens_per_second: float = 0.0
     categories: list[str] = field(default_factory=list)
     status: str = "ok"
     error: str = ""
@@ -118,6 +126,8 @@ class RunResult:
     total_output_tokens: int = 0
     total_reasoning_tokens: int = 0
     total_tokens: int = 0
+    avg_time_to_first_token_ms: float = 0.0
+    avg_tokens_per_second: float = 0.0
     category_counts: dict[str, int] = field(default_factory=dict)
     status: str = "ok"
     error: str = ""
@@ -383,6 +393,8 @@ def _run_full_agent(
             if content.get("type") == "stats" and "performance_stats" in content:
                 stats = content["performance_stats"]
                 step_num += 1
+                raw_ttft = stats.get("time_to_first_token")
+                ttft_ms = float(raw_ttft) * 1000 if raw_ttft else 0.0
                 step_results.append(
                     StepResult(
                         step_number=step_num,
@@ -394,6 +406,8 @@ def _run_full_agent(
                         ),
                         total_tokens=stats.get("total_tokens", 0) or 0,
                         duration_ms=int(stats.get("duration", 0) * 1000),
+                        time_to_first_token_ms=ttft_ms,
+                        tokens_per_second=float(stats.get("tokens_per_second", 0) or 0),
                     )
                 )
             continue
@@ -437,6 +451,7 @@ def _run_full_agent(
             mbox_path=mbox_path,
             mode="full",
             batch_results=[],
+            step_results=step_results,
             total_emails=0,
             total_duration_ms=total_duration_ms,
             total_input_tokens=input_tokens,
@@ -469,6 +484,12 @@ def _run_full_agent(
             )
         )
 
+    # Compute TTFT and TPS averages across all steps.
+    ttft_vals = [s.time_to_first_token_ms for s in step_results if s.time_to_first_token_ms > 0]
+    tps_vals = [s.tokens_per_second for s in step_results if s.tokens_per_second > 0]
+    avg_ttft = sum(ttft_vals) / len(ttft_vals) if ttft_vals else 0.0
+    avg_tps = sum(tps_vals) / len(tps_vals) if tps_vals else 0.0
+
     batch = BatchResult(
         batch_number=1,
         batch_size=len(email_results),
@@ -479,6 +500,8 @@ def _run_full_agent(
         total_output_tokens=output_tokens,
         total_reasoning_tokens=total_reasoning_tokens,
         total_tokens=total_tokens,
+        avg_time_to_first_token_ms=round(avg_ttft, 1),
+        avg_tokens_per_second=round(avg_tps, 1),
         categories=sorted(category_counts.keys()),
         status="completed" if email_results else "error",
         error="No triage results found in agent conversation" if not email_results else "",
@@ -499,6 +522,8 @@ def _run_full_agent(
         total_output_tokens=output_tokens,
         total_reasoning_tokens=total_reasoning_tokens,
         total_tokens=total_tokens,
+        avg_time_to_first_token_ms=round(avg_ttft, 1),
+        avg_tokens_per_second=round(avg_tps, 1),
         category_counts=category_counts,
         status="completed" if email_results else "error",
         error="No triage results found in agent conversation" if not email_results else "",
@@ -532,6 +557,8 @@ def _extract_steps_from_result(agent_result: dict) -> list[StepResult]:
             if content.get("type") == "stats" and "performance_stats" in content:
                 stats = content["performance_stats"]
                 step_num += 1
+                raw_ttft = stats.get("time_to_first_token")
+                ttft_ms = float(raw_ttft) * 1000 if raw_ttft else 0.0
                 steps.append(
                     StepResult(
                         step_number=step_num,
@@ -543,6 +570,8 @@ def _extract_steps_from_result(agent_result: dict) -> list[StepResult]:
                         ),
                         total_tokens=stats.get("total_tokens", 0) or 0,
                         duration_ms=int(stats.get("duration", 0) * 1000),
+                        time_to_first_token_ms=ttft_ms,
+                        tokens_per_second=float(stats.get("tokens_per_second", 0) or 0),
                     )
                 )
     return steps
@@ -694,6 +723,8 @@ def run_interactive_benchmark(
             output_tokens=output_tokens,
             reasoning_tokens=sum(s.reasoning_tokens for s in steps),
             total_tokens=total_tokens,
+            time_to_first_token_ms=round(sum(s.time_to_first_token_ms for s in steps) / max(len(steps), 1), 1),
+            tokens_per_second=round(sum(s.tokens_per_second for s in steps) / max(len(steps), 1), 1),
             final_answer=str(final)[:500] if final else "",
             status="ok",
         )
@@ -708,13 +739,22 @@ def run_interactive_benchmark(
         if steps:
             for s in steps:
                 time_str = f"{s.duration_ms}ms" if s.duration_ms < 1000 else f"{s.duration_ms/1000:.1f}s"
-                print(f"    Step {s.step_number}: {s.input_tokens} in / {s.output_tokens} out / {s.reasoning_tokens} reasoning / {s.total_tokens} total / {time_str}")
+                ttft_str = f"{s.time_to_first_token_ms:.0f}ms" if s.time_to_first_token_ms > 0 else "n/a"
+                tps_str = f"{s.tokens_per_second:.1f}t/s" if s.tokens_per_second > 0 else ""
+                perf = f"{ttft_str}"
+                if tps_str:
+                    perf += f" / {tps_str}"
+                print(f"    Step {s.step_number}: {s.input_tokens} in / {s.output_tokens} out / {s.reasoning_tokens} reasoning / {s.total_tokens} total / {time_str} / {perf}")
 
     total_duration_ms = int((time.monotonic() - total_start) * 1000)
     total_tokens = sum(t.total_tokens for t in turns)
     total_input = sum(t.input_tokens for t in turns)
     total_output = sum(t.output_tokens for t in turns)
     total_reasoning = sum(t.reasoning_tokens for t in turns)
+    ttft_vals = [t.time_to_first_token_ms for t in turns if t.time_to_first_token_ms > 0]
+    tps_vals = [t.tokens_per_second for t in turns if t.tokens_per_second > 0]
+    avg_ttft = sum(ttft_vals) / len(ttft_vals) if ttft_vals else 0.0
+    avg_tps = sum(tps_vals) / len(tps_vals) if tps_vals else 0.0
     all_emails = set()
     all_tools = []
     for t in turns:
@@ -740,6 +780,8 @@ def run_interactive_benchmark(
         "total_tokens": total_tokens,
         "avg_tokens_per_turn": round(total_tokens / max(len(turns), 1), 1),
         "avg_duration_per_turn_ms": round(total_duration_ms / max(len(turns), 1), 0),
+        "avg_time_to_first_token_ms": round(avg_ttft, 1),
+        "avg_tokens_per_second": round(avg_tps, 1),
     }
 
     # Print final summary.

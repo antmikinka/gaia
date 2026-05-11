@@ -263,8 +263,11 @@ def main(argv: Optional[list[str]] = None) -> int:
                         "tool_name": s.tool_name,
                         "input_tokens": s.input_tokens,
                         "output_tokens": s.output_tokens,
+                        "reasoning_tokens": s.reasoning_tokens,
                         "total_tokens": s.total_tokens,
                         "duration_ms": s.duration_ms,
+                        "time_to_first_token_ms": round(s.time_to_first_token_ms, 1),
+                        "tokens_per_second": round(s.tokens_per_second, 1),
                     }
                     for s in t.step_results
                 ],
@@ -273,6 +276,9 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "duration_ms": t.duration_ms,
                 "input_tokens": t.input_tokens,
                 "output_tokens": t.output_tokens,
+                "reasoning_tokens": t.reasoning_tokens,
+                "time_to_first_token_ms": round(t.time_to_first_token_ms, 1),
+                "tokens_per_second": round(t.tokens_per_second, 1),
                 "total_tokens": t.total_tokens,
                 "final_answer": t.final_answer,
                 "status": t.status,
@@ -291,9 +297,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             "total_duration_ms": summary["total_duration_ms"],
             "total_input_tokens": summary["total_input_tokens"],
             "total_output_tokens": summary["total_output_tokens"],
+            "total_reasoning_tokens": summary["total_reasoning_tokens"],
             "total_tokens": summary["total_tokens"],
             "avg_tokens_per_turn": summary["avg_tokens_per_turn"],
             "avg_duration_per_turn_ms": summary["avg_duration_per_turn_ms"],
+            "avg_time_to_first_token_ms": summary.get("avg_time_to_first_token_ms", 0),
+            "avg_tokens_per_second": summary.get("avg_tokens_per_second", 0),
             "turns": [_turn_to_dict(t) for t in summary["turns"]],
         }
         with open(interactive_path, "w", encoding="utf-8") as f:

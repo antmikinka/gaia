@@ -72,6 +72,8 @@ CSV_COLUMNS = [
     "total_tokens",
     "total_steps",
     "total_duration_ms",
+    "avg_time_to_first_token_ms",
+    "avg_tokens_per_second",
     "emails_fetched",
     "categories_assigned",
     "final_response",
@@ -152,6 +154,8 @@ def _run_to_csv_rows(run: RunResult) -> list[dict[str, Any]]:
                 "reason": _truncate(email.reason, 200),
                 "error": _truncate(email.error, 200),
                 "duration_per_email_ms": email.duration_ms,
+                "avg_time_to_first_token_ms": round(run.avg_time_to_first_token_ms, 1),
+                "avg_tokens_per_second": round(run.avg_tokens_per_second, 1),
             }
             rows.append(row)
 
@@ -201,6 +205,8 @@ def _run_to_csv_rows(run: RunResult) -> list[dict[str, Any]]:
             "reason": "",
             "error": "",
             "duration_per_email_ms": run.total_duration_ms // max(run.total_emails, 1),
+            "avg_time_to_first_token_ms": round(run.avg_time_to_first_token_ms, 1),
+            "avg_tokens_per_second": round(run.avg_tokens_per_second, 1),
         }
     )
 
@@ -266,6 +272,8 @@ def _email_result_to_dict(er: EmailResult) -> dict[str, Any]:
         "output_tokens": er.output_tokens,
         "reasoning_tokens": er.reasoning_tokens,
         "total_tokens": er.total_tokens,
+        "time_to_first_token_ms": round(er.time_to_first_token_ms, 1),
+        "tokens_per_second": round(er.tokens_per_second, 1),
         "status": er.status,
         "error": er.error,
     }
@@ -281,6 +289,8 @@ def _batch_result_to_dict(br: BatchResult) -> dict[str, Any]:
         "total_output_tokens": br.total_output_tokens,
         "total_reasoning_tokens": br.total_reasoning_tokens,
         "total_tokens": br.total_tokens,
+        "avg_time_to_first_token_ms": round(br.avg_time_to_first_token_ms, 1),
+        "avg_tokens_per_second": round(br.avg_tokens_per_second, 1),
         "categories": br.categories,
         "openclaw_categories": [map_category(c, "openclaw") for c in br.categories],
         "status": br.status,
@@ -309,6 +319,8 @@ def _run_result_to_dict(run: RunResult) -> dict[str, Any]:
         "avg_output_tokens_per_email": round(run.total_output_tokens / n, 1),
         "avg_reasoning_tokens_per_email": round(run.total_reasoning_tokens / n, 1),
         "avg_total_tokens_per_email": round(run.total_tokens / n, 1),
+        "avg_time_to_first_token_ms": round(run.avg_time_to_first_token_ms, 1),
+        "avg_tokens_per_second": round(run.avg_tokens_per_second, 1),
         "category_counts": run.category_counts,
         "openclaw_category_counts": {
             map_category(k, "openclaw"): v for k, v in run.category_counts.items()
@@ -326,6 +338,8 @@ def _run_result_to_dict(run: RunResult) -> dict[str, Any]:
                 "reasoning_tokens": s.reasoning_tokens,
                 "total_tokens": s.total_tokens,
                 "duration_ms": s.duration_ms,
+                "time_to_first_token_ms": round(s.time_to_first_token_ms, 1),
+                "tokens_per_second": round(s.tokens_per_second, 1),
             }
             for s in run.step_results
         ],
@@ -413,6 +427,13 @@ def print_summary(run: RunResult) -> None:
                     f"{s.output_tokens:>8}  {s.reasoning_tokens:>8}  {s.total_tokens:>8}  {time_str:>8}"
                 )
             print(f"  {'─'*78}")
+        # Performance metrics.
+        if run.avg_time_to_first_token_ms > 0 or run.avg_tokens_per_second > 0:
+            print(f"\n  Performance:")
+            if run.avg_time_to_first_token_ms > 0:
+                print(f"    Avg TTFT:    {run.avg_time_to_first_token_ms:.0f}ms")
+            if run.avg_tokens_per_second > 0:
+                print(f"    Avg TPS:     {run.avg_tokens_per_second:.1f} tokens/s")
     print(f"  Status:       {run.status}")
 
     if run.category_counts:

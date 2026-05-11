@@ -31,6 +31,8 @@ class RunDelta:
     delta_reasoning_tokens: int
     delta_total_tokens: int
     delta_total_emails: int
+    delta_avg_ttft_ms: float = 0.0  # B - A, avg TTFT in milliseconds
+    delta_avg_tps: float = 0.0      # B - A, avg tokens per second
     category_deltas: dict[str, int] = field(default_factory=dict)
     # Per-category: count in B - count in A
 
@@ -46,6 +48,8 @@ class BatchDelta:
     delta_input_tokens: int
     delta_output_tokens: int
     delta_reasoning_tokens: int
+    delta_avg_ttft_ms: float = 0.0
+    delta_avg_tps: float = 0.0
     delta_email_count: int
 
 
@@ -149,6 +153,10 @@ def _compute_run_delta(run_a: dict, run_b: dict) -> RunDelta:
         - run_a.get("total_reasoning_tokens", 0),
         delta_total_tokens=run_b.get("total_tokens", 0) - run_a.get("total_tokens", 0),
         delta_total_emails=run_b.get("total_emails", 0) - run_a.get("total_emails", 0),
+        delta_avg_ttft_ms=run_b.get("avg_time_to_first_token_ms", 0)
+        - run_a.get("avg_time_to_first_token_ms", 0),
+        delta_avg_tps=run_b.get("avg_tokens_per_second", 0)
+        - run_a.get("avg_tokens_per_second", 0),
         category_deltas=category_deltas,
     )
 
@@ -175,6 +183,10 @@ def _compute_batch_deltas(run_a: dict, run_b: dict) -> list[BatchDelta]:
                 - ba.get("total_output_tokens", 0),
                 delta_reasoning_tokens=bb.get("total_reasoning_tokens", 0)
                 - ba.get("total_reasoning_tokens", 0),
+                delta_avg_ttft_ms=bb.get("avg_time_to_first_token_ms", 0)
+                - ba.get("avg_time_to_first_token_ms", 0),
+                delta_avg_tps=bb.get("avg_tokens_per_second", 0)
+                - ba.get("avg_tokens_per_second", 0),
                 delta_email_count=len(bb.get("email_results", []))
                 - len(ba.get("email_results", [])),
             )
@@ -248,6 +260,7 @@ def compare_runs(runs: list[dict]) -> ComparisonReport:
             for metric_key in [
                 "total_input_tokens",
                 "total_output_tokens",
+                "total_reasoning_tokens",
                 "total_tokens",
                 "total_emails",
                 "avg_input_tokens_per_email",
@@ -291,11 +304,14 @@ def compare_runs(runs: list[dict]) -> ComparisonReport:
     for metric_key in [
         "total_input_tokens",
         "total_output_tokens",
+        "total_reasoning_tokens",
         "total_tokens",
         "total_emails",
         "avg_input_tokens_per_email",
         "avg_output_tokens_per_email",
         "avg_total_tokens_per_email",
+        "avg_time_to_first_token_ms",
+        "avg_tokens_per_second",
     ]:
         values = [run.get(metric_key, 0) for run in runs]
         variance_summaries.append(compute_variance(values, metric_name=metric_key))
@@ -333,6 +349,10 @@ def print_comparison_report(report: ComparisonReport) -> None:
             print(f"  {delta.run_id_a[-14:]} → {delta.run_id_b[-14:]}")
             print(f"    Duration: {sign_dur}{delta.delta_duration_ms}ms")
             print(f"    Tokens:   {sign_tok}{delta.delta_total_tokens}")
+            sign_ttft = "+" if delta.delta_avg_ttft_ms >= 0 else ""
+            sign_tps = "+" if delta.delta_avg_tps >= 0 else ""
+            print(f"    TTFT:     {sign_ttft}{delta.delta_avg_ttft_ms:.1f}ms")
+            print(f"    TPS:      {sign_tps}{delta.delta_avg_tps:.1f}")
             if delta.category_deltas:
                 for cat, d in sorted(delta.category_deltas.items()):
                     sign = "+" if d >= 0 else ""
@@ -376,8 +396,11 @@ def to_dict(report: ComparisonReport) -> dict[str, Any]:
                 "delta_duration_ms": d.delta_duration_ms,
                 "delta_input_tokens": d.delta_input_tokens,
                 "delta_output_tokens": d.delta_output_tokens,
+                "delta_reasoning_tokens": d.delta_reasoning_tokens,
                 "delta_total_tokens": d.delta_total_tokens,
                 "delta_total_emails": d.delta_total_emails,
+                "delta_avg_ttft_ms": round(d.delta_avg_ttft_ms, 1),
+                "delta_avg_tps": round(d.delta_avg_tps, 1),
                 "category_deltas": d.category_deltas,
             }
             for d in report.run_deltas
@@ -390,6 +413,9 @@ def to_dict(report: ComparisonReport) -> dict[str, Any]:
                 "delta_duration_ms": d.delta_duration_ms,
                 "delta_input_tokens": d.delta_input_tokens,
                 "delta_output_tokens": d.delta_output_tokens,
+                "delta_reasoning_tokens": d.delta_reasoning_tokens,
+                "delta_avg_ttft_ms": round(d.delta_avg_ttft_ms, 1),
+                "delta_avg_tps": round(d.delta_avg_tps, 1),
                 "delta_email_count": d.delta_email_count,
             }
             for d in report.batch_deltas

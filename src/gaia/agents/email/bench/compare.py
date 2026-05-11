@@ -65,8 +65,12 @@ class ModeComparison:
     full_avg_tokens_per_email: float = 0.0
     full_avg_input_per_email: float = 0.0
     full_avg_output_per_email: float = 0.0
+    full_avg_reasoning_per_email: float = 0.0
     full_ms_per_token: float = 0.0
     full_tokens_per_second: float = 0.0
+    # TTFT/TPS from server stats
+    full_avg_ttft_ms: float = 0.0
+    full_avg_tps: float = 0.0
 
     # Quality (if ground truth available)
     heuristic_quality: float = 0.0
@@ -149,8 +153,12 @@ def compare_modes(heuristic: dict, full: dict) -> ModeComparison:
     f_avg_tok = round(f_tok / max(f_emails, 1), 1)
     f_avg_in = round(f_in / max(f_emails, 1), 1)
     f_avg_out = round(f_out / max(f_emails, 1), 1)
+    f_avg_reason = round(f_reason / max(f_emails, 1), 1)
     f_ms_per_tok = round(f_dur / max(f_tok, 1), 1) if f_tok > 0 else 0.0
     f_tok_per_sec = round(f_tok / max(f_dur / 1000, 0.001), 1) if f_dur > 0 else 0.0
+    # TTFT/TPS from server stats (full mode only)
+    f_ttft = full.get("avg_time_to_first_token_ms", 0) or 0.0
+    f_tps = full.get("avg_tokens_per_second", 0) or 0.0
 
     return ModeComparison(
         heuristic_run_id=heuristic.get("run_id", "unknown"),
@@ -184,8 +192,11 @@ def compare_modes(heuristic: dict, full: dict) -> ModeComparison:
         full_avg_tokens_per_email=f_avg_tok,
         full_avg_input_per_email=f_avg_in,
         full_avg_output_per_email=f_avg_out,
+        full_avg_reasoning_per_email=f_avg_reason,
         full_ms_per_token=f_ms_per_tok,
         full_tokens_per_second=f_tok_per_sec,
+        full_avg_ttft_ms=f_ttft,
+        full_avg_tps=f_tps,
         heuristic_quality=_compute_quality(heuristic),
         full_quality=_compute_quality(full),
     )
@@ -241,6 +252,7 @@ def print_mode_comparison(heuristic: dict, full: dict) -> ModeComparison:
         ("Time per email (ms)", c.heuristic_avg_ms_per_email, c.full_avg_ms_per_email),
         ("Time per email (s)", round(c.heuristic_avg_ms_per_email / 1000, 3), round(c.full_avg_ms_per_email / 1000, 3)),
         ("Input tokens/email", c.heuristic_input_tokens / max(c.heuristic_emails, 1), c.full_avg_input_per_email),
+        ("Reasoning tokens/email", c.heuristic_reasoning_tokens / max(c.heuristic_emails, 1), c.full_avg_reasoning_per_email),
         ("Output tokens/email", c.heuristic_output_tokens / max(c.heuristic_emails, 1), c.full_avg_output_per_email),
         ("Total tokens/email", c.heuristic_total_tokens / max(c.heuristic_emails, 1), c.full_avg_tokens_per_email),
     ]
@@ -258,6 +270,13 @@ def print_mode_comparison(heuristic: dict, full: dict) -> ModeComparison:
         print(f"  {'─'*66}")
         print(f"    ms per token:        {c.full_ms_per_token:.1f}")
         print(f"    tokens per second:   {c.full_tokens_per_second:,.1f}")
+        if c.full_avg_ttft_ms > 0:
+            print(f"    avg TTFT (server):   {c.full_avg_ttft_ms:.0f}ms")
+        if c.full_avg_tps > 0:
+            print(f"    avg TPS (server):    {c.full_avg_tps:,.1f} tokens/s")
+            if c.full_tokens_per_second > 0:
+                overhead = c.full_avg_tps / c.full_tokens_per_second
+                print(f"    Agent overhead:    {overhead:.1f}x server TPS vs end-to-end")
         print(f"    Time overhead vs heuristic:  {c.delta_duration_ms / max(c.heuristic_duration_ms, 1) * 100:.0f}% slower")
         print()
 
@@ -338,12 +357,15 @@ def save_mode_comparison(report: ModeComparison, path: Path) -> Path:
                 "avg_ms_per_email": report.full_avg_ms_per_email,
                 "avg_input_per_email": report.full_avg_input_per_email,
                 "avg_output_per_email": report.full_avg_output_per_email,
+                "avg_reasoning_per_email": report.full_avg_reasoning_per_email,
                 "avg_tokens_per_email": report.full_avg_tokens_per_email,
             },
         },
         "efficiency": {
             "full_ms_per_token": report.full_ms_per_token,
             "full_tokens_per_second": report.full_tokens_per_second,
+            "full_avg_ttft_ms": report.full_avg_ttft_ms,
+            "full_avg_tps": report.full_avg_tps,
         },
         "category_distribution": {
             "heuristic": report.heuristic_categories,
