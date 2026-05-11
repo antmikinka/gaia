@@ -354,13 +354,17 @@ gaia email bench \
 | 02 | Token Composition | Composition (donut) | Full/interactive modes |
 | 03 | Duration vs Token Cost | Comparison (grouped column) | Full/interactive modes |
 | 04 | Per-Email Duration Histogram | Distribution (histogram) | Always |
-| 05a | Duration Trend | Comparison (line graph) | Multi-iteration (>= 2 runs) |
-| 05b | Token Trend | Comparison (line graph) | Multi-iteration (>= 2 runs) |
-| 05c | Per-Email Averages Trend | Comparison (dual-axis line) | Multi-iteration (>= 2 runs) |
+| 05a | LLM Latency Consistency | Comparison (line + stats box) | Multi-iteration (>= 2 runs) |
+| 05b | LLM Token Variance | Comparison (line + stats box) | Multi-iteration (>= 2 runs) |
+| 05c | Per-Email Cost Variance | Comparison (dual-axis + stats) | Multi-iteration (>= 2 runs) |
 | 06 | Interactive Turn Breakdown | Comparison (grouped column) | Interactive mode |
 | 07 | Interactive Token Heatmap | Relationship (heatmap) | Interactive mode |
-| 08 | Category Stability | Composition (stacked bar) | Multi-iteration (>= 2 runs) |
+| 08 | Category Stability | Composition (stacked bar + annotation) | Multi-iteration (>= 2 runs) |
 | 09 | Token vs Duration Scatter | Relationship (scatter + trend) | Always (>= 2 data points) |
+
+**Variance charts (05a, 05b, 05c)** include a **Consistency Report** box showing μ (mean), σ (stdev), and CV% (coefficient of variation). These quantify LLM non-determinism — how much token counts and latency vary when running the *same* benchmark on the *same* emails. Low CV% = predictable cost. High CV% = volatile behavior.
+
+**Category Stability (08)** shows that heuristic classification is deterministic — bars should be identical across runs, contrasting with LLM-based variance shown in charts 05a-c.
 
 **Output:** All charts saved as numbered PNGs in `--chart-dir/` with a `CHARTS.md` index file.
 

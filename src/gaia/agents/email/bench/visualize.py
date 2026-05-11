@@ -74,6 +74,48 @@ def _save_chart(fig, output_dir: Path, name: str, dpi: int = 150) -> Path:
     return path
 
 
+def _compute_stats(values: list[float]) -> dict[str, float]:
+    """Compute mean, stdev, min, max, CV% for a list of values."""
+    n = len(values)
+    if n == 0:
+        return {"mean": 0, "stdev": 0, "min": 0, "max": 0, "cv_pct": 0}
+    mean = sum(values) / n
+    if n < 2:
+        stdev = 0.0
+    else:
+        variance = sum((v - mean) ** 2 for v in values) / (n - 1)
+        stdev = variance ** 0.5
+    min_v = min(values)
+    max_v = max(values)
+    cv_pct = (stdev / mean * 100) if mean != 0 else 0.0
+    return {"mean": mean, "stdev": stdev, "min": min_v, "max": max_v, "cv_pct": cv_pct}
+
+
+def _add_consistency_box(ax, stats: dict[str, float], unit: str = "",
+                         label: str = "LLM Non-Determinism", n_runs: int = 1) -> None:
+    """Add a consistency report text box to the upper-right of an axis."""
+    plt_mod = _require_matplotlib()
+    text = (
+        f"{label}\n"
+        f"n = {n_runs} runs\n"
+        f"μ = {stats['mean']:.1f} {unit}\n"
+        f"σ = {stats['stdev']:.1f}\n"
+        f"CV = {stats['cv_pct']:.1f}%"
+    )
+    props = dict(boxstyle="round,pad=0.4", facecolor="#F7FAFC",
+                 edgecolor="#CBD5E0", alpha=0.9)
+    ax.text(0.98, 0.97, text, transform=ax.transAxes, fontsize=8,
+            verticalalignment="top", horizontalalignment="right",
+            fontfamily="monospace", bbox=props)
+
+
+def _add_subtitle(fig, text: str, y_offset: float = 0.02) -> None:
+    """Add a subtitle below the main title."""
+    plt_mod = _require_matplotlib()
+    fig.text(0.5, y_offset, text, ha="center", va="bottom",
+             fontsize=8, color="#718096", style="italic")
+
+
 # ---------------------------------------------------------------------------
 # Chart 1: Category Distribution (Comparison — Horizontal Bar)
 # ---------------------------------------------------------------------------
@@ -210,7 +252,12 @@ def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path
 # ---------------------------------------------------------------------------
 
 def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Path]:
-    """Line graphs showing duration and tokens across iterations."""
+    """Line graphs showing LLM non-determinism across iterations.
+
+    Same emails + same prompt → different outputs due to temperature-based sampling.
+    Each chart includes a consistency report (μ, σ, CV%) quantifying the variance.
+    Low CV% = predictable cost. High CV% = volatile token/duration behavior.
+    """
     plt_mod = _require_matplotlib()
     paths = []
     if len(runs) < 2:
@@ -219,46 +266,62 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
     n = len(runs)
     x = list(range(1, n + 1))
 
-    # 5a: Duration trend (mins)
+    # 5a: Duration trend (mins) — LLM latency consistency
     dur_vals = [r.get("total_duration_ms", 0) / 60_000 for r in runs]
+    dur_stats = _compute_stats(dur_vals)
     fig, ax = plt_mod.subplots(figsize=(8, 4))
     ax.plot(x, dur_vals, marker="o", linestyle="-", linewidth=2,
             color=COLORS["duration"], label="Duration")
+    # Mean reference line
+    ax.axhline(dur_stats["mean"], color=COLORS["duration"], linestyle="--",
+               alpha=0.4, linewidth=1)
     for i, v in enumerate(dur_vals):
         ax.annotate(f"{v:.1f}", (x[i], v), textcoords="offset points",
                     xytext=(0, 10), ha="center", fontsize=8)
     ax.set_xlabel("Run iteration")
     ax.set_ylabel("Duration (minutes)")
-    ax.set_title("Duration Trend Across Iterations", fontweight="bold", fontsize=12)
+    ax.set_title("LLM Latency Consistency Across Runs", fontweight="bold", fontsize=12)
     ax.set_xticks(x)
     ax.grid(True, linestyle="--", alpha=0.3)
-    fig.tight_layout()
+    _add_consistency_box(ax, dur_stats, unit="min", label="Latency Variance", n_runs=n)
+    fig.tight_layout(rect=[0, 0.06, 1, 1])
+    _add_subtitle(fig, "Same emails, different timing — measures inference latency non-determinism")
     paths.append(_save_chart(fig, output_dir, "05a_duration_trend"))
 
-    # 5b: Token trend
+    # 5b: Token trend — LLM output non-determinism
     tok_vals = [r.get("total_tokens", 0) for r in runs]
     if any(v > 0 for v in tok_vals):
+        tok_stats = _compute_stats([float(v) for v in tok_vals])
         fig, ax = plt_mod.subplots(figsize=(8, 4))
         ax.plot(x, tok_vals, marker="s", linestyle="-", linewidth=2,
                 color=COLORS["tokens"], label="Total tokens")
+        # Mean reference line
+        ax.axhline(tok_stats["mean"], color=COLORS["tokens"], linestyle="--",
+                   alpha=0.4, linewidth=1)
         for i, v in enumerate(tok_vals):
             ax.annotate(f"{v:,}", (x[i], v), textcoords="offset points",
                         xytext=(0, 10), ha="center", fontsize=8)
         ax.set_xlabel("Run iteration")
         ax.set_ylabel("Total tokens")
-        ax.set_title("Token Consumption Trend Across Iterations", fontweight="bold", fontsize=12)
+        ax.set_title("LLM Token Consumption Variance Across Runs", fontweight="bold", fontsize=12)
         ax.set_xticks(x)
         ax.grid(True, linestyle="--", alpha=0.3)
-        fig.tight_layout()
+        _add_consistency_box(ax, tok_stats, unit="tokens", label="Token Variance", n_runs=n)
+        fig.tight_layout(rect=[0, 0.06, 1, 1])
+        _add_subtitle(fig, "Same prompt, different responses — temperature-based sampling variance")
         paths.append(_save_chart(fig, output_dir, "05b_token_trend"))
 
-    # 5c: Per-email averages trend
+    # 5c: Per-email averages trend — granular cost variance
     avg_dur = [r.get("avg_duration_per_email_ms", 0) for r in runs]
     avg_tok = [r.get("avg_total_tokens_per_email", 0) for r in runs]
     if any(v > 0 for v in avg_tok) or any(v > 0 for v in avg_dur):
+        avg_dur_stats = _compute_stats([v / 60_000 for v in avg_dur])
+        avg_tok_stats = _compute_stats([float(v) for v in avg_tok])
         fig, ax1 = plt_mod.subplots(figsize=(8, 4))
         ax1.plot(x, avg_dur, marker="o", linestyle="-", linewidth=2,
                  color=COLORS["duration"], label="Avg duration/email (ms)")
+        ax1.axhline(avg_dur_stats["mean"] * 60_000, color=COLORS["duration"],
+                     linestyle="--", alpha=0.4, linewidth=1)
         ax1.set_xlabel("Run iteration")
         ax1.set_ylabel("Avg duration/email (ms)", color=COLORS["duration"])
         ax1.tick_params(axis="y", labelcolor=COLORS["duration"])
@@ -266,13 +329,26 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         ax2 = ax1.twinx()
         ax2.plot(x, avg_tok, marker="s", linestyle="-", linewidth=2,
                  color=COLORS["tokens"], label="Avg tokens/email")
+        ax2.axhline(avg_tok_stats["mean"], color=COLORS["tokens"],
+                     linestyle="--", alpha=0.4, linewidth=1)
         ax2.set_ylabel("Avg tokens/email", color=COLORS["tokens"])
         ax2.tick_params(axis="y", labelcolor=COLORS["tokens"])
 
-        ax1.set_title("Per-Email Averages Trend", fontweight="bold", fontsize=12)
+        ax1.set_title("Per-Email Cost Variance (LLM Non-Determinism)", fontweight="bold", fontsize=12)
         ax1.set_xticks(x)
         ax1.grid(True, linestyle="--", alpha=0.3)
-        fig.tight_layout()
+        # Dual consistency boxes
+        _add_consistency_box(ax1, avg_dur_stats, unit="ms", label="Duration/Email", n_runs=n)
+        # Shift the second box to avoid overlap
+        plt_mod.text(0.98, 0.82,
+                     f"Tokens/Email\n  μ = {avg_tok_stats['mean']:.1f}\n  σ = {avg_tok_stats['stdev']:.1f}\n  CV = {avg_tok_stats['cv_pct']:.1f}%",
+                     transform=ax1.transAxes, fontsize=8,
+                     verticalalignment="top", horizontalalignment="right",
+                     fontfamily="monospace",
+                     bbox=dict(boxstyle="round,pad=0.4", facecolor="#EBF8FF",
+                               edgecolor="#90CDF4", alpha=0.9))
+        fig.tight_layout(rect=[0, 0.06, 1, 1])
+        _add_subtitle(fig, "Per-email granularity of LLM cost variance — range shows min to max across runs")
         paths.append(_save_chart(fig, output_dir, "05c_per_email_trend"))
 
     return paths
@@ -373,7 +449,12 @@ def plot_interactive_heatmap(interactive: dict[str, Any], output_dir: Path) -> P
 # ---------------------------------------------------------------------------
 
 def plot_category_stability(runs: list[dict[str, Any]], output_dir: Path) -> Path | None:
-    """Stacked bar chart showing category composition per run."""
+    """Stacked bar chart showing category composition per run.
+
+    Heuristic category assignment is deterministic — bars should be identical
+    across runs. This contrasts with LLM-based modes where classification
+    can vary due to temperature-based sampling.
+    """
     plt_mod = _require_matplotlib()
     if len(runs) < 2:
         return None
@@ -387,12 +468,12 @@ def plot_category_stability(runs: list[dict[str, Any]], output_dir: Path) -> Pat
     cats = sorted(all_cats)
     x = list(range(1, len(runs) + 1))
     bottom = [0] * len(runs)
-    colors = [COLORS.get(c.lower(), "#4c78a8") for c in cats]
+    cat_colors = [COLORS.get(c.lower(), "#4c78a8") for c in cats]
 
     fig, ax = plt_mod.subplots(figsize=(max(6, len(runs) * 1.5), 4))
     for i, cat in enumerate(cats):
         vals = [r.get("category_counts", {}).get(cat, 0) for r in runs]
-        ax.bar(x, vals, bottom=bottom, label=cat, color=colors[i], edgecolor="white")
+        ax.bar(x, vals, bottom=bottom, label=cat, color=cat_colors[i], edgecolor="white")
         bottom = [b + v for b, v in zip(bottom, vals)]
 
     ax.set_xlabel("Run iteration")
@@ -401,6 +482,13 @@ def plot_category_stability(runs: list[dict[str, Any]], output_dir: Path) -> Pat
     ax.set_xticks(x)
     ax.legend(loc="upper right", fontsize=8)
     ax.grid(axis="y", linestyle="--", alpha=0.3)
+    # Annotation: heuristic categories are deterministic
+    props = dict(boxstyle="round,pad=0.4", facecolor="#F0FFF4",
+                 edgecolor="#9AE6B4", alpha=0.9)
+    ax.text(0.02, 0.97, "Heuristic categories are deterministic\n"
+            "— bars should be identical across runs —",
+            transform=ax.transAxes, fontsize=7, verticalalignment="top",
+            fontfamily="monospace", bbox=props)
     fig.tight_layout()
     return _save_chart(fig, output_dir, "08_category_stability")
 
@@ -512,13 +600,13 @@ def generate_charts(
             trend_paths = plot_variance_trend(runs, output_dir)
             paths.extend(trend_paths)
             for tp in trend_paths:
-                charts_index.append((tp.name, "Variance Trend — Line graph of metrics across iterations"))
+                charts_index.append((tp.name, "LLM Non-Determinism Trend — Line graph with μ, σ, CV% showing token/duration variance across identical runs"))
 
             # Chart 8: Category stability stacked bar
             p = plot_category_stability(runs, output_dir)
             if p:
                 paths.append(p)
-                charts_index.append((p.name, "Category Stability — Stacked bar of category composition per run"))
+                charts_index.append((p.name, "Category Stability — Stacked bar; identical bars confirm deterministic heuristic classification"))
 
     # --- Interactive mode charts ---
     if interactive_path and interactive_path.exists():
