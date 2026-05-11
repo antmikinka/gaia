@@ -1358,12 +1358,15 @@ def main():
         ),
         parents=[parent_parser],
     )
+    email_subparsers = email_parser.add_subparsers(dest="email_action")
+
+    # Default: one-shot/interactive triage (no subcommand).
     email_parser.add_argument(
         "-q",
         "--query",
         type=str,
         default=None,
-        help="One-shot query to send to the agent (non-interactive).",
+        help="One-shot query to send to agent (non-interactive).",
     )
     email_parser.add_argument(
         "-i",
@@ -1388,6 +1391,110 @@ def main():
             "Debug mode — adds full prompt + LLM response logging to "
             "verbose output. Sensitive payloads in logs."
         ),
+    )
+
+    # Bench subcommand (#962 benchmark harness)
+    bench_parser = email_subparsers.add_parser(
+        "bench",
+        help="Benchmark the Email Triage Agent against an MBOX file.",
+    )
+    bench_parser.add_argument(
+        "--mbox-path",
+        required=True,
+        help="Path to the MBOX file to benchmark against.",
+    )
+    bench_parser.add_argument(
+        "--mode",
+        choices=["heuristic", "full", "interactive"],
+        default="heuristic",
+        help="Benchmark mode: 'heuristic' (fast, no LLM) or 'full' (end-to-end with LLM).",
+    )
+    bench_parser.add_argument(
+        "--iterations",
+        type=int,
+        default=1,
+        help="Number of benchmark iterations to run (for variance analysis).",
+    )
+    bench_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=20,
+        help="Number of emails to process per batch.",
+    )
+    bench_parser.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Maximum number of emails to process.",
+    )
+    bench_parser.add_argument(
+        "--model",
+        type=str,
+        default="heuristic-only",
+        help="Model ID for full agent mode.",
+    )
+    bench_parser.add_argument(
+        "--base-url",
+        type=str,
+        default=None,
+        help="Base URL for the LLM server (full mode only). Defaults to LEMONADE_BASE_URL or http://localhost:13305/api/v1.",
+    )
+    bench_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="benchmark_results",
+        help="Directory to write output files (CSV, JSON, JSONL).",
+    )
+    bench_parser.add_argument(
+        "--variance-only",
+        action="store_true",
+        help="Only run variance analysis on existing JSONL results.",
+    )
+    bench_parser.add_argument(
+        "--jsonl-path",
+        type=str,
+        default=None,
+        help="Path to JSONL file for variance-only mode.",
+    )
+    bench_parser.add_argument(
+        "--ground-truth",
+        type=str,
+        default=None,
+        help="Path to ground truth JSON file for quality scoring.",
+    )
+    bench_parser.add_argument(
+        "--cost-per-1m-input",
+        type=float,
+        default=0.0,
+        help="Cost per 1M input tokens (default 0 for local LLM).",
+    )
+    bench_parser.add_argument(
+        "--cost-per-1m-output",
+        type=float,
+        default=0.0,
+        help="Cost per 1M output tokens (default 0 for local LLM).",
+    )
+    bench_parser.add_argument(
+        "--compare",
+        nargs=2,
+        metavar=("HEURISTIC_JSON", "FULL_JSON"),
+        help="Compare heuristic and full mode results. Pass paths to two JSON output files.",
+    )
+    bench_parser.add_argument(
+        "--steps",
+        action="store_true",
+        help="Print per-step token breakdown for full mode.",
+    )
+    bench_parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="Generate chart PNGs from benchmark output after the run completes.",
+    )
+    bench_parser.add_argument(
+        "--chart-dir",
+        type=str,
+        default="benchmark_charts",
+        help="Directory to write chart PNGs (used with --visualize).",
     )
 
     # Add Docker app command
@@ -3759,10 +3866,62 @@ def handle_email_command(args):
     the agent (the agent's config has no such field). The local-LLM-only
     path is the only path.
 
+    Supports ``gaia email bench`` for benchmarking via the bench harness.
+
     Args:
         args: Parsed command line arguments for the email command
     """
     log = get_logger(__name__)
+
+    # Dispatch to benchmark harness if requested.
+    if getattr(args, "email_action", None) == "bench":
+        from gaia.agents.email.bench.cli import main as bench_main
+
+        bench_args = []
+        for key in [
+            "mbox_path",
+            "mode",
+            "iterations",
+            "batch_size",
+            "limit",
+            "model",
+            "base_url",
+            "output_dir",
+            "jsonl_path",
+            "ground_truth",
+            "chart_dir",
+        ]:
+            val = getattr(args, key, None)
+            if val is not None:
+                bench_args.append(f"--{key.replace('_', '-')}")
+                bench_args.append(str(val))
+
+        # Cost params.
+        cost_input = getattr(args, "cost_per_1m_input", 0.0)
+        cost_output = getattr(args, "cost_per_1m_output", 0.0)
+        if cost_input:
+            bench_args.append("--cost-per-1m-input")
+            bench_args.append(str(cost_input))
+        if cost_output:
+            bench_args.append("--cost-per-1m-output")
+            bench_args.append(str(cost_output))
+
+        # Boolean flags.
+        if getattr(args, "variance_only", False):
+            bench_args.append("--variance-only")
+        if getattr(args, "visualize", False):
+            bench_args.append("--visualize")
+        if getattr(args, "steps", False):
+            bench_args.append("--steps")
+
+        # Compare param (list).
+        compare_paths = getattr(args, "compare", None)
+        if compare_paths:
+            bench_args.append("--compare")
+            bench_args.extend(compare_paths)
+
+        rc = bench_main(bench_args)
+        sys.exit(rc)
 
     # Initialize Lemonade — local LLM only. The email agent's config will
     # also reject any non-local base_url at construction time, but the
