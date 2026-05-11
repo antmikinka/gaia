@@ -19,6 +19,7 @@ from typing import Any
 
 try:
     import matplotlib
+
     matplotlib.use("Agg")  # Non-interactive backend
     import matplotlib.pyplot as plt
 except ImportError:  # pragma: no cover - handled at runtime
@@ -46,6 +47,9 @@ COLORS = {
     "full": "#3182CE",
     "duration": "#DD6B20",
     "tokens": "#3182CE",
+    # Framework colors.
+    "gaia": "#ED6C02",  # AMD orange
+    "clawflow": "#3182CE",  # Blue
 }
 
 
@@ -85,16 +89,21 @@ def _compute_stats(values: list[float]) -> dict[str, float]:
         stdev = 0.0
     else:
         variance = sum((v - mean) ** 2 for v in values) / (n - 1)
-        stdev = variance ** 0.5
+        stdev = variance**0.5
     min_v = min(values)
     max_v = max(values)
     cv_pct = (stdev / mean * 100) if mean != 0 else 0.0
     return {"mean": mean, "stdev": stdev, "min": min_v, "max": max_v, "cv_pct": cv_pct}
 
 
-def _add_consistency_box(ax, stats: dict[str, float], unit: str = "",
-                         label: str = "LLM Non-Determinism", n_runs: int = 1,
-                         y_pos: float = 0.97) -> None:
+def _add_consistency_box(
+    ax,
+    stats: dict[str, float],
+    unit: str = "",
+    label: str = "LLM Non-Determinism",
+    n_runs: int = 1,
+    y_pos: float = 0.97,
+) -> None:
     """Add a consistency report text box to the upper-right of an axis.
 
     Args:
@@ -112,23 +121,41 @@ def _add_consistency_box(ax, stats: dict[str, float], unit: str = "",
         f"σ = {stats['stdev']:.1f}\n"
         f"CV = {stats['cv_pct']:.1f}%"
     )
-    props = dict(boxstyle="round,pad=0.4", facecolor="#F7FAFC",
-                 edgecolor="#CBD5E0", alpha=0.9)
-    ax.text(0.98, y_pos, text, transform=ax.transAxes, fontsize=8,
-            verticalalignment="top", horizontalalignment="right",
-            fontfamily="monospace", bbox=props)
+    props = dict(
+        boxstyle="round,pad=0.4", facecolor="#F7FAFC", edgecolor="#CBD5E0", alpha=0.9
+    )
+    ax.text(
+        0.98,
+        y_pos,
+        text,
+        transform=ax.transAxes,
+        fontsize=8,
+        verticalalignment="top",
+        horizontalalignment="right",
+        fontfamily="monospace",
+        bbox=props,
+    )
 
 
 def _add_subtitle(fig, text: str, y_offset: float = 0.02) -> None:
     """Add a subtitle below the main title."""
     pass  # fig.text() is always available once figure exists
-    fig.text(0.5, y_offset, text, ha="center", va="bottom",
-             fontsize=8, color="#718096", style="italic")
+    fig.text(
+        0.5,
+        y_offset,
+        text,
+        ha="center",
+        va="bottom",
+        fontsize=8,
+        color="#718096",
+        style="italic",
+    )
 
 
 # ---------------------------------------------------------------------------
 # Chart 1: Category Distribution (Comparison — Horizontal Bar)
 # ---------------------------------------------------------------------------
+
 
 def plot_category_distribution(run: dict[str, Any], output_dir: Path) -> Path | None:
     """Horizontal bar chart of category counts."""
@@ -144,8 +171,14 @@ def plot_category_distribution(run: dict[str, Any], output_dir: Path) -> Path | 
     fig, ax = plt_mod.subplots(figsize=(8, 4))
     bars = ax.barh(labels, values, color=colors, edgecolor="white", height=0.5)
     for bar, val in zip(bars, values):
-        ax.text(bar.get_width() + 0.1, bar.get_y() + bar.get_height() / 2,
-                str(val), va="center", fontweight="bold", fontsize=10)
+        ax.text(
+            bar.get_width() + 0.1,
+            bar.get_y() + bar.get_height() / 2,
+            str(val),
+            va="center",
+            fontweight="bold",
+            fontsize=10,
+        )
     ax.set_xlabel("Email count")
     ax.set_title("Category Distribution", fontweight="bold", fontsize=12)
     ax.grid(axis="x", linestyle="--", alpha=0.3)
@@ -156,6 +189,7 @@ def plot_category_distribution(run: dict[str, Any], output_dir: Path) -> Path | 
 # ---------------------------------------------------------------------------
 # Chart 2: Token Composition (Composition — Donut)
 # ---------------------------------------------------------------------------
+
 
 def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None:
     """Donut chart showing input / reasoning / output token split."""
@@ -182,15 +216,26 @@ def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None
         colors = [COLORS["input"], COLORS["output"]]
 
     wedges, texts, autotexts = ax.pie(
-        sizes, labels=labels, colors=colors, autopct="%1.1f%%",
-        startangle=90, wedgeprops={"width": 0.5, "edgecolor": "white"},
+        sizes,
+        labels=labels,
+        colors=colors,
+        autopct="%1.1f%%",
+        startangle=90,
+        wedgeprops={"width": 0.5, "edgecolor": "white"},
     )
     for t in autotexts:
         t.set_fontsize(10)
         t.set_fontweight("bold")
     total = sum(sizes)
-    ax.text(0, 0, f"Total\n{total:,}", ha="center", va="center",
-            fontsize=11, fontweight="bold")
+    ax.text(
+        0,
+        0,
+        f"Total\n{total:,}",
+        ha="center",
+        va="center",
+        fontsize=11,
+        fontweight="bold",
+    )
     ax.set_title("Token Composition", fontweight="bold", fontsize=12)
     fig.tight_layout()
     return _save_chart(fig, output_dir, "02_token_composition")
@@ -199,6 +244,7 @@ def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None
 # ---------------------------------------------------------------------------
 # Chart 3: Duration vs Tokens (Comparison — Grouped Column)
 # ---------------------------------------------------------------------------
+
 
 def plot_duration_vs_tokens(run: dict[str, Any], output_dir: Path) -> Path | None:
     """Side-by-side columns: total duration (mins) vs total tokens."""
@@ -213,14 +259,20 @@ def plot_duration_vs_tokens(run: dict[str, Any], output_dir: Path) -> Path | Non
 
     x = [0]
     width = 0.35
-    bar1 = ax1.bar(x[0] - width / 2, dur_mins, width,
-                   label=f"Duration: {dur_mins:.1f} min", color=COLORS["duration"])
+    bar1 = ax1.bar(
+        x[0] - width / 2,
+        dur_mins,
+        width,
+        label=f"Duration: {dur_mins:.1f} min",
+        color=COLORS["duration"],
+    )
     ax1.set_ylabel("Duration (minutes)", color=COLORS["duration"])
     ax1.tick_params(axis="y", labelcolor=COLORS["duration"])
 
     ax2 = ax1.twinx()
-    bar2 = ax2.bar(x[0] + width / 2, tok, width,
-                   label=f"Tokens: {tok:,}", color=COLORS["tokens"])
+    bar2 = ax2.bar(
+        x[0] + width / 2, tok, width, label=f"Tokens: {tok:,}", color=COLORS["tokens"]
+    )
     ax2.set_ylabel("Total tokens", color=COLORS["tokens"])
     ax2.tick_params(axis="y", labelcolor=COLORS["tokens"])
 
@@ -240,6 +292,7 @@ def plot_duration_vs_tokens(run: dict[str, Any], output_dir: Path) -> Path | Non
 # Chart 4: Per-Email Duration Histogram (Distribution)
 # ---------------------------------------------------------------------------
 
+
 def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path | None:
     """Histogram of per-email processing durations."""
     plt_mod = _require_matplotlib()
@@ -254,11 +307,21 @@ def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path
         return None
 
     fig, ax = plt_mod.subplots(figsize=(8, 4))
-    ax.hist(durations, bins=min(15, len(durations)), color=COLORS["duration"],
-            edgecolor="white", alpha=0.85)
+    ax.hist(
+        durations,
+        bins=min(15, len(durations)),
+        color=COLORS["duration"],
+        edgecolor="white",
+        alpha=0.85,
+    )
     mean_dur = sum(durations) / len(durations)
-    ax.axvline(mean_dur, color="black", linestyle="--", linewidth=1,
-               label=f"Mean: {mean_dur:.0f}ms")
+    ax.axvline(
+        mean_dur,
+        color="black",
+        linestyle="--",
+        linewidth=1,
+        label=f"Mean: {mean_dur:.0f}ms",
+    )
     ax.set_xlabel("Duration per email (ms)")
     ax.set_ylabel("Frequency")
     ax.set_title("Per-Email Duration Distribution", fontweight="bold", fontsize=12)
@@ -271,6 +334,7 @@ def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path
 # ---------------------------------------------------------------------------
 # Chart 5: Variance Trend (Comparison — Line Graph)
 # ---------------------------------------------------------------------------
+
 
 def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Path]:
     """Line graphs showing LLM non-determinism across iterations.
@@ -291,14 +355,32 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
     dur_vals = [r.get("total_duration_ms", 0) / 60_000 for r in runs]
     dur_stats = _compute_stats(dur_vals)
     fig, ax = plt_mod.subplots(figsize=(8, 4))
-    ax.plot(x, dur_vals, marker="o", linestyle="-", linewidth=2,
-            color=COLORS["duration"], label="Duration")
+    ax.plot(
+        x,
+        dur_vals,
+        marker="o",
+        linestyle="-",
+        linewidth=2,
+        color=COLORS["duration"],
+        label="Duration",
+    )
     # Mean reference line
-    ax.axhline(dur_stats["mean"], color=COLORS["duration"], linestyle="--",
-               alpha=0.4, linewidth=1)
+    ax.axhline(
+        dur_stats["mean"],
+        color=COLORS["duration"],
+        linestyle="--",
+        alpha=0.4,
+        linewidth=1,
+    )
     for i, v in enumerate(dur_vals):
-        ax.annotate(f"{v:.1f}", (x[i], v), textcoords="offset points",
-                    xytext=(0, 10), ha="center", fontsize=8)
+        ax.annotate(
+            f"{v:.1f}",
+            (x[i], v),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            fontsize=8,
+        )
     ax.set_xlabel("Run iteration")
     ax.set_ylabel("Duration (minutes)")
     ax.set_title("LLM Latency Consistency Across Runs", fontweight="bold", fontsize=12)
@@ -306,7 +388,10 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
     ax.grid(True, linestyle="--", alpha=0.3)
     _add_consistency_box(ax, dur_stats, unit="min", label="Latency Variance", n_runs=n)
     fig.tight_layout(rect=[0, 0.06, 1, 1])
-    _add_subtitle(fig, "Same emails, different timing — measures inference latency non-determinism")
+    _add_subtitle(
+        fig,
+        "Same emails, different timing — measures inference latency non-determinism",
+    )
     paths.append(_save_chart(fig, output_dir, "05a_duration_trend"))
 
     # 5b: Token trend — LLM output non-determinism
@@ -314,31 +399,68 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
     if any(v > 0 for v in tok_vals):
         tok_stats = _compute_stats([float(v) for v in tok_vals])
         fig, ax = plt_mod.subplots(figsize=(8, 4))
-        ax.plot(x, tok_vals, marker="s", linestyle="-", linewidth=2,
-                color=COLORS["tokens"], label="Total tokens")
+        ax.plot(
+            x,
+            tok_vals,
+            marker="s",
+            linestyle="-",
+            linewidth=2,
+            color=COLORS["tokens"],
+            label="Total tokens",
+        )
         # Mean reference line
-        ax.axhline(tok_stats["mean"], color=COLORS["tokens"], linestyle="--",
-                   alpha=0.4, linewidth=1)
+        ax.axhline(
+            tok_stats["mean"],
+            color=COLORS["tokens"],
+            linestyle="--",
+            alpha=0.4,
+            linewidth=1,
+        )
         # Reasoning token overlay if present
         reasoning_vals = [r.get("total_reasoning_tokens", 0) for r in runs]
         if any(v > 0 for v in reasoning_vals):
-            ax.plot(x, reasoning_vals, marker="^", linestyle="-", linewidth=1.5,
-                    color=COLORS["reasoning"], label="Reasoning tokens")
+            ax.plot(
+                x,
+                reasoning_vals,
+                marker="^",
+                linestyle="-",
+                linewidth=1.5,
+                color=COLORS["reasoning"],
+                label="Reasoning tokens",
+            )
             reason_stats = _compute_stats([float(v) for v in reasoning_vals])
-            ax.axhline(reason_stats["mean"], color=COLORS["reasoning"], linestyle="--",
-                       alpha=0.3, linewidth=1)
+            ax.axhline(
+                reason_stats["mean"],
+                color=COLORS["reasoning"],
+                linestyle="--",
+                alpha=0.3,
+                linewidth=1,
+            )
         for i, v in enumerate(tok_vals):
-            ax.annotate(f"{v:,}", (x[i], v), textcoords="offset points",
-                        xytext=(0, 10), ha="center", fontsize=8)
+            ax.annotate(
+                f"{v:,}",
+                (x[i], v),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=8,
+            )
         ax.set_xlabel("Run iteration")
         ax.set_ylabel("Total tokens")
-        ax.set_title("LLM Token Consumption Variance Across Runs", fontweight="bold", fontsize=12)
+        ax.set_title(
+            "LLM Token Consumption Variance Across Runs", fontweight="bold", fontsize=12
+        )
         ax.set_xticks(x)
         ax.legend(fontsize=9)
         ax.grid(True, linestyle="--", alpha=0.3)
-        _add_consistency_box(ax, tok_stats, unit="tokens", label="Token Variance", n_runs=n)
+        _add_consistency_box(
+            ax, tok_stats, unit="tokens", label="Token Variance", n_runs=n
+        )
         fig.tight_layout(rect=[0, 0.06, 1, 1])
-        _add_subtitle(fig, "Same prompt, different responses — temperature-based sampling variance")
+        _add_subtitle(
+            fig,
+            "Same prompt, different responses — temperature-based sampling variance",
+        )
         paths.append(_save_chart(fig, output_dir, "05b_token_trend"))
 
     # 5c: Per-email averages trend — granular cost variance
@@ -348,30 +470,70 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         avg_dur_stats = _compute_stats([v / 60_000 for v in avg_dur])
         avg_tok_stats = _compute_stats([float(v) for v in avg_tok])
         fig, ax1 = plt_mod.subplots(figsize=(8, 4))
-        ax1.plot(x, avg_dur, marker="o", linestyle="-", linewidth=2,
-                 color=COLORS["duration"], label="Avg duration/email (ms)")
-        ax1.axhline(avg_dur_stats["mean"] * 60_000, color=COLORS["duration"],
-                     linestyle="--", alpha=0.4, linewidth=1)
+        ax1.plot(
+            x,
+            avg_dur,
+            marker="o",
+            linestyle="-",
+            linewidth=2,
+            color=COLORS["duration"],
+            label="Avg duration/email (ms)",
+        )
+        ax1.axhline(
+            avg_dur_stats["mean"] * 60_000,
+            color=COLORS["duration"],
+            linestyle="--",
+            alpha=0.4,
+            linewidth=1,
+        )
         ax1.set_xlabel("Run iteration")
         ax1.set_ylabel("Avg duration/email (ms)", color=COLORS["duration"])
         ax1.tick_params(axis="y", labelcolor=COLORS["duration"])
 
         ax2 = ax1.twinx()
-        ax2.plot(x, avg_tok, marker="s", linestyle="-", linewidth=2,
-                 color=COLORS["tokens"], label="Avg tokens/email")
-        ax2.axhline(avg_tok_stats["mean"], color=COLORS["tokens"],
-                     linestyle="--", alpha=0.4, linewidth=1)
+        ax2.plot(
+            x,
+            avg_tok,
+            marker="s",
+            linestyle="-",
+            linewidth=2,
+            color=COLORS["tokens"],
+            label="Avg tokens/email",
+        )
+        ax2.axhline(
+            avg_tok_stats["mean"],
+            color=COLORS["tokens"],
+            linestyle="--",
+            alpha=0.4,
+            linewidth=1,
+        )
         ax2.set_ylabel("Avg tokens/email", color=COLORS["tokens"])
         ax2.tick_params(axis="y", labelcolor=COLORS["tokens"])
 
-        ax1.set_title("Per-Email Cost Variance (LLM Non-Determinism)", fontweight="bold", fontsize=12)
+        ax1.set_title(
+            "Per-Email Cost Variance (LLM Non-Determinism)",
+            fontweight="bold",
+            fontsize=12,
+        )
         ax1.set_xticks(x)
         ax1.grid(True, linestyle="--", alpha=0.3)
         # Dual consistency boxes
-        _add_consistency_box(ax1, avg_dur_stats, unit="ms", label="Duration/Email", n_runs=n)
-        _add_consistency_box(ax1, avg_tok_stats, unit="tokens", label="Tokens/Email", n_runs=n, y_pos=0.78)
+        _add_consistency_box(
+            ax1, avg_dur_stats, unit="ms", label="Duration/Email", n_runs=n
+        )
+        _add_consistency_box(
+            ax1,
+            avg_tok_stats,
+            unit="tokens",
+            label="Tokens/Email",
+            n_runs=n,
+            y_pos=0.78,
+        )
         fig.tight_layout(rect=[0, 0.06, 1, 1])
-        _add_subtitle(fig, "Per-email granularity of LLM cost variance — range shows min to max across runs")
+        _add_subtitle(
+            fig,
+            "Per-email granularity of LLM cost variance — range shows min to max across runs",
+        )
         paths.append(_save_chart(fig, output_dir, "05c_per_email_trend"))
 
     # 5d: TTFT trend — model load/prefill latency consistency
@@ -379,13 +541,27 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
     if any(v > 0 for v in ttft_vals):
         ttft_stats = _compute_stats([float(v) for v in ttft_vals])
         fig, ax = plt_mod.subplots(figsize=(8, 4))
-        ax.plot(x, ttft_vals, marker="D", linestyle="-", linewidth=2,
-                color="#E53E3E", label="Avg TTFT (ms)")
-        ax.axhline(ttft_stats["mean"], color="#E53E3E", linestyle="--",
-                   alpha=0.4, linewidth=1)
+        ax.plot(
+            x,
+            ttft_vals,
+            marker="D",
+            linestyle="-",
+            linewidth=2,
+            color="#E53E3E",
+            label="Avg TTFT (ms)",
+        )
+        ax.axhline(
+            ttft_stats["mean"], color="#E53E3E", linestyle="--", alpha=0.4, linewidth=1
+        )
         for i, v in enumerate(ttft_vals):
-            ax.annotate(f"{v:.0f}", (x[i], v), textcoords="offset points",
-                        xytext=(0, 10), ha="center", fontsize=8)
+            ax.annotate(
+                f"{v:.0f}",
+                (x[i], v),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=8,
+            )
         ax.set_xlabel("Run iteration")
         ax.set_ylabel("Avg TTFT (ms)")
         ax.set_title("TTFT Consistency Across Runs", fontweight="bold", fontsize=12)
@@ -393,7 +569,10 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         ax.grid(True, linestyle="--", alpha=0.3)
         _add_consistency_box(ax, ttft_stats, unit="ms", label="TTFT Variance", n_runs=n)
         fig.tight_layout(rect=[0, 0.06, 1, 1])
-        _add_subtitle(fig, "Model load + prefill latency — high variance indicates cold-start instability")
+        _add_subtitle(
+            fig,
+            "Model load + prefill latency — high variance indicates cold-start instability",
+        )
         paths.append(_save_chart(fig, output_dir, "05d_ttft_trend"))
 
     # 5e: TPS trend — throughput consistency
@@ -401,21 +580,41 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
     if any(v > 0 for v in tps_vals):
         tps_stats = _compute_stats([float(v) for v in tps_vals])
         fig, ax = plt_mod.subplots(figsize=(8, 4))
-        ax.plot(x, tps_vals, marker="^", linestyle="-", linewidth=2,
-                color="#38A169", label="Avg TPS (tokens/s)")
-        ax.axhline(tps_stats["mean"], color="#38A169", linestyle="--",
-                   alpha=0.4, linewidth=1)
+        ax.plot(
+            x,
+            tps_vals,
+            marker="^",
+            linestyle="-",
+            linewidth=2,
+            color="#38A169",
+            label="Avg TPS (tokens/s)",
+        )
+        ax.axhline(
+            tps_stats["mean"], color="#38A169", linestyle="--", alpha=0.4, linewidth=1
+        )
         for i, v in enumerate(tps_vals):
-            ax.annotate(f"{v:.1f}", (x[i], v), textcoords="offset points",
-                        xytext=(0, 10), ha="center", fontsize=8)
+            ax.annotate(
+                f"{v:.1f}",
+                (x[i], v),
+                textcoords="offset points",
+                xytext=(0, 10),
+                ha="center",
+                fontsize=8,
+            )
         ax.set_xlabel("Run iteration")
         ax.set_ylabel("Avg Tokens Per Second")
-        ax.set_title("Throughput Consistency Across Runs", fontweight="bold", fontsize=12)
+        ax.set_title(
+            "Throughput Consistency Across Runs", fontweight="bold", fontsize=12
+        )
         ax.set_xticks(x)
         ax.grid(True, linestyle="--", alpha=0.3)
-        _add_consistency_box(ax, tps_stats, unit="tok/s", label="TPS Variance", n_runs=n)
+        _add_consistency_box(
+            ax, tps_stats, unit="tok/s", label="TPS Variance", n_runs=n
+        )
         fig.tight_layout(rect=[0, 0.06, 1, 1])
-        _add_subtitle(fig, "Inference throughput — lower variance = predictable throughput")
+        _add_subtitle(
+            fig, "Inference throughput — lower variance = predictable throughput"
+        )
         paths.append(_save_chart(fig, output_dir, "05e_tps_trend"))
 
     return paths
@@ -425,7 +624,10 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
 # Chart 6: Interactive Turn Breakdown (Comparison — Grouped Column)
 # ---------------------------------------------------------------------------
 
-def plot_interactive_turns(interactive: dict[str, Any], output_dir: Path) -> Path | None:
+
+def plot_interactive_turns(
+    interactive: dict[str, Any], output_dir: Path
+) -> Path | None:
     """Grouped column chart: per-turn tokens and duration."""
     plt_mod = _require_matplotlib()
     turns = interactive.get("turns", [])
@@ -443,22 +645,52 @@ def plot_interactive_turns(interactive: dict[str, Any], output_dir: Path) -> Pat
 
     if has_reasoning:
         width = 0.25
-        bars1 = ax1.bar([i - width for i in x], dur_vals, width,
-                        label="Duration (s)", color=COLORS["duration"], alpha=0.85)
-        ax1.bar([i for i in x], reasoning_vals, width,
-                label="Reasoning tokens", color=COLORS["reasoning"], alpha=0.85)
+        bars1 = ax1.bar(
+            [i - width for i in x],
+            dur_vals,
+            width,
+            label="Duration (s)",
+            color=COLORS["duration"],
+            alpha=0.85,
+        )
+        ax1.bar(
+            [i for i in x],
+            reasoning_vals,
+            width,
+            label="Reasoning tokens",
+            color=COLORS["reasoning"],
+            alpha=0.85,
+        )
         ax2 = ax1.twinx()
-        ax2.bar([i + width for i in x], tok_vals, width,
-                label="Total tokens", color=COLORS["tokens"], alpha=0.85)
+        ax2.bar(
+            [i + width for i in x],
+            tok_vals,
+            width,
+            label="Total tokens",
+            color=COLORS["tokens"],
+            alpha=0.85,
+        )
         ax2.set_ylabel("Tokens", color=COLORS["tokens"])
         ax2.tick_params(axis="y", labelcolor=COLORS["tokens"])
     else:
         width = 0.35
-        bars1 = ax1.bar([i - width / 2 for i in x], dur_vals, width,
-                        label="Duration (s)", color=COLORS["duration"], alpha=0.85)
+        bars1 = ax1.bar(
+            [i - width / 2 for i in x],
+            dur_vals,
+            width,
+            label="Duration (s)",
+            color=COLORS["duration"],
+            alpha=0.85,
+        )
         ax2 = ax1.twinx()
-        ax2.bar([i + width / 2 for i in x], tok_vals, width,
-                label="Tokens", color=COLORS["tokens"], alpha=0.85)
+        ax2.bar(
+            [i + width / 2 for i in x],
+            tok_vals,
+            width,
+            label="Tokens",
+            color=COLORS["tokens"],
+            alpha=0.85,
+        )
         ax2.set_ylabel("Tokens", color=COLORS["tokens"])
         ax2.tick_params(axis="y", labelcolor=COLORS["tokens"])
 
@@ -467,7 +699,9 @@ def plot_interactive_turns(interactive: dict[str, Any], output_dir: Path) -> Pat
 
     ax1.set_xticks(x)
     ax1.set_xticklabels(turn_labels)
-    ax1.set_title("Interactive Session — Per-Turn Breakdown", fontweight="bold", fontsize=12)
+    ax1.set_title(
+        "Interactive Session — Per-Turn Breakdown", fontweight="bold", fontsize=12
+    )
 
     lines1, labels1 = ax1.get_legend_handles_labels()
     lines2, labels2 = ax2.get_legend_handles_labels()
@@ -481,7 +715,10 @@ def plot_interactive_turns(interactive: dict[str, Any], output_dir: Path) -> Pat
 # Chart 7: Interactive Token Heatmap (Relationship — Heatmap)
 # ---------------------------------------------------------------------------
 
-def plot_interactive_heatmap(interactive: dict[str, Any], output_dir: Path) -> Path | None:
+
+def plot_interactive_heatmap(
+    interactive: dict[str, Any], output_dir: Path
+) -> Path | None:
     """Heatmap: Turn x Step matrix of token consumption."""
     plt_mod = _require_matplotlib()
     turns = interactive.get("turns", [])
@@ -500,7 +737,9 @@ def plot_interactive_heatmap(interactive: dict[str, Any], output_dir: Path) -> P
             row.append(0)
         matrix.append(row)
 
-    fig, ax = plt_mod.subplots(figsize=(max(6, max_steps * 2), max(3, len(turns) * 1.2)))
+    fig, ax = plt_mod.subplots(
+        figsize=(max(6, max_steps * 2), max(3, len(turns) * 1.2))
+    )
     im = ax.imshow(matrix, aspect="auto", cmap="YlOrRd")
 
     ax.set_xticks(range(max_steps))
@@ -509,16 +748,29 @@ def plot_interactive_heatmap(interactive: dict[str, Any], output_dir: Path) -> P
     ax.set_yticklabels([f"T{i['turn_number']}" for i in turns])
     ax.set_xlabel("Step")
     ax.set_ylabel("Turn")
-    ax.set_title("Token Consumption Heatmap (Turn x Step)", fontweight="bold", fontsize=12)
+    ax.set_title(
+        "Token Consumption Heatmap (Turn x Step)", fontweight="bold", fontsize=12
+    )
 
     # Add value labels
     for i in range(len(turns)):
         for j in range(max_steps):
             val = matrix[i][j]
             if val > 0:
-                ax.text(j, i, f"{val:,}", ha="center", va="center",
-                        fontsize=8, fontweight="bold",
-                        color="white" if val > max(v for row in matrix for v in row) * 0.6 else "black")
+                ax.text(
+                    j,
+                    i,
+                    f"{val:,}",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                    fontweight="bold",
+                    color=(
+                        "white"
+                        if val > max(v for row in matrix for v in row) * 0.6
+                        else "black"
+                    ),
+                )
 
     fig.colorbar(im, ax=ax, label="Total tokens")
     fig.tight_layout()
@@ -529,7 +781,10 @@ def plot_interactive_heatmap(interactive: dict[str, Any], output_dir: Path) -> P
 # Chart 8: Category Stability (Composition — Stacked Bar)
 # ---------------------------------------------------------------------------
 
-def plot_category_stability(runs: list[dict[str, Any]], output_dir: Path) -> Path | None:
+
+def plot_category_stability(
+    runs: list[dict[str, Any]], output_dir: Path
+) -> Path | None:
     """Stacked bar chart showing category composition per run.
 
     Heuristic category assignment is deterministic — bars should be identical
@@ -554,7 +809,9 @@ def plot_category_stability(runs: list[dict[str, Any]], output_dir: Path) -> Pat
     fig, ax = plt_mod.subplots(figsize=(max(6, len(runs) * 1.5), 4))
     for i, cat in enumerate(cats):
         vals = [r.get("category_counts", {}).get(cat, 0) for r in runs]
-        ax.bar(x, vals, bottom=bottom, label=cat, color=cat_colors[i], edgecolor="white")
+        ax.bar(
+            x, vals, bottom=bottom, label=cat, color=cat_colors[i], edgecolor="white"
+        )
         bottom = [b + v for b, v in zip(bottom, vals)]
 
     ax.set_xlabel("Run iteration")
@@ -564,12 +821,20 @@ def plot_category_stability(runs: list[dict[str, Any]], output_dir: Path) -> Pat
     ax.legend(loc="upper right", fontsize=8)
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     # Annotation: heuristic categories are deterministic
-    props = dict(boxstyle="round,pad=0.4", facecolor="#F0FFF4",
-                 edgecolor="#9AE6B4", alpha=0.9)
-    ax.text(0.02, 0.97, "Heuristic categories are deterministic\n"
-            "— bars should be identical across runs —",
-            transform=ax.transAxes, fontsize=7, verticalalignment="top",
-            fontfamily="monospace", bbox=props)
+    props = dict(
+        boxstyle="round,pad=0.4", facecolor="#F0FFF4", edgecolor="#9AE6B4", alpha=0.9
+    )
+    ax.text(
+        0.02,
+        0.97,
+        "Heuristic categories are deterministic\n"
+        "— bars should be identical across runs —",
+        transform=ax.transAxes,
+        fontsize=7,
+        verticalalignment="top",
+        fontfamily="monospace",
+        bbox=props,
+    )
     fig.tight_layout()
     return _save_chart(fig, output_dir, "08_category_stability")
 
@@ -577,6 +842,7 @@ def plot_category_stability(runs: list[dict[str, Any]], output_dir: Path) -> Pat
 # ---------------------------------------------------------------------------
 # Chart 9: Token vs Duration Scatter (Relationship — Scatter)
 # ---------------------------------------------------------------------------
+
 
 def plot_token_duration_scatter(run: dict[str, Any], output_dir: Path) -> Path | None:
     """Scatter plot: per-email tokens vs duration with size=email_id hash."""
@@ -594,15 +860,23 @@ def plot_token_duration_scatter(run: dict[str, Any], output_dir: Path) -> Path |
 
     durations, tokens = zip(*points)
     fig, ax = plt_mod.subplots(figsize=(8, 4))
-    ax.scatter(durations, tokens, c=COLORS["tokens"], alpha=0.7, s=60, edgecolors="white")
+    ax.scatter(
+        durations, tokens, c=COLORS["tokens"], alpha=0.7, s=60, edgecolors="white"
+    )
 
     # Add trend line if numpy is available.
     if np is not None:
         z = np.polyfit(durations, tokens, 1)
         p = np.poly1d(z)
         xs = np.linspace(min(durations), max(durations), 50)
-        ax.plot(xs, p(xs), "--", color=COLORS["duration"], alpha=0.6,
-                label=f"Trend (slope={z[0]:.2f})")
+        ax.plot(
+            xs,
+            p(xs),
+            "--",
+            color=COLORS["duration"],
+            alpha=0.6,
+            label=f"Trend (slope={z[0]:.2f})",
+        )
         ax.legend(fontsize=9)
 
     ax.set_xlabel("Duration per email (ms)")
@@ -616,6 +890,7 @@ def plot_token_duration_scatter(run: dict[str, Any], output_dir: Path) -> Path |
 # ---------------------------------------------------------------------------
 # Chart 10: Per-Step TTFT & TPS (Comparison — Dual-Axis Line)
 # ---------------------------------------------------------------------------
+
 
 def plot_step_performance(run: dict[str, Any], output_dir: Path) -> Path | None:
     """Dual-axis line chart: per-step TTFT and TPS."""
@@ -632,14 +907,28 @@ def plot_step_performance(run: dict[str, Any], output_dir: Path) -> Path | None:
     fig, ax1 = plt_mod.subplots(figsize=(8, 4))
     x = list(range(1, len(steps) + 1))
 
-    ax1.plot(x, ttft_vals, marker="o", linestyle="-", linewidth=2,
-             color="#E53E3E", label="TTFT (ms)")
+    ax1.plot(
+        x,
+        ttft_vals,
+        marker="o",
+        linestyle="-",
+        linewidth=2,
+        color="#E53E3E",
+        label="TTFT (ms)",
+    )
     ax1.set_ylabel("Time to First Token (ms)", color="#E53E3E")
     ax1.tick_params(axis="y", labelcolor="#E53E3E")
 
     ax2 = ax1.twinx()
-    ax2.plot(x, tps_vals, marker="s", linestyle="-", linewidth=2,
-             color="#38A169", label="TPS (tokens/s)")
+    ax2.plot(
+        x,
+        tps_vals,
+        marker="s",
+        linestyle="-",
+        linewidth=2,
+        color="#38A169",
+        label="TPS (tokens/s)",
+    )
     ax2.set_ylabel("Tokens Per Second", color="#38A169")
     ax2.tick_params(axis="y", labelcolor="#38A169")
 
@@ -656,14 +945,516 @@ def plot_step_performance(run: dict[str, Any], output_dir: Path) -> Path | None:
 
 
 # ---------------------------------------------------------------------------
-# Main entry point
+# Chart 11: Model Duration Comparison (Grouped Column)
 # ---------------------------------------------------------------------------
+
+
+def plot_model_duration_comparison(
+    runs: list[dict[str, Any]], output_dir: Path
+) -> Path | None:
+    """Grouped column chart: total duration per model."""
+    plt_mod = _require_matplotlib()
+    if not runs:
+        return None
+
+    # Group by model.
+    model_durations: dict[str, list[float]] = {}
+    for r in runs:
+        model = r.get("model", "unknown")
+        dur = r.get("total_duration_ms", 0) / 60_000  # to minutes
+        model_durations.setdefault(model, []).append(dur)
+
+    if len(model_durations) < 2:
+        return None
+
+    models = sorted(model_durations.keys())
+    x = list(range(len(models)))
+    width = 0.35
+
+    fig, ax = plt_mod.subplots(figsize=(max(6, len(models) * 1.5), 4))
+    means = [sum(v) / len(v) for v in model_durations.values()]
+    mins = [min(v) for v in model_durations.values()]
+    bars = ax.bar(
+        [i - width / 2 for i in x],
+        means,
+        width,
+        label="Mean duration",
+        color=COLORS["duration"],
+        alpha=0.85,
+    )
+    ax.bar(
+        [i + width / 2 for i in x],
+        mins,
+        width,
+        label="Min duration",
+        color=COLORS["heuristic"],
+        alpha=0.85,
+    )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([m[:20] for m in models], rotation=30, ha="right")
+    ax.set_ylabel("Duration (minutes)")
+    ax.set_title("Model Duration Comparison", fontweight="bold", fontsize=12)
+    ax.legend(fontsize=9)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "11_model_duration_comparison")
+
+
+# ---------------------------------------------------------------------------
+# Chart 12: Model Token Cost (Stacked Column)
+# ---------------------------------------------------------------------------
+
+
+def plot_model_token_cost(runs: list[dict[str, Any]], output_dir: Path) -> Path | None:
+    """Stacked column chart: input / output token cost per model."""
+    plt_mod = _require_matplotlib()
+    if not runs:
+        return None
+
+    model_tokens: dict[str, dict[str, float]] = {}
+    for r in runs:
+        model = r.get("model", "unknown")
+        if model not in model_tokens:
+            model_tokens[model] = {"input": 0, "output": 0, "reasoning": 0, "n": 0}
+        model_tokens[model]["input"] += r.get("total_input_tokens", 0)
+        model_tokens[model]["output"] += r.get("total_output_tokens", 0)
+        model_tokens[model]["reasoning"] += r.get("total_reasoning_tokens", 0)
+        model_tokens[model]["n"] += 1
+
+    # Average per run.
+    models = sorted(model_tokens.keys())
+    x = list(range(len(models)))
+    in_avg = [model_tokens[m]["input"] / model_tokens[m]["n"] for m in models]
+    out_avg = [model_tokens[m]["output"] / model_tokens[m]["n"] for m in models]
+    reason_avg = [model_tokens[m]["reasoning"] / model_tokens[m]["n"] for m in models]
+
+    if all(v == 0 for v in in_avg):
+        return None
+
+    fig, ax = plt_mod.subplots(figsize=(max(6, len(models) * 1.5), 4))
+    ax.bar(x, in_avg, label="Input tokens", color=COLORS["input"])
+    ax.bar(x, out_avg, bottom=in_avg, label="Output tokens", color=COLORS["output"])
+    if any(v > 0 for v in reason_avg):
+        inout = [i + o for i, o in zip(in_avg, out_avg)]
+        ax.bar(
+            x,
+            reason_avg,
+            bottom=inout,
+            label="Reasoning tokens",
+            color=COLORS["reasoning"],
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([m[:20] for m in models], rotation=30, ha="right")
+    ax.set_ylabel("Avg tokens per run")
+    ax.set_title("Model Token Cost", fontweight="bold", fontsize=12)
+    ax.legend(fontsize=9)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "12_model_token_cost")
+
+
+# ---------------------------------------------------------------------------
+# Chart 13: TTFT Comparison (Horizontal Bar)
+# ---------------------------------------------------------------------------
+
+
+def plot_ttft_comparison(runs: list[dict[str, Any]], output_dir: Path) -> Path | None:
+    """Horizontal bar chart: avg TTFT per model."""
+    plt_mod = _require_matplotlib()
+    if not runs:
+        return None
+
+    model_ttft: dict[str, list[float]] = {}
+    for r in runs:
+        model = r.get("model", "unknown")
+        ttft = r.get("avg_time_to_first_token_ms", 0)
+        if ttft > 0:
+            model_ttft.setdefault(model, []).append(ttft)
+
+    if not model_ttft:
+        return None
+
+    models = sorted(model_ttft.keys())
+    means = [sum(v) / len(v) for v in model_ttft.values()]
+
+    fig, ax = plt_mod.subplots(figsize=(8, max(3, len(models) * 0.7)))
+    colors = [COLORS.get(m.lower().split("/")[0], "#4c78a8") for m in models]
+    bars = ax.barh(models, means, color=colors, edgecolor="white", height=0.5)
+    for bar, val in zip(bars, means):
+        ax.text(
+            bar.get_width() + 1,
+            bar.get_y() + bar.get_height() / 2,
+            f"{val:.0f}ms",
+            va="center",
+            fontsize=9,
+        )
+    ax.set_xlabel("Avg TTFT (ms)")
+    ax.set_title("TTFT Comparison Across Models", fontweight="bold", fontsize=12)
+    ax.grid(axis="x", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "13_ttft_comparison")
+
+
+# ---------------------------------------------------------------------------
+# Chart 14: TPS Comparison (Horizontal Bar)
+# ---------------------------------------------------------------------------
+
+
+def plot_tps_comparison(runs: list[dict[str, Any]], output_dir: Path) -> Path | None:
+    """Horizontal bar chart: avg TPS per model."""
+    plt_mod = _require_matplotlib()
+    if not runs:
+        return None
+
+    model_tps: dict[str, list[float]] = {}
+    for r in runs:
+        model = r.get("model", "unknown")
+        tps = r.get("avg_tokens_per_second", 0)
+        if tps > 0:
+            model_tps.setdefault(model, []).append(tps)
+
+    if not model_tps:
+        return None
+
+    models = sorted(model_tps.keys())
+    means = [sum(v) / len(v) for v in model_tps.values()]
+
+    fig, ax = plt_mod.subplots(figsize=(8, max(3, len(models) * 0.7)))
+    colors = [COLORS.get(m.lower().split("/")[0], "#38A169") for m in models]
+    bars = ax.barh(models, means, color=colors, edgecolor="white", height=0.5)
+    for bar, val in zip(bars, means):
+        ax.text(
+            bar.get_width() + 0.5,
+            bar.get_y() + bar.get_height() / 2,
+            f"{val:.1f} t/s",
+            va="center",
+            fontsize=9,
+        )
+    ax.set_xlabel("Avg Tokens Per Second")
+    ax.set_title("TPS Comparison Across Models", fontweight="bold", fontsize=12)
+    ax.grid(axis="x", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "14_tps_comparison")
+
+
+# ---------------------------------------------------------------------------
+# Chart 15: Framework Category Comparison (Side-by-Side Stacked Bars)
+# ---------------------------------------------------------------------------
+
+
+def plot_framework_category_comparison(
+    gaia_runs: list[dict[str, Any]],
+    clawflow_runs: list[dict[str, Any]],
+    output_dir: Path,
+) -> Path | None:
+    """Side-by-side stacked bars: GAIA vs ClawFlow category distribution."""
+    plt_mod = _require_matplotlib()
+    if not gaia_runs and not clawflow_runs:
+        return None
+
+    all_cats = set()
+    for r in gaia_runs + clawflow_runs:
+        all_cats.update(r.get("category_counts", {}).keys())
+    if not all_cats:
+        return None
+
+    cats = sorted(all_cats)
+    cat_colors = [COLORS.get(c.lower(), "#4c78a8") for c in cats]
+
+    def _avg_counts(runs):
+        if not runs:
+            return {c: 0 for c in cats}
+        totals = {c: 0 for c in cats}
+        for r in runs:
+            for c in cats:
+                totals[c] += r.get("category_counts", {}).get(c, 0)
+        return {c: totals[c] / len(runs) for c in cats}
+
+    gaia_avgs = _avg_counts(gaia_runs)
+    cf_avgs = _avg_counts(clawflow_runs)
+
+    fig, ax = plt_mod.subplots(figsize=(7, 4))
+    x = [0, 1]
+    width = 0.35
+    bottom_g = [0, 0]
+    bottom_cf = [0, 0]
+
+    for i, cat in enumerate(cats):
+        vals_g = [gaia_avgs[cat], 0] if gaia_runs else [0, 0]
+        vals_cf = [0, cf_avgs[cat]] if clawflow_runs else [0, 0]
+        if gaia_runs:
+            ax.bar(
+                [x[0]],
+                vals_g,
+                bottom=bottom_g[0:1],
+                label=cat if i == 0 else "",
+                color=cat_colors[i],
+                alpha=0.85,
+            )
+            bottom_g = [b + v for b, v in zip(bottom_g, vals_g)]
+        if clawflow_runs:
+            ax.bar(
+                [x[1]],
+                vals_cf,
+                bottom=bottom_cf[1:2],
+                label=cat if i == 0 else "",
+                color=cat_colors[i],
+                alpha=0.65,
+            )
+            bottom_cf = [b + v for b, v in zip(bottom_cf, vals_cf)]
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(["GAIA", "ClawFlow"])
+    ax.set_ylabel("Avg emails per category")
+    ax.set_title("Framework Category Comparison", fontweight="bold", fontsize=12)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "15_framework_category_comparison")
+
+
+# ---------------------------------------------------------------------------
+# Chart 16: Architecture Radar (Radar/Spider Chart)
+# ---------------------------------------------------------------------------
+
+
+def plot_architecture_radar(
+    gaia_result: dict[str, Any],
+    clawflow_result: dict[str, Any],
+    output_dir: Path,
+) -> Path | None:
+    """Radar/spider chart comparing GAIA vs ClawFlow on multiple dimensions."""
+    plt_mod = _require_matplotlib()
+    if not gaia_result or not clawflow_result:
+        return None
+
+    # Normalized dimensions (0-1 scale).
+    def _normalize(val, max_val):
+        return min(val / max(max_val, 1), 1.0)
+
+    g_dur = gaia_result.get("total_duration_ms", 0)
+    c_dur = clawflow_result.get("total_duration_ms", 0)
+    max_dur = max(g_dur, c_dur, 1)
+
+    g_tok = gaia_result.get("total_tokens", 0)
+    c_tok = clawflow_result.get("total_tokens", 0)
+    max_tok = max(g_tok, c_tok, 1)
+
+    g_ttft = gaia_result.get("avg_time_to_first_token_ms", 0)
+    c_ttft = clawflow_result.get("avg_time_to_first_token_ms", 0)
+    max_ttft = max(g_ttft, c_ttft, 1)
+
+    g_emails = gaia_result.get("total_emails", 0)
+    c_emails = clawflow_result.get("total_emails", 0)
+    max_emails = max(g_emails, c_emails, 1)
+
+    categories = ["Duration", "Tokens", "TTFT", "Emails Processed"]
+    gaia_vals = [
+        1.0 - _normalize(g_dur, max_dur),  # Lower is better (invert)
+        1.0 - _normalize(g_tok, max_tok),
+        1.0 - _normalize(g_ttft, max_ttft),
+        _normalize(g_emails, max_emails),  # Higher is better
+    ]
+    cf_vals = [
+        1.0 - _normalize(c_dur, max_dur),
+        1.0 - _normalize(c_tok, max_tok),
+        1.0 - _normalize(c_ttft, max_ttft),
+        _normalize(c_emails, max_emails),
+    ]
+
+    N = len(categories)
+    angles = [n / N * 2 * math.pi for n in range(N)]
+    angles += angles[:1]  # Close the radar.
+
+    fig, ax = plt_mod.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    gaia_vals += gaia_vals[:1]
+    cf_vals += cf_vals[:1]
+
+    ax.plot(angles, gaia_vals, "o-", linewidth=2, label="GAIA", color=COLORS["gaia"])
+    ax.fill(angles, gaia_vals, alpha=0.15, color=COLORS["gaia"])
+    ax.plot(
+        angles, cf_vals, "s-", linewidth=2, label="ClawFlow", color=COLORS["clawflow"]
+    )
+    ax.fill(angles, cf_vals, alpha=0.15, color=COLORS["clawflow"])
+
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(categories, fontsize=9)
+    ax.set_ylim(0, 1)
+    ax.set_title(
+        "Architecture Comparison Radar\n(higher = better)",
+        fontweight="bold",
+        fontsize=12,
+        pad=20,
+    )
+    ax.legend(loc="upper right", fontsize=10)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "16_architecture_radar")
+
+
+# ---------------------------------------------------------------------------
+# Chart 17: Per-Model Variance Trend (Multi-Line)
+# ---------------------------------------------------------------------------
+
+
+def plot_per_model_variance_trend(
+    runs: list[dict[str, Any]], output_dir: Path
+) -> Path | None:
+    """Multi-line chart showing token variance per model across iterations."""
+    plt_mod = _require_matplotlib()
+    if not runs:
+        return None
+
+    # Group by model, preserve iteration order.
+    model_tokens: dict[str, list[int]] = {}
+    for r in runs:
+        model = r.get("model", "unknown")
+        model_tokens.setdefault(model, []).append(r.get("total_tokens", 0))
+
+    # Only show models with >= 2 runs.
+    models_with_runs = {m: v for m, v in model_tokens.items() if len(v) >= 2}
+    if not models_with_runs:
+        return None
+
+    max_iters = max(len(v) for v in models_with_runs.values())
+    fig, ax = plt_mod.subplots(figsize=(max(6, max_iters * 1.5), 4))
+
+    model_colors = [
+        COLORS.get(m.lower().split("/")[0], f"C{i}")
+        for i, m in enumerate(models_with_runs)
+    ]
+    for i, (model, vals) in enumerate(models_with_runs.items()):
+        x = list(range(1, len(vals) + 1))
+        ax.plot(
+            x,
+            vals,
+            marker="o",
+            linestyle="-",
+            linewidth=2,
+            color=model_colors[i],
+            label=model[:25],
+        )
+
+    ax.set_xlabel("Run iteration")
+    ax.set_ylabel("Total tokens")
+    ax.set_title(
+        "Per-Model Token Variance Across Iterations", fontweight="bold", fontsize=12
+    )
+    ax.legend(fontsize=8)
+    ax.grid(True, linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "17_per_model_variance_trend")
+
+
+# ---------------------------------------------------------------------------
+# Chart 18: Cold-Start Impact (Scatter with Annotation)
+# ---------------------------------------------------------------------------
+
+
+def plot_cold_start_impact(runs: list[dict[str, Any]], output_dir: Path) -> Path | None:
+    """Scatter plot: duration vs tokens, annotated with cold-start markers."""
+    plt_mod = _require_matplotlib()
+    if not runs:
+        return None
+
+    cold_points = []
+    warm_points = []
+    for r in runs:
+        dur = r.get("total_duration_ms", 0) / 1000
+        tok = r.get("total_tokens", 0)
+        is_cold = r.get("is_cold_start", False)
+        if is_cold:
+            cold_points.append((dur, tok, r.get("model", "unknown")))
+        else:
+            warm_points.append((dur, tok, r.get("model", "unknown")))
+
+    if not cold_points:
+        return None
+
+    fig, ax = plt_mod.subplots(figsize=(8, 4))
+
+    if warm_points:
+        wx, wy = zip(*[(p[0], p[1]) for p in warm_points])
+        ax.scatter(
+            wx,
+            wy,
+            c=COLORS["clawflow"],
+            alpha=0.7,
+            s=80,
+            edgecolors="white",
+            label="Warm start",
+        )
+
+    if cold_points:
+        cx, cy = zip(*[(p[0], p[1]) for p in cold_points])
+        ax.scatter(
+            cx,
+            cy,
+            c=COLORS["urgent"],
+            alpha=0.9,
+            s=120,
+            edgecolors="black",
+            marker="D",
+            label="Cold start",
+        )
+        # Annotate cold-start points.
+        for dur, tok, model in cold_points:
+            ax.annotate(
+                model[:20],
+                (dur, tok),
+                textcoords="offset points",
+                xytext=(8, 5),
+                fontsize=7,
+            )
+
+    # Add cold-start impact annotation.
+    if warm_points and cold_points:
+        warm_avg_dur = sum(p[0] for p in warm_points) / len(warm_points)
+        cold_avg_dur = sum(p[0] for p in cold_points) / len(cold_points)
+        overhead_pct = (
+            ((cold_avg_dur - warm_avg_dur) / warm_avg_dur * 100)
+            if warm_avg_dur > 0
+            else 0
+        )
+        props = dict(
+            boxstyle="round,pad=0.4",
+            facecolor="#FFF5F5",
+            edgecolor="#E53E3E",
+            alpha=0.9,
+        )
+        text = (
+            f"Cold-start overhead: +{overhead_pct:.0f}%\n"
+            f"Warm avg: {warm_avg_dur:.1f}s  |  Cold avg: {cold_avg_dur:.1f}s"
+        )
+        ax.text(
+            0.02,
+            0.95,
+            text,
+            transform=ax.transAxes,
+            fontsize=8,
+            verticalalignment="top",
+            fontfamily="monospace",
+            bbox=props,
+        )
+
+    ax.set_xlabel("Duration (seconds)")
+    ax.set_ylabel("Total tokens")
+    ax.set_title("Cold-Start Impact on Duration", fontweight="bold", fontsize=12)
+    ax.legend(fontsize=9)
+    ax.grid(True, linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "18_cold_start_impact")
+
 
 def generate_charts(
     json_path: Path | None = None,
     jsonl_path: Path | None = None,
     interactive_path: Path | None = None,
     output_dir: Path | None = None,
+    *,
+    multi_model_runs: list[dict[str, Any]] | None = None,
+    clawflow_result: dict[str, Any] | None = None,
+    gaia_result_for_comparison: dict[str, Any] | None = None,
 ) -> list[Path]:
     """Generate all applicable charts from benchmark output files.
 
@@ -688,39 +1479,69 @@ def generate_charts(
         p = plot_category_distribution(run, output_dir)
         if p:
             paths.append(p)
-            charts_index.append((p.name, "Category Distribution — Horizontal bar chart of email categories"))
+            charts_index.append(
+                (
+                    p.name,
+                    "Category Distribution — Horizontal bar chart of email categories",
+                )
+            )
 
         # Chart 2: Token composition (full/interactive only)
         if mode in ("full", "interactive"):
             p = plot_token_composition(run, output_dir)
             if p:
                 paths.append(p)
-                charts_index.append((p.name, "Token Composition — Donut chart of input, reasoning, and output tokens"))
+                charts_index.append(
+                    (
+                        p.name,
+                        "Token Composition — Donut chart of input, reasoning, and output tokens",
+                    )
+                )
 
             # Chart 3: Duration vs tokens (full/interactive only)
             p = plot_duration_vs_tokens(run, output_dir)
             if p:
                 paths.append(p)
-                charts_index.append((p.name, "Duration vs Token Cost — Grouped column of total time and tokens"))
+                charts_index.append(
+                    (
+                        p.name,
+                        "Duration vs Token Cost — Grouped column of total time and tokens",
+                    )
+                )
 
         # Chart 4: Per-email duration histogram (always)
         p = plot_email_duration_histogram(run, output_dir)
         if p:
             paths.append(p)
-            charts_index.append((p.name, "Per-Email Duration Distribution — Histogram of processing times"))
+            charts_index.append(
+                (
+                    p.name,
+                    "Per-Email Duration Distribution — Histogram of processing times",
+                )
+            )
 
         # Chart 9: Token vs duration scatter
         p = plot_token_duration_scatter(run, output_dir)
         if p:
             paths.append(p)
-            charts_index.append((p.name, "Token vs Duration Relationship — Scatter plot with trend line"))
+            charts_index.append(
+                (
+                    p.name,
+                    "Token vs Duration Relationship — Scatter plot with trend line",
+                )
+            )
 
         # Chart 10: Per-step TTFT & TPS (full mode only)
         if mode in ("full", "interactive"):
             p = plot_step_performance(run, output_dir)
             if p:
                 paths.append(p)
-                charts_index.append((p.name, "Per-Step TTFT & TPS — Dual-axis line chart of latency and throughput per LLM call"))
+                charts_index.append(
+                    (
+                        p.name,
+                        "Per-Step TTFT & TPS — Dual-axis line chart of latency and throughput per LLM call",
+                    )
+                )
 
     # --- Variance trend charts (multi-iteration) ---
     if jsonl_path and jsonl_path.exists():
@@ -730,13 +1551,23 @@ def generate_charts(
             trend_paths = plot_variance_trend(runs, output_dir)
             paths.extend(trend_paths)
             for tp in trend_paths:
-                charts_index.append((tp.name, "LLM Non-Determinism Trend — Line graph with μ, σ, CV% showing token/duration variance across identical runs"))
+                charts_index.append(
+                    (
+                        tp.name,
+                        "LLM Non-Determinism Trend — Line graph with μ, σ, CV% showing token/duration variance across identical runs",
+                    )
+                )
 
             # Chart 8: Category stability stacked bar
             p = plot_category_stability(runs, output_dir)
             if p:
                 paths.append(p)
-                charts_index.append((p.name, "Category Stability — Stacked bar; identical bars confirm deterministic heuristic classification"))
+                charts_index.append(
+                    (
+                        p.name,
+                        "Category Stability — Stacked bar; identical bars confirm deterministic heuristic classification",
+                    )
+                )
 
     # --- Interactive mode charts ---
     if interactive_path and interactive_path.exists():
@@ -746,13 +1577,116 @@ def generate_charts(
         p = plot_interactive_turns(interactive, output_dir)
         if p:
             paths.append(p)
-            charts_index.append((p.name, "Interactive Turn Breakdown — Per-turn duration and tokens"))
+            charts_index.append(
+                (p.name, "Interactive Turn Breakdown — Per-turn duration and tokens")
+            )
 
         # Chart 7: Interactive token heatmap
         p = plot_interactive_heatmap(interactive, output_dir)
         if p:
             paths.append(p)
-            charts_index.append((p.name, "Interactive Token Heatmap — Turn x Step matrix of token consumption"))
+            charts_index.append(
+                (
+                    p.name,
+                    "Interactive Token Heatmap — Turn x Step matrix of token consumption",
+                )
+            )
+
+    # --- Multi-model charts ---
+    if multi_model_runs and len(multi_model_runs) >= 2:
+        # Chart 11: Model duration comparison
+        p = plot_model_duration_comparison(multi_model_runs, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Model Duration Comparison — Grouped column of mean and min duration per model",
+                )
+            )
+
+        # Chart 12: Model token cost
+        p = plot_model_token_cost(multi_model_runs, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Model Token Cost — Stacked column of input/output/reasoning tokens per model",
+                )
+            )
+
+        # Chart 13: TTFT comparison
+        p = plot_ttft_comparison(multi_model_runs, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "TTFT Comparison — Horizontal bar of avg time-to-first-token per model",
+                )
+            )
+
+        # Chart 14: TPS comparison
+        p = plot_tps_comparison(multi_model_runs, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "TPS Comparison — Horizontal bar of avg tokens-per-second per model",
+                )
+            )
+
+        # Chart 17: Per-model variance trend
+        p = plot_per_model_variance_trend(multi_model_runs, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Per-Model Variance Trend — Multi-line chart of token variance across iterations",
+                )
+            )
+
+        # Chart 18: Cold-start impact
+        p = plot_cold_start_impact(multi_model_runs, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Cold-Start Impact — Scatter plot with annotation showing cold vs warm start overhead",
+                )
+            )
+
+    # --- Framework comparison charts ---
+    if clawflow_result and gaia_result_for_comparison:
+        # Chart 15: Framework category comparison
+        gaia_list = [gaia_result_for_comparison]
+        cf_list = [clawflow_result]
+        p = plot_framework_category_comparison(gaia_list, cf_list, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Framework Category Comparison — Side-by-side stacked bars of GAIA vs ClawFlow categories",
+                )
+            )
+
+        # Chart 16: Architecture radar
+        p = plot_architecture_radar(
+            gaia_result_for_comparison, clawflow_result, output_dir
+        )
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Architecture Radar — Spider chart comparing GAIA vs ClawFlow on multiple normalized dimensions",
+                )
+            )
 
     # --- Write charts index ---
     if charts_index:
@@ -777,8 +1711,10 @@ def generate_charts(
 # CLI entry point
 # ---------------------------------------------------------------------------
 
+
 def build_parser():
     import argparse
+
     parser = argparse.ArgumentParser(
         prog="gaia email bench --visualize",
         description="Generate charts from benchmark JSON/JSONL output.",
@@ -786,8 +1722,12 @@ def build_parser():
     parser.add_argument("--json-path", type=str, help="Path to results.json")
     parser.add_argument("--jsonl-path", type=str, help="Path to results.jsonl")
     parser.add_argument("--interactive-path", type=str, help="Path to interactive.json")
-    parser.add_argument("--output-dir", type=str, default="benchmark_charts",
-                        help="Directory to write chart PNGs")
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="benchmark_charts",
+        help="Directory to write chart PNGs",
+    )
     return parser
 
 
@@ -801,18 +1741,26 @@ def main(argv: list[str] | None = None) -> int:
             if candidate.exists():
                 args.json_path = str(candidate)
                 break
-        for candidate in [Path("results.jsonl"), Path("benchmark_results/results.jsonl")]:
+        for candidate in [
+            Path("results.jsonl"),
+            Path("benchmark_results/results.jsonl"),
+        ]:
             if candidate.exists():
                 args.jsonl_path = str(candidate)
                 break
-        for candidate in [Path("interactive.json"), Path("benchmark_results/interactive.json")]:
+        for candidate in [
+            Path("interactive.json"),
+            Path("benchmark_results/interactive.json"),
+        ]:
             if candidate.exists():
                 args.interactive_path = str(candidate)
                 break
 
         if not any([args.json_path, args.jsonl_path, args.interactive_path]):
-            print("Error: No benchmark output files found. "
-                  "Run a benchmark first or specify --json-path/--jsonl-path/--interactive-path")
+            print(
+                "Error: No benchmark output files found. "
+                "Run a benchmark first or specify --json-path/--jsonl-path/--interactive-path"
+            )
             return 1
 
     generate_charts(

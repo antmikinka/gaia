@@ -5,12 +5,24 @@ Benchmark harness for the GAIA Email Triage Agent.
 
 Produces CSV/JSON/JSONL output compatible with openclaw-eval's
 inbox_zero benchmarks, with +/- variance analysis across runs.
+
+Extended for multi-model support and cross-framework (GAIA vs ClawFlow) comparison.
 """
 
+from gaia.agents.email.bench.clawflow_adapter import (
+    normalize_categories,
+    parse_clawflow_output,
+    probe_clawflow,
+    run_clawflow,
+)
 from gaia.agents.email.bench.compare import (
+    FrameworkComparison,
     ModeComparison,
+    compare_frameworks,
     compare_modes,
+    print_framework_comparison,
     print_mode_comparison,
+    save_framework_comparison,
     save_mode_comparison,
 )
 from gaia.agents.email.bench.output import (
@@ -35,20 +47,32 @@ from gaia.agents.email.bench.runner import (
 from gaia.agents.email.bench.variance import (
     ComparisonReport,
     VarianceSummary,
+    bootstrap_ci,
+    cliffs_delta,
     compare_runs,
+    compare_runs_by_model,
+    mann_whitney_u,
     to_dict,
 )
 from gaia.agents.email.bench.visualize import (
     generate_charts,
+    plot_architecture_radar,
     plot_category_distribution,
     plot_category_stability,
+    plot_cold_start_impact,
     plot_duration_vs_tokens,
     plot_email_duration_histogram,
+    plot_framework_category_comparison,
     plot_interactive_heatmap,
     plot_interactive_turns,
+    plot_model_duration_comparison,
+    plot_model_token_cost,
+    plot_per_model_variance_trend,
     plot_step_performance,
     plot_token_composition,
     plot_token_duration_scatter,
+    plot_tps_comparison,
+    plot_ttft_comparison,
     plot_variance_trend,
 )
 
@@ -73,23 +97,44 @@ __all__ = [
     # Variance
     "ComparisonReport",
     "VarianceSummary",
+    "bootstrap_ci",
+    "cliffs_delta",
     "compare_runs",
+    "compare_runs_by_model",
+    "mann_whitney_u",
     "to_dict",
     # Compare
+    "FrameworkComparison",
     "ModeComparison",
+    "compare_frameworks",
     "compare_modes",
+    "print_framework_comparison",
     "print_mode_comparison",
+    "save_framework_comparison",
     "save_mode_comparison",
     # Visualize
     "generate_charts",
+    "plot_architecture_radar",
     "plot_category_distribution",
     "plot_category_stability",
+    "plot_cold_start_impact",
     "plot_duration_vs_tokens",
     "plot_email_duration_histogram",
+    "plot_framework_category_comparison",
     "plot_interactive_heatmap",
     "plot_interactive_turns",
+    "plot_model_duration_comparison",
+    "plot_model_token_cost",
+    "plot_per_model_variance_trend",
     "plot_step_performance",
     "plot_token_composition",
     "plot_token_duration_scatter",
+    "plot_ttft_comparison",
+    "plot_tps_comparison",
     "plot_variance_trend",
+    # ClawFlow adapter
+    "normalize_categories",
+    "parse_clawflow_output",
+    "probe_clawflow",
+    "run_clawflow",
 ]

@@ -39,7 +39,7 @@ class StepResult:
     total_tokens: int = 0
     duration_ms: int = 0
     time_to_first_token_ms: float = 0.0  # TTFT: time from prompt send to first token
-    tokens_per_second: float = 0.0       # TPS: inference throughput
+    tokens_per_second: float = 0.0  # TPS: inference throughput
     status: str = "ok"
 
 
@@ -131,6 +131,9 @@ class RunResult:
     category_counts: dict[str, int] = field(default_factory=dict)
     status: str = "ok"
     error: str = ""
+    # Multi-model / cross-framework extensions.
+    is_cold_start: bool = False
+    source_framework: str = "gaia"
 
 
 # ---------------------------------------------------------------------------
@@ -302,7 +305,7 @@ def _run_full_agent(
 
     from gaia.agents.email.agent import EmailTriageAgent
     from gaia.agents.email.config import EmailAgentConfig
-    from gaia.agents.email.fake_gmail import FakeGmailBackend, FakeCalendarBackend
+    from gaia.agents.email.fake_gmail import FakeCalendarBackend, FakeGmailBackend
 
     run_id = f"run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{model_id.replace('/', '-')}-{uuid.uuid4().hex[:6]}"
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -485,7 +488,9 @@ def _run_full_agent(
         )
 
     # Compute TTFT and TPS averages across all steps.
-    ttft_vals = [s.time_to_first_token_ms for s in step_results if s.time_to_first_token_ms > 0]
+    ttft_vals = [
+        s.time_to_first_token_ms for s in step_results if s.time_to_first_token_ms > 0
+    ]
     tps_vals = [s.tokens_per_second for s in step_results if s.tokens_per_second > 0]
     avg_ttft = sum(ttft_vals) / len(ttft_vals) if ttft_vals else 0.0
     avg_tps = sum(tps_vals) / len(tps_vals) if tps_vals else 0.0
@@ -504,7 +509,9 @@ def _run_full_agent(
         avg_tokens_per_second=round(avg_tps, 1),
         categories=sorted(category_counts.keys()),
         status="completed" if email_results else "error",
-        error="No triage results found in agent conversation" if not email_results else "",
+        error=(
+            "No triage results found in agent conversation" if not email_results else ""
+        ),
     )
 
     run = RunResult(
@@ -526,7 +533,9 @@ def _run_full_agent(
         avg_tokens_per_second=round(avg_tps, 1),
         category_counts=category_counts,
         status="completed" if email_results else "error",
-        error="No triage results found in agent conversation" if not email_results else "",
+        error=(
+            "No triage results found in agent conversation" if not email_results else ""
+        ),
     )
 
     return run
@@ -601,7 +610,9 @@ def _extract_emails_affected(agent_result: dict) -> list[str]:
             content = msg["content"]
             if isinstance(content, list):
                 text = "".join(
-                    block.get("text", "") for block in content if isinstance(block, dict)
+                    block.get("text", "")
+                    for block in content
+                    if isinstance(block, dict)
                 )
             elif isinstance(content, str):
                 text = content
@@ -651,14 +662,12 @@ def run_interactive_benchmark(
 
     from gaia.agents.email.agent import EmailTriageAgent
     from gaia.agents.email.config import EmailAgentConfig
-    from gaia.agents.email.fake_gmail import FakeGmailBackend, FakeCalendarBackend
+    from gaia.agents.email.fake_gmail import FakeCalendarBackend, FakeGmailBackend
 
     run_id = f"run-interactive-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{model_id.replace('/', '-')}-{uuid.uuid4().hex[:6]}"
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    scenario = scenario or [
-        p.format(limit=limit) for p in DEFAULT_INTERACTIVE_SCENARIO
-    ]
+    scenario = scenario or [p.format(limit=limit) for p in DEFAULT_INTERACTIVE_SCENARIO]
 
     fake = FakeGmailBackend(mbox_path=Path(mbox_path))
     fake_cal = FakeCalendarBackend()
@@ -723,8 +732,12 @@ def run_interactive_benchmark(
             output_tokens=output_tokens,
             reasoning_tokens=sum(s.reasoning_tokens for s in steps),
             total_tokens=total_tokens,
-            time_to_first_token_ms=round(sum(s.time_to_first_token_ms for s in steps) / max(len(steps), 1), 1),
-            tokens_per_second=round(sum(s.tokens_per_second for s in steps) / max(len(steps), 1), 1),
+            time_to_first_token_ms=round(
+                sum(s.time_to_first_token_ms for s in steps) / max(len(steps), 1), 1
+            ),
+            tokens_per_second=round(
+                sum(s.tokens_per_second for s in steps) / max(len(steps), 1), 1
+            ),
             final_answer=str(final)[:500] if final else "",
             status="ok",
         )
@@ -733,25 +746,41 @@ def run_interactive_benchmark(
         # Print per-turn summary.
         tool_str = ", ".join(tools) if tools else "(no tools)"
         print(f"  Duration: {turn_duration/1000:.1f}s")
-        print(f"  Tokens:   {total_tokens:,} (in={input_tokens}, out={output_tokens}, reasoning={turn.reasoning_tokens})")
+        print(
+            f"  Tokens:   {total_tokens:,} (in={input_tokens}, out={output_tokens}, reasoning={turn.reasoning_tokens})"
+        )
         print(f"  Tools:    {tool_str}")
         print(f"  Emails:   {len(email_ids)} affected")
         if steps:
             for s in steps:
-                time_str = f"{s.duration_ms}ms" if s.duration_ms < 1000 else f"{s.duration_ms/1000:.1f}s"
-                ttft_str = f"{s.time_to_first_token_ms:.0f}ms" if s.time_to_first_token_ms > 0 else "n/a"
-                tps_str = f"{s.tokens_per_second:.1f}t/s" if s.tokens_per_second > 0 else ""
+                time_str = (
+                    f"{s.duration_ms}ms"
+                    if s.duration_ms < 1000
+                    else f"{s.duration_ms/1000:.1f}s"
+                )
+                ttft_str = (
+                    f"{s.time_to_first_token_ms:.0f}ms"
+                    if s.time_to_first_token_ms > 0
+                    else "n/a"
+                )
+                tps_str = (
+                    f"{s.tokens_per_second:.1f}t/s" if s.tokens_per_second > 0 else ""
+                )
                 perf = f"{ttft_str}"
                 if tps_str:
                     perf += f" / {tps_str}"
-                print(f"    Step {s.step_number}: {s.input_tokens} in / {s.output_tokens} out / {s.reasoning_tokens} reasoning / {s.total_tokens} total / {time_str} / {perf}")
+                print(
+                    f"    Step {s.step_number}: {s.input_tokens} in / {s.output_tokens} out / {s.reasoning_tokens} reasoning / {s.total_tokens} total / {time_str} / {perf}"
+                )
 
     total_duration_ms = int((time.monotonic() - total_start) * 1000)
     total_tokens = sum(t.total_tokens for t in turns)
     total_input = sum(t.input_tokens for t in turns)
     total_output = sum(t.output_tokens for t in turns)
     total_reasoning = sum(t.reasoning_tokens for t in turns)
-    ttft_vals = [t.time_to_first_token_ms for t in turns if t.time_to_first_token_ms > 0]
+    ttft_vals = [
+        t.time_to_first_token_ms for t in turns if t.time_to_first_token_ms > 0
+    ]
     tps_vals = [t.tokens_per_second for t in turns if t.tokens_per_second > 0]
     avg_ttft = sum(ttft_vals) / len(ttft_vals) if ttft_vals else 0.0
     avg_tps = sum(tps_vals) / len(tps_vals) if tps_vals else 0.0
@@ -796,7 +825,9 @@ def run_interactive_benchmark(
     print(f"    Input:    {total_input:,}")
     print(f"    Output:   {total_output:,}")
     print(f"    Reasoning: {total_reasoning:,}")
-    print(f"  Avg/turn:  {summary['avg_tokens_per_turn']} tokens, {summary['avg_duration_per_turn_ms']}ms")
+    print(
+        f"  Avg/turn:  {summary['avg_tokens_per_turn']} tokens, {summary['avg_duration_per_turn_ms']}ms"
+    )
     print(f"  Tools:     {', '.join(all_tools)}")
     print(f"  Emails:    {len(all_emails)} unique emails affected")
     print(f"{'='*70}\n")

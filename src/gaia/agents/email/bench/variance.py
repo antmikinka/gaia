@@ -6,11 +6,15 @@ Variance analysis for the GAIA Email Triage Agent benchmark.
 Computes statistical summaries (mean, stdev, min, max, CV%) and
 +/- deltas between consecutive runs for duration, tokens, and
 category distributions.
+
+Extended for multi-model support: per-model grouping, Mann-Whitney U,
+Cliff's delta, bootstrap confidence intervals, and extended percentiles.
 """
 
 from __future__ import annotations
 
 import math
+import random
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -32,7 +36,7 @@ class RunDelta:
     delta_total_tokens: int
     delta_total_emails: int
     delta_avg_ttft_ms: float = 0.0  # B - A, avg TTFT in milliseconds
-    delta_avg_tps: float = 0.0      # B - A, avg tokens per second
+    delta_avg_tps: float = 0.0  # B - A, avg tokens per second
     category_deltas: dict[str, int] = field(default_factory=dict)
     # Per-category: count in B - count in A
 
@@ -50,7 +54,7 @@ class BatchDelta:
     delta_reasoning_tokens: int
     delta_avg_ttft_ms: float = 0.0
     delta_avg_tps: float = 0.0
-    delta_email_count: int
+    delta_email_count: int = 0
 
 
 @dataclass
@@ -64,6 +68,17 @@ class VarianceSummary:
     max_val: float
     cv_pct: float  # coefficient of variation (%)
     values: list[float] = field(default_factory=list)
+    # Extended percentiles and robust statistics (multi-model support).
+    median: float = 0.0
+    p25: float = 0.0
+    p75: float = 0.0
+    p95: float = 0.0
+    p99: float = 0.0
+    iqr: float = 0.0  # interquartile range (p75 - p25)
+    mad: float = 0.0  # median absolute deviation
+    skewness: float = 0.0
+    n: int = 0  # total runs included
+    filtered_n: int = 0  # runs after filtering (e.g., cold-start excluded)
 
 
 @dataclass
@@ -101,8 +116,57 @@ def _cv_pct(_values: list[float], mean_val: float, stdev_val: float) -> float:
     return abs(stdev_val / mean_val) * 100
 
 
+# ---------------------------------------------------------------------------
+# Extended percentile / robust statistic helpers
+# ---------------------------------------------------------------------------
+
+
+def _percentile(values: list[float], p: float) -> float:
+    """Compute the p-th percentile (0-100) using linear interpolation."""
+    if not values:
+        return 0.0
+    s = sorted(values)
+    n = len(s)
+    if n == 1:
+        return s[0]
+    # Linear interpolation (same as numpy default).
+    k = (p / 100.0) * (n - 1)
+    f = math.floor(k)
+    c = math.ceil(k)
+    if f == c:
+        return s[int(k)]
+    d0 = s[f] * (c - k)
+    d1 = s[c] * (k - f)
+    return d0 + d1
+
+
+def _median(values: list[float]) -> float:
+    return _percentile(values, 50)
+
+
+def _mad(values: list[float]) -> float:
+    """Median Absolute Deviation."""
+    if not values:
+        return 0.0
+    med = _median(values)
+    return _median([abs(v - med) for v in values])
+
+
+def _skewness(values: list[float]) -> float:
+    """Fisher-Pearson skewness coefficient."""
+    n = len(values)
+    if n < 3:
+        return 0.0
+    m = _mean(values)
+    s = _stdev(values, m)
+    if s == 0:
+        return 0.0
+    m3 = sum((v - m) ** 3 for v in values) / n
+    return m3 / (s**3)
+
+
 def compute_variance(values: list[float], *, metric_name: str = "") -> VarianceSummary:
-    """Compute mean/stdev/min/max/CV% for a list of values."""
+    """Compute mean/stdev/min/max/CV% + extended percentiles for a list of values."""
     if not values:
         return VarianceSummary(
             metric=metric_name,
@@ -114,6 +178,8 @@ def compute_variance(values: list[float], *, metric_name: str = "") -> VarianceS
         )
     m = _mean(values)
     s = _stdev(values, m)
+    p25 = _percentile(values, 25)
+    p75 = _percentile(values, 75)
     return VarianceSummary(
         metric=metric_name,
         mean=round(m, 2),
@@ -122,6 +188,16 @@ def compute_variance(values: list[float], *, metric_name: str = "") -> VarianceS
         max_val=max(values),
         cv_pct=round(_cv_pct(values, m, s), 2),
         values=values,
+        median=round(_percentile(values, 50), 2),
+        p25=round(p25, 2),
+        p75=round(p75, 2),
+        p95=round(_percentile(values, 95), 2),
+        p99=round(_percentile(values, 99), 2),
+        iqr=round(p75 - p25, 2),
+        mad=round(_mad(values), 2),
+        skewness=round(_skewness(values), 4),
+        n=len(values),
+        filtered_n=len(values),
     )
 
 
@@ -298,7 +374,9 @@ def compare_runs(runs: list[dict]) -> ComparisonReport:
         values_ms = [run.get(key, 0) for run in runs]
         values_mins = [v / 60_000 for v in values_ms]
         display_key = key.replace("_ms", "_mins")
-        variance_summaries.append(compute_variance(values_mins, metric_name=display_key))
+        variance_summaries.append(
+            compute_variance(values_mins, metric_name=display_key)
+        )
 
     # Non-duration metrics: pass through as-is.
     for metric_key in [
@@ -363,13 +441,22 @@ def print_comparison_report(report: ComparisonReport) -> None:
         print("\n  Variance Summary (across all runs):")
         print(f"  {'─'*66}")
         for vs in report.variance_summaries:
-            print(
+            line = (
                 f"  {vs.metric:<30s}: μ={vs.mean:>10.2f}  "
                 f"σ={vs.stdev:>10.2f}  "
                 f"min={vs.min_val:>8.2f}  "
                 f"max={vs.max_val:>8.2f}  "
                 f"CV={vs.cv_pct:>5.1f}%"
             )
+            # Extended stats on a second line if n >= 2.
+            if vs.n >= 2 and vs.median != 0:
+                line += (
+                    f"\n  {'':>30s}  median={vs.median:>8.2f}  "
+                    f"IQR={vs.iqr:>8.2f}  "
+                    f"MAD={vs.mad:>8.2f}  "
+                    f"skew={vs.skewness:>6.2f}"
+                )
+            print(line)
 
     if report.category_stability:
         print("\n  Category Stability:")
@@ -428,8 +515,182 @@ def to_dict(report: ComparisonReport) -> dict[str, Any]:
                 "min": vs.min_val,
                 "max": vs.max_val,
                 "cv_pct": vs.cv_pct,
+                "median": vs.median,
+                "p25": vs.p25,
+                "p75": vs.p75,
+                "p95": vs.p95,
+                "p99": vs.p99,
+                "iqr": vs.iqr,
+                "mad": vs.mad,
+                "skewness": vs.skewness,
+                "n": vs.n,
+                "filtered_n": vs.filtered_n,
             }
             for vs in report.variance_summaries
         ],
         "category_stability": report.category_stability,
     }
+
+
+# ---------------------------------------------------------------------------
+# Cross-model grouping
+# ---------------------------------------------------------------------------
+
+
+def compare_runs_by_model(runs: list[dict]) -> dict[str, ComparisonReport]:
+    """Group runs by model_id and compute per-model variance reports.
+
+    Args:
+        runs: List of run result dicts (from JSON/JSONL output).
+
+    Returns:
+        Dict mapping model_id -> ComparisonReport for that model.
+    """
+    groups: dict[str, list[dict]] = {}
+    for run in runs:
+        model_id = run.get("model", "unknown")
+        groups.setdefault(model_id, []).append(run)
+
+    return {model: compare_runs(group) for model, group in groups.items()}
+
+
+# ---------------------------------------------------------------------------
+# Statistical tests (stdlib-only, no scipy dependency)
+# ---------------------------------------------------------------------------
+
+
+def mann_whitney_u(values_a: list[float], values_b: list[float]) -> tuple[float, float]:
+    """Mann-Whitney U test for cross-model comparison.
+
+    Returns (U_statistic, approximate_p_value).
+    Uses normal approximation with continuity correction and tie handling.
+    Requires at least 2 samples per group.
+    """
+    n1 = len(values_a)
+    n2 = len(values_b)
+    if n1 < 2 or n2 < 2:
+        return (0.0, 1.0)
+
+    # Rank all values together.
+    combined = [(v, 0) for v in values_a] + [(v, 1) for v in values_b]
+    combined.sort(key=lambda x: x[0])
+
+    # Assign ranks (handle ties with average rank).
+    ranks_a: list[float] = []
+    ranks_b: list[float] = []
+    i = 0
+    while i < len(combined):
+        j = i
+        while j < len(combined) and combined[j][0] == combined[i][0]:
+            j += 1
+        # Average rank for tied values.
+        avg_rank = (i + 1 + j) / 2.0
+        for k in range(i, j):
+            if combined[k][1] == 0:
+                ranks_a.append(avg_rank)
+            else:
+                ranks_b.append(avg_rank)
+        i = j
+
+    R1 = sum(ranks_a)
+    U1 = R1 - n1 * (n1 + 1) / 2.0
+    U2 = n1 * n2 - U1
+    U = min(U1, U2)
+
+    # Normal approximation for p-value.
+    mean_u = n1 * n2 / 2.0
+    std_u = math.sqrt(n1 * n2 * (n1 + n2 + 1) / 12.0)
+    if std_u == 0:
+        return (U, 1.0)
+
+    # Continuity correction.
+    z = (U - mean_u + 0.5) / std_u if U < mean_u else (U - mean_u - 0.5) / std_u
+    # Approximate two-tailed p-value using error function approximation.
+    p_value = 2.0 * (1.0 - _normal_cdf(abs(z)))
+    return (U, max(0.0, min(1.0, p_value)))
+
+
+def _normal_cdf(x: float) -> float:
+    """Approximation of the standard normal CDF."""
+    # Abramowitz and Stegun approximation (error < 7.5e-8).
+    a1 = 0.254829592
+    a2 = -0.284496736
+    a3 = 1.421413741
+    a4 = -1.453152027
+    a5 = 1.061405429
+    p = 0.3275911
+    sign = 1 if x >= 0 else -1
+    x = abs(x) / math.sqrt(2)
+    t = 1.0 / (1.0 + p * x)
+    y = 1.0 - (((((a5 * t + a4) * t) + a3) * t + a2) * t + a1) * t * math.exp(-x * x)
+    return 0.5 * (1.0 + sign * y)
+
+
+def cliffs_delta(values_a: list[float], values_b: list[float]) -> float:
+    """Cliff's delta effect size for cross-model comparison.
+
+    Returns a value in [-1, 1]:
+    - |d| < 0.147: negligible
+    - 0.147 <= |d| < 0.33: small
+    - 0.33 <= |d| < 0.474: medium
+    - |d| >= 0.474: large
+    """
+    if not values_a or not values_b:
+        return 0.0
+
+    n1 = len(values_a)
+    n2 = len(values_b)
+    greater = 0
+    ties = 0
+    for a in values_a:
+        for b in values_b:
+            if a > b:
+                greater += 1
+            elif a == b:
+                ties += 1
+
+    return (2.0 * greater + ties) / (n1 * n2) - 1.0
+
+
+def bootstrap_ci(
+    values_a: list[float],
+    values_b: list[float],
+    *,
+    n_bootstrap: int = 1000,
+    confidence: float = 0.95,
+    statistic: str = "mean_diff",
+) -> tuple[float, float]:
+    """Bootstrap 95% confidence interval for the difference between two samples.
+
+    Args:
+        values_a: First sample.
+        values_b: Second sample.
+        n_bootstrap: Number of bootstrap resamples.
+        confidence: Confidence level (default 0.95).
+        statistic: "mean_diff" or "median_diff".
+
+    Returns:
+        (lower_bound, upper_bound) of the confidence interval.
+    """
+    if len(values_a) < 2 or len(values_b) < 2:
+        return (0.0, 0.0)
+
+    if statistic == "median_diff":
+        observed = _median(values_a) - _median(values_b)
+    else:
+        observed = _mean(values_a) - _mean(values_b)
+
+    boot_stats: list[float] = []
+    rng = random.Random(42)  # Reproducible.
+    for _ in range(n_bootstrap):
+        resample_a = [rng.choice(values_a) for _ in range(len(values_a))]
+        resample_b = [rng.choice(values_b) for _ in range(len(values_b))]
+        if statistic == "median_diff":
+            boot_stats.append(_median(resample_a) - _median(resample_b))
+        else:
+            boot_stats.append(_mean(resample_a) - _mean(resample_b))
+
+    alpha = (1.0 - confidence) / 2.0
+    lower = _percentile(boot_stats, alpha * 100)
+    upper = _percentile(boot_stats, (1.0 - alpha) * 100)
+    return (round(lower, 4), round(upper, 4))

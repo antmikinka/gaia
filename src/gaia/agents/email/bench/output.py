@@ -50,6 +50,7 @@ CSV_COLUMNS = [
     "run_id",
     "timestamp",
     "model",
+    "source_framework",
     "provider",
     "mbox_path",
     "turn_number",
@@ -72,8 +73,6 @@ CSV_COLUMNS = [
     "total_tokens",
     "total_steps",
     "total_duration_ms",
-    "avg_time_to_first_token_ms",
-    "avg_tokens_per_second",
     "emails_fetched",
     "categories_assigned",
     "final_response",
@@ -114,6 +113,7 @@ def _run_to_csv_rows(run: RunResult) -> list[dict[str, Any]]:
                 "run_id": run.run_id,
                 "timestamp": run.timestamp,
                 "model": run.model,
+                "source_framework": getattr(run, "source_framework", "gaia"),
                 "provider": run.provider,
                 "mbox_path": run.mbox_path,
                 "turn_number": batch.batch_number,
@@ -154,8 +154,6 @@ def _run_to_csv_rows(run: RunResult) -> list[dict[str, Any]]:
                 "reason": _truncate(email.reason, 200),
                 "error": _truncate(email.error, 200),
                 "duration_per_email_ms": email.duration_ms,
-                "avg_time_to_first_token_ms": round(run.avg_time_to_first_token_ms, 1),
-                "avg_tokens_per_second": round(run.avg_tokens_per_second, 1),
             }
             rows.append(row)
 
@@ -165,6 +163,7 @@ def _run_to_csv_rows(run: RunResult) -> list[dict[str, Any]]:
             "run_id": run.run_id,
             "timestamp": run.timestamp,
             "model": run.model,
+            "source_framework": getattr(run, "source_framework", "gaia"),
             "provider": run.provider,
             "mbox_path": run.mbox_path,
             "turn_number": "SUMMARY",
@@ -205,8 +204,6 @@ def _run_to_csv_rows(run: RunResult) -> list[dict[str, Any]]:
             "reason": "",
             "error": "",
             "duration_per_email_ms": run.total_duration_ms // max(run.total_emails, 1),
-            "avg_time_to_first_token_ms": round(run.avg_time_to_first_token_ms, 1),
-            "avg_tokens_per_second": round(run.avg_tokens_per_second, 1),
         }
     )
 
@@ -305,6 +302,7 @@ def _run_result_to_dict(run: RunResult) -> dict[str, Any]:
         "run_id": run.run_id,
         "timestamp": run.timestamp,
         "model": run.model,
+        "source_framework": getattr(run, "source_framework", "gaia"),
         "provider": run.provider,
         "mbox_path": run.mbox_path,
         "mode": run.mode,
@@ -321,6 +319,7 @@ def _run_result_to_dict(run: RunResult) -> dict[str, Any]:
         "avg_total_tokens_per_email": round(run.total_tokens / n, 1),
         "avg_time_to_first_token_ms": round(run.avg_time_to_first_token_ms, 1),
         "avg_tokens_per_second": round(run.avg_tokens_per_second, 1),
+        "is_cold_start": getattr(run, "is_cold_start", False),
         "category_counts": run.category_counts,
         "openclaw_category_counts": {
             map_category(k, "openclaw"): v for k, v in run.category_counts.items()
@@ -418,10 +417,16 @@ def print_summary(run: RunResult) -> None:
         if run.step_results:
             print(f"\n  Per-Step Token Breakdown:")
             print(f"  {'─'*78}")
-            print(f"  {'Step':<6}  {'Action':<12}  {'Input':>8}  {'Output':>8}  {'Reason':>8}  {'Total':>8}  {'Time':>8}")
+            print(
+                f"  {'Step':<6}  {'Action':<12}  {'Input':>8}  {'Output':>8}  {'Reason':>8}  {'Total':>8}  {'Time':>8}"
+            )
             print(f"  {'─'*78}")
             for s in run.step_results:
-                time_str = f"{s.duration_ms}ms" if s.duration_ms < 1000 else f"{s.duration_ms/1000:.1f}s"
+                time_str = (
+                    f"{s.duration_ms}ms"
+                    if s.duration_ms < 1000
+                    else f"{s.duration_ms/1000:.1f}s"
+                )
                 print(
                     f"    {s.step_number:<4}  {s.action:<12}  {s.input_tokens:>8}  "
                     f"{s.output_tokens:>8}  {s.reasoning_tokens:>8}  {s.total_tokens:>8}  {time_str:>8}"
@@ -467,15 +472,30 @@ SUMMARY_ROW_DEFS = [
     ("Cost Per Turn", "", "{cost_per_turn}", "{cost_per_turn}"),
     ("Avg Input Tokens Per Turn", "", "{avg_input_tokens}", "{avg_input_tokens}"),
     ("Avg Output Tokens Per Turn", "", "{avg_output_tokens}", "{avg_output_tokens}"),
-    ("Avg Reasoning Tokens Per Turn", "", "{avg_reasoning_tokens}", "{avg_reasoning_tokens}"),
-    ("Avg Time Per Batch (mins)", "", "{avg_time_per_batch_mins}", "{avg_time_per_batch_mins}"),
+    (
+        "Avg Reasoning Tokens Per Turn",
+        "",
+        "{avg_reasoning_tokens}",
+        "{avg_reasoning_tokens}",
+    ),
+    (
+        "Avg Time Per Batch (mins)",
+        "",
+        "{avg_time_per_batch_mins}",
+        "{avg_time_per_batch_mins}",
+    ),
     ("Quality Per Turn", "", "{quality_per_turn}", "{quality_per_turn}"),
     ("", "", "", ""),
     ("Total Email Amount", "", "{total_emails}", "{total_emails}"),
     ("Total Cost", "", "{total_cost}", "{total_cost}"),
     ("Total Input Tokens", "", "{total_input_tokens}", "{total_input_tokens}"),
     ("Total Output Tokens", "", "{total_output_tokens}", "{total_output_tokens}"),
-    ("Total Reasoning Tokens", "", "{total_reasoning_tokens}", "{total_reasoning_tokens}"),
+    (
+        "Total Reasoning Tokens",
+        "",
+        "{total_reasoning_tokens}",
+        "{total_reasoning_tokens}",
+    ),
     ("Total Time (mins)", "", "{total_time_mins}", "{total_time_mins}"),
     ("Total Quality", "", "{total_quality}", "{total_quality}"),
 ]
@@ -539,15 +559,31 @@ def to_summary_csv(
     Two-column layout: Metric name | GAIA value (repeated for side-by-side).
     """
     quality = _compute_quality(run, ground_truth or {})
-    cost = _compute_cost(run, cost_per_1m_input=cost_per_1m_input, cost_per_1m_output=cost_per_1m_output)
+    cost = _compute_cost(
+        run, cost_per_1m_input=cost_per_1m_input, cost_per_1m_output=cost_per_1m_output
+    )
 
     batch_size = run.batch_results[0].batch_size if run.batch_results else 0
     num_batches = len(run.batch_results)
-    total_time_mins = round(run.total_duration_ms / 60_000, 2) if run.total_duration_ms else 0
+    total_time_mins = (
+        round(run.total_duration_ms / 60_000, 2) if run.total_duration_ms else 0
+    )
     avg_time_per_batch_mins = round(total_time_mins / max(num_batches, 1), 2)
-    avg_input_tokens = round(run.total_input_tokens / max(num_batches, 1), 0) if run.total_input_tokens else 0
-    avg_output_tokens = round(run.total_output_tokens / max(num_batches, 1), 0) if run.total_output_tokens else 0
-    avg_reasoning_tokens = round(run.total_reasoning_tokens / max(num_batches, 1), 0) if run.total_reasoning_tokens else 0
+    avg_input_tokens = (
+        round(run.total_input_tokens / max(num_batches, 1), 0)
+        if run.total_input_tokens
+        else 0
+    )
+    avg_output_tokens = (
+        round(run.total_output_tokens / max(num_batches, 1), 0)
+        if run.total_output_tokens
+        else 0
+    )
+    avg_reasoning_tokens = (
+        round(run.total_reasoning_tokens / max(num_batches, 1), 0)
+        if run.total_reasoning_tokens
+        else 0
+    )
 
     fmt = {
         "provider": run.provider,
