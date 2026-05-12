@@ -393,20 +393,26 @@ def generate_reports(
         output_dir = input_dir
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Load GAIA results.
-    jsonl_path = input_dir / "results.jsonl"
-    if not jsonl_path.exists():
-        print(f"Error: No results.jsonl found in {input_dir}")
-        return
-
+    # Load GAIA results (all results_*.jsonl files).
     from gaia.agents.email.bench.output import load_jsonl
 
-    runs = load_jsonl(jsonl_path)
-    if not runs:
-        print(f"Error: results.jsonl is empty in {input_dir}")
+    jsonl_paths = sorted(input_dir.glob("results_*.jsonl"))
+    if not jsonl_paths:
+        print(f"Error: No results_*.jsonl files found in {input_dir}")
         return
 
-    print(f"Loaded {len(runs)} GAIA run(s) from {jsonl_path}")
+    runs: list[dict[str, Any]] = []
+    for jp in jsonl_paths:
+        loaded = load_jsonl(jp)
+        if loaded:
+            runs.extend(loaded)
+            print(f"  Loaded {len(loaded)} run(s) from {jp.name}")
+
+    if not runs:
+        print(f"Error: All results files are empty in {input_dir}")
+        return
+
+    print(f"Total GAIA runs loaded: {len(runs)}")
 
     # Load optional ground truth for quality scoring.
     gt_data: dict[str, Any] | None = None
@@ -419,13 +425,13 @@ def generate_reports(
         else:
             print(f"Warning: ground truth file not found: {gt_path}")
 
-    # Load optional ClawFlow results.
-    cf_json_path = input_dir / "clawflow_results.json"
+    # Load optional ClawFlow results (all clawflow_results_*.json files).
+    cf_paths = sorted(input_dir.glob("clawflow_results_*.json"))
     clawflow_run = None
-    if cf_json_path.exists():
-        with open(cf_json_path, "r", encoding="utf-8") as f:
+    if cf_paths:
+        with open(cf_paths[-1], "r", encoding="utf-8") as f:
             clawflow_run = json.load(f)
-        print(f"Loaded ClawFlow run from {cf_json_path}")
+        print(f"Loaded ClawFlow run from {cf_paths[-1].name} ({len(cf_paths)} file(s) found)")
 
     # 1. report.csv (with cost/quality columns if provided)
     _generate_report_csv(

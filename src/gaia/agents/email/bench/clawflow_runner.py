@@ -14,8 +14,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Optional
+
+
+def _slug(text: str) -> str:
+    """Filesystem-safe slug from a model name."""
+    return re.sub(r"[^a-z0-9._-]", "_", text.lower()).strip("_")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -104,7 +110,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
 
         # Save ClawFlow results.
-        cf_json = output_dir / "clawflow_results.json"
+        model_slug = _slug(args.model or "unknown")
+        cf_json = output_dir / f"clawflow_results_{model_slug}.json"
         with open(cf_json, "w", encoding="utf-8") as f:
             json.dump(clawflow_result, f, indent=2, ensure_ascii=False)
         print(f"ClawFlow results saved to: {cf_json}")

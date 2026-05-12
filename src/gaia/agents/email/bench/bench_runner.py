@@ -14,8 +14,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Any, Optional
+
+
+def _slug(text: str) -> str:
+    """Filesystem-safe slug from a model name."""
+    return re.sub(r"[^a-z0-9._-]", "_", text.lower()).strip("_")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -88,7 +94,6 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    jsonl_path = output_dir / "results.jsonl"
 
     # Interactive mode: single multi-turn session (special case, one-shot).
     if args.mode == "interactive":
@@ -101,7 +106,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             limit=args.limit,
         )
 
-        interactive_path = output_dir / "interactive.json"
+        model_slug = _slug(args.model or "unknown")
+        interactive_path = output_dir / f"interactive_{model_slug}.json"
         interactive_path.parent.mkdir(parents=True, exist_ok=True)
 
         def _turn_to_dict(t):
@@ -180,6 +186,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     for model_id in model_list:
         batch_size = batch_size_map.get(model_id, args.batch_size)
         model_exps = exps
+        jsonl_path = output_dir / f"results_{_slug(model_id)}.jsonl"
 
         print(f"\n{'='*70}")
         print(f"  Model: {model_id}")

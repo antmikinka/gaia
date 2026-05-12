@@ -4,12 +4,45 @@ Benchmark harness for the GAIA Email Triage Agent. Measures token consumption, w
 
 The benchmark follows the Unix philosophy of small, composable tools: one command runs the benchmark, another runs ClawFlow, and a third reads both outputs to produce all analysis, reports, and charts.
 
+## Table of Contents
+
+- [Quick Reference](#quick-reference)
+- [1. Full Mode (Single LLM Turn)](#1-full-mode-single-llm-turn)
+- [2. Interactive Mode (Multi-Turn Session)](#2-interactive-mode-multi-turn-session)
+- [3. Multi-Model Benchmark](#3-multi-model-benchmark)
+- [4. ClawFlow Benchmark](#4-clawflow-benchmark)
+- [5. Report Generation](#5-report-generation)
+- [7. Quality Scoring](#7-quality-scoring)
+- [8. Cost Estimation](#8-cost-estimation)
+- [9. Charts (Visualizations)](#9-charts-visualizations)
+- [10. Statistical Tests](#10-statistical-tests)
+- [11. Output Files](#11-output-files)
+- [12. CLI Reference](#12-cli-reference)
+- [Architecture](#architecture)
+
 ## Quick Reference
+
+### Essential Commands
+
+```bash
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --models "<model>" --limit 10   # Run a quick 10-email benchmark
+gaia email clawflow --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --model "<model>"             # Run ClawFlow benchmark on same MBOX
+gaia email report --input-dir benchmark_results --charts              # Generate unified report with charts
+```
+
+All outputs go to the same `--output-dir` (default `benchmark_results`). Files are named after the model so multiple runs coexist:
+
+| Command | Output pattern | Example |
+|---------|----------------|---------|
+| `gaia email bench` | `results_<model>.jsonl` | `results_qwen3.5-4b-gguf.jsonl` |
+| `gaia email bench --mode interactive` | `interactive_<model>.json` | `interactive_qwen3.5-4b-gguf.json` |
+| `gaia email clawflow` | `clawflow_results_<model>.json` | `clawflow_results_qwen3.5-4b-gguf.json` |
+| `gaia email report` | reads all matching files via glob | |
 
 | Command | Purpose | Primary output |
 |---------|---------|----------------|
-| `gaia email bench` | Run GAIA benchmarks (full / interactive) | `results.jsonl` |
-| `gaia email clawflow` | Run ClawFlow benchmarks on the same MBOX | `clawflow_results.json` |
+| `gaia email bench` | Run GAIA benchmarks (full / interactive) | `results_<model>.jsonl` |
+| `gaia email clawflow` | Run ClawFlow benchmarks on the same MBOX | `clawflow_results_<model>.json` |
 | `gaia email report` | Read both results, produce analysis + charts | `report.csv`, `variance.json`, `quality.json`, `statistical_tests.json`, `framework_comparison.json`, `charts/` |
 
 | Mode | LLM? | What it measures | Speed |
@@ -24,7 +57,7 @@ The benchmark follows the Unix philosophy of small, composable tools: one comman
 End-to-end agent invocation: the LLM plans the triage, calls `triage_inbox`, and produces a summary. Captures token counts for the entire agent loop.
 
 ```bash
-gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10
 ```
 
 **What it measures:**
@@ -52,12 +85,7 @@ gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B
 ### Custom LLM server
 
 ```bash
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --model "Qwen3.5-4B-GGUF" \
-  --base-url "http://localhost:13305/api/v1" \
-  --limit 10
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode full --model "Qwen3.5-4B-GGUF" --base-url "http://localhost:13305/api/v1" --limit 10
 ```
 
 ---
@@ -67,7 +95,7 @@ gaia email bench \
 Simulates a realistic multi-turn email session. The agent retains context across turns, and tokens are tracked per-turn, per-step, and per-email.
 
 ```bash
-gaia email bench --mbox-path "path/to/your.mbox" --mode interactive --model "Qwen3.5-4B-GGUF" --limit 10
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode interactive --model "Qwen3.5-4B-GGUF" --limit 10
 ```
 
 **Default scenario (4 turns):**
@@ -119,7 +147,7 @@ gaia email bench --mbox-path "path/to/your.mbox" --mode interactive --model "Qwe
 ======================================================================
 ```
 
-**Output file:** `interactive.json` with full per-turn, per-step, and per-email action data.
+**Output file:** `interactive_<model>.json` with full per-turn, per-step, and per-email action data.
 
 **Use cases:**
 - Measuring total token cost of a complete email session
@@ -133,13 +161,7 @@ gaia email bench --mbox-path "path/to/your.mbox" --mode interactive --model "Qwe
 Run multiple LLM models sequentially against the same MBOX file, measuring comparative performance without model-eviction churn from concurrent runs.
 
 ```bash
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --models "Qwen3.5-4B-GGUF" \
-  --models "Qwen3.5-14B-GGUF" \
-  --models "claude-sonnet-4-6" \
-  --experiments-per-model 3
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode full --models "Qwen3.5-4B-GGUF" --models "Qwen3.5-14B-GGUF" --models "claude-sonnet-4-6" --experiments-per-model 3
 ```
 
 **Key flags:**
@@ -156,7 +178,7 @@ gaia email bench \
 
 **Cold-start tagging:** The first experiment of each model is tagged `is_cold_start: true`. Use `--skip-cold-start` to exclude these from variance analysis, avoiding first-run TTFT contamination from model loading.
 
-**Output:** All runs are appended to a single `results.jsonl` for unified cross-model variance analysis. When multiple models are present, `variance_by_model.json` contains per-model variance reports.
+**Output:** All runs are appended to `results_<model>.jsonl` (one file per model, all experiments). When multiple models are present, `variance_by_model.json` contains per-model variance reports.
 
 **Serial execution guarantee:** At most one model runs at a time, preventing Lemonade Server model eviction races. Runs execute in the order specified on the command line.
 
@@ -167,10 +189,7 @@ gaia email bench \
 Run [ClawFlow](https://github.com/openclaw-eval) CLI on the same MBOX to produce framework-comparable results. This replaces the old `--clawflow` flag on `gaia email bench`.
 
 ```bash
-gaia email clawflow \
-  --mbox-path "path/to/your.mbox" \
-  --workflow inbox-zero-helper \
-  --timeout 3600
+gaia email clawflow --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --workflow inbox-zero-helper --timeout 3600
 ```
 
 **Key flags:**
@@ -187,7 +206,7 @@ gaia email clawflow \
 
 1. ClawFlow CLI is invoked as a subprocess
 2. ClawFlow's JSON output is parsed and mapped to GAIA's `RunResult` schema
-3. Results are saved to `clawflow_results.json`
+3. Results are saved to `clawflow_results_<model>.json`
 
 **Invocation:** ClawFlow is invoked via `python clawflow_cli.py --workflow <name> --model <model> --json --quiet`. The adapter probes for the script at the default location (`openclaw-eval/scripts/agentic-framework-test/gaia_agents/clawflow_cli.py`) or an explicit `--clawflow-path`.
 
@@ -200,7 +219,7 @@ gaia email clawflow \
 | `FYI` | `informational` |
 | `PROMOTIONAL` | `low priority` |
 
-**Output:** `clawflow_results.json` -- raw ClawFlow output mapped to GAIA schema.
+**Output:** `clawflow_results_<model>.json` -- raw ClawFlow output mapped to GAIA schema.
 
 ---
 
@@ -213,8 +232,8 @@ gaia email report --input-dir benchmark_results
 ```
 
 **What it reads:**
-- `results.jsonl` (from `gaia email bench`)
-- `clawflow_results.json` (from `gaia email clawflow`, if present)
+- `results_*.jsonl` (from `gaia email bench` — all models, all experiments)
+- `clawflow_results_*.json` (from `gaia email clawflow`, if present)
 
 **What it produces:**
 
@@ -229,7 +248,7 @@ gaia email report --input-dir benchmark_results
 
 ### Variance Analysis
 
-When multiple experiments exist in `results.jsonl`, the report computes variance statistics automatically.
+When multiple experiments exist in `results_*.jsonl`, the report computes variance statistics automatically.
 
 **Variance report example:**
 ```
@@ -248,14 +267,14 @@ When multiple experiments exist in `results.jsonl`, the report computes variance
 
 ### Framework Comparison (GAIA vs ClawFlow)
 
-When both `results.jsonl` and `clawflow_results.json` are present in the input directory, the report automatically produces a framework comparison:
+When both `results_*.jsonl` and `clawflow_results_*.json` are present in the input directory, the report automatically produces a framework comparison:
 
 ```bash
 # Step 1: Run GAIA benchmark
-gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10
 
 # Step 2: Run ClawFlow benchmark
-gaia email clawflow --mbox-path "path/to/your.mbox" --workflow inbox-zero-helper
+gaia email clawflow --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --workflow inbox-zero-helper
 
 # Step 3: Generate unified report with framework comparison
 gaia email report --input-dir benchmark_comparison
@@ -271,16 +290,10 @@ Provide a ground truth JSON to measure classification accuracy.
 
 ```bash
 # Run the benchmark
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --model "Qwen3.5-4B-GGUF" \
-  --limit 10
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10
 
 # Then generate the quality report
-gaia email report \
-  --input-dir benchmark_results \
-  --ground-truth "path/to/ground_truth.json"
+gaia email report --input-dir benchmark_results --ground-truth "path/to/ground_truth.json"
 ```
 
 **Ground truth format:**
@@ -301,17 +314,10 @@ For paid API models, estimate the cost of running the benchmark.
 
 ```bash
 # Run the benchmark
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --model "claude-sonnet-4-6" \
-  --limit 100
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode full --model "claude-sonnet-4-6" --limit 100
 
 # Then generate the cost report
-gaia email report \
-  --input-dir benchmark_results \
-  --cost-per-1m-input 3.0 \
-  --cost-per-1m-output 15.0
+gaia email report --input-dir benchmark_results --cost-per-1m-input 3.0 --cost-per-1m-output 15.0
 ```
 
 Cost appears in `report.csv` as `Cost Per Turn` and `Total Cost`.
@@ -324,7 +330,7 @@ Generate static PNG charts from benchmark output for reports, dashboards, and pr
 
 ```bash
 # Run benchmarks first
-gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10 --experiments-per-model 5
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10 --experiments-per-model 5
 
 # Then generate charts from the results
 gaia email report --input-dir benchmark_results --charts
@@ -403,11 +409,7 @@ When multiple models are benchmarked with sufficient experiments (>= 2 per model
 - **Bootstrap CI excludes 0**: Confirms the direction of difference
 
 ```bash
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --models "model-a" --models "model-b" \
-  --experiments-per-model 5
+gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-3-001\Takeout\Mail\All mail Including Spam and Trash.mbox" --mode full --models "model-a" --models "model-b" --experiments-per-model 5
 
 gaia email report --input-dir benchmark_results
 ```
@@ -432,15 +434,14 @@ The three subcommands produce distinct outputs:
 
 | File | Format | When |
 |------|--------|------|
-| `results.jsonl` | JSONL | Every run (append-only log, all models, all experiments) |
-| `results.json` | JSON | Single-run detail (when `--experiments-per-model 1`) |
-| `interactive.json` | JSON | Interactive mode only |
+| `results_<model>.jsonl` | JSONL | Every run (append-only per model, all experiments) |
+| `interactive_<model>.json` | JSON | Interactive mode only |
 
 ### `gaia email clawflow`
 
 | File | Format | When |
 |------|--------|------|
-| `clawflow_results.json` | JSON | Every run |
+| `clawflow_results_<model>.json` | JSON | Every run |
 
 ### `gaia email report`
 
@@ -516,16 +517,16 @@ The `report.csv` contains per-run rows with columns: `model`, `framework`, `expe
 The email benchmark follows the Unix philosophy: three focused commands, each doing one job well, composed via shared output files.
 
 ```
-gaia email bench       ---->  results.jsonl / interactive.json
-gaia email clawflow    ---->  clawflow_results.json
-                               |
+gaia email bench       ---->  results_<model>.jsonl / interactive_<model>.json
+gaia email clawflow    ---->  clawflow_results_<model>.json
+                                  |
 gaia email report  <----  reads both, produces:
-                               report.csv
-                               variance.json
-                               quality.json
-                               statistical_tests.json
-                               framework_comparison.json
-                               charts/
+                              report.csv
+                              variance.json
+                              quality.json
+                              statistical_tests.json
+                              framework_comparison.json
+                              charts/
 ```
 
 This design separates concerns cleanly:
