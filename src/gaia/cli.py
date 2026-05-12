@@ -1393,165 +1393,191 @@ def main():
         ),
     )
 
-    # Bench subcommand (#962 benchmark harness)
-    bench_parser = email_subparsers.add_parser(
+    # Email benchmark subcommands (#962 benchmark harness, split into 3).
+    # The bench/* directory now has its own dispatcher with 3 subcommands:
+    #   bench, clawflow, report -- each independent.
+    _email_bench_parser = email_subparsers.add_parser(
         "bench",
         help="Benchmark the Email Triage Agent against an MBOX file.",
     )
-    bench_parser.add_argument(
-        "--mbox-path",
-        required=True,
+    # Forward all bench args to the internal dispatcher.
+    _email_bench_parser.add_argument(
+        "--mbox-path", required=True,
         help="Path to the MBOX file to benchmark against.",
     )
-    bench_parser.add_argument(
-        "--mode",
-        choices=["heuristic", "full", "interactive"],
-        default="heuristic",
-        help="Benchmark mode: 'heuristic' (fast, no LLM) or 'full' (end-to-end with LLM).",
+    _email_bench_parser.add_argument(
+        "--mode", choices=["heuristic", "full", "interactive"], default="heuristic",
+        help="Benchmark mode.",
     )
-    bench_parser.add_argument(
-        "--experiments",
-        "--iterations",
-        dest="experiments",
-        type=int,
-        default=1,
-        help="Number of benchmark experiments to run (for variance analysis). Alias: --iterations (deprecated).",
-    )
-    bench_parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=20,
-        help="Emails per batch (each batch = one LLM prompt). See --limit for total cap.",
-    )
-    bench_parser.add_argument(
-        "--limit",
-        type=int,
-        default=100,
-        help="Max total emails from MBOX (default 100, 0=no limit). Independent of --batch-size.",
-    )
-    bench_parser.add_argument(
-        "--model",
-        type=str,
-        default="heuristic-only",
+    _email_bench_parser.add_argument(
+        "--model", type=str, default="heuristic-only",
         help="Model ID for full agent mode.",
     )
-    bench_parser.add_argument(
-        "--base-url",
-        type=str,
-        default=None,
-        help="Base URL for the LLM server (full mode only). Defaults to LEMONADE_BASE_URL or http://localhost:13305/api/v1.",
+    _email_bench_parser.add_argument(
+        "--models", action="append", default=None,
+        help="Model IDs to benchmark sequentially.",
     )
-    bench_parser.add_argument(
-        "--output-dir",
-        type=str,
-        default="benchmark_results",
-        help="Directory to write output files (CSV, JSON, JSONL).",
+    _email_bench_parser.add_argument(
+        "--experiments", "--iterations", dest="experiments", type=int, default=1,
+        help="Number of benchmark experiments (deprecated; use --experiments-per-model).",
     )
-    bench_parser.add_argument(
-        "--variance-only",
-        action="store_true",
-        help="Only run variance analysis on existing JSONL results.",
+    _email_bench_parser.add_argument(
+        "--experiments-per-model", "--iterations-per-model",
+        dest="experiments_per_model", type=int, default=1,
+        help="Experiments per model in multi-model benchmark.",
     )
-    bench_parser.add_argument(
-        "--jsonl-path",
-        type=str,
-        default=None,
-        help="Path to JSONL file for variance-only mode.",
+    _email_bench_parser.add_argument(
+        "--batch-size", type=int, default=20,
+        help="Emails per batch.",
     )
-    bench_parser.add_argument(
-        "--ground-truth",
-        type=str,
-        default=None,
-        help="Path to ground truth JSON file for quality scoring.",
+    _email_bench_parser.add_argument(
+        "--limit", type=int, default=100,
+        help="Max total emails from MBOX (0=no limit).",
     )
-    bench_parser.add_argument(
-        "--cost-per-1m-input",
-        type=float,
-        default=0.0,
-        help="Cost per 1M input tokens (default 0 for local LLM).",
+    _email_bench_parser.add_argument(
+        "--model-batch-sizes", type=str, default=None,
+        help="Comma-separated model:batch_size pairs.",
     )
-    bench_parser.add_argument(
-        "--cost-per-1m-output",
-        type=float,
-        default=0.0,
-        help="Cost per 1M output tokens (default 0 for local LLM).",
+    _email_bench_parser.add_argument(
+        "--base-url", type=str, default=None,
+        help="Base URL for the LLM server (full mode only).",
     )
-    bench_parser.add_argument(
-        "--compare",
-        nargs=2,
-        metavar=("HEURISTIC_JSON", "FULL_JSON"),
-        help="Compare heuristic and full mode results. Pass paths to two JSON output files.",
+    _email_bench_parser.add_argument(
+        "--output-dir", type=str, default="benchmark_results",
+        help="Directory to write output files.",
     )
-    bench_parser.add_argument(
-        "--steps",
-        action="store_true",
+    _email_bench_parser.add_argument(
+        "--variance-only", action="store_true",
+        help="DEPRECATED: use 'gaia email report --input-dir <dir>'.",
+    )
+    _email_bench_parser.add_argument(
+        "--jsonl-path", type=str, default=None,
+        help="DEPRECATED: use 'gaia email report --input-dir <dir>'.",
+    )
+    _email_bench_parser.add_argument(
+        "--ground-truth", type=str, default=None,
+        help="Path to ground truth JSON for quality scoring.",
+    )
+    _email_bench_parser.add_argument(
+        "--cost-per-1m-input", type=float, default=0.0,
+        help="Cost per 1M input tokens.",
+    )
+    _email_bench_parser.add_argument(
+        "--cost-per-1m-output", type=float, default=0.0,
+        help="Cost per 1M output tokens.",
+    )
+    _email_bench_parser.add_argument(
+        "--compare", nargs=2, metavar=("HEURISTIC_JSON", "FULL_JSON"),
+        help="DEPRECATED: use 'gaia email report --compare <path1> <path2>'.",
+    )
+    _email_bench_parser.add_argument(
+        "--steps", action="store_true",
         help="Print per-step token breakdown for full mode.",
     )
-    bench_parser.add_argument(
-        "--visualize",
-        action="store_true",
-        help="Generate chart PNGs from benchmark output after the run completes.",
+    _email_bench_parser.add_argument(
+        "--visualize", action="store_true",
+        help="DEPRECATED: use 'gaia email report --charts --input-dir <dir>'.",
     )
-    bench_parser.add_argument(
-        "--chart-dir",
-        type=str,
-        default="benchmark_charts",
-        help="Directory to write chart PNGs (used with --visualize).",
+    _email_bench_parser.add_argument(
+        "--chart-dir", type=str, default="benchmark_charts",
+        help="Directory for chart PNGs (used with legacy --visualize).",
     )
-    # Multi-model support.
-    bench_parser.add_argument(
-        "--models",
-        action="append",
-        default=None,
-        help="Model IDs to benchmark sequentially (can be specified multiple times).",
+    _email_bench_parser.add_argument(
+        "--skip-cold-start", action="store_true",
+        help="Skip cold-start iteration in reports.",
     )
-    bench_parser.add_argument(
-        "--experiments-per-model",
-        "--iterations-per-model",
-        dest="experiments_per_model",
-        type=int,
-        default=1,
-        help="Experiments per model in multi-model benchmark. Alias: --iterations-per-model (deprecated).",
+    _email_bench_parser.add_argument(
+        "--fail-fast", action="store_true",
+        help="Abort on first model iteration failure.",
     )
-    bench_parser.add_argument(
-        "--model-batch-sizes",
-        type=str,
-        default=None,
-        help="Comma-separated model:batch_size pairs, e.g. 'model1:10,model2:20'.",
+    # ClawFlow (deprecated from bench; use 'gaia email clawflow').
+    _email_bench_parser.add_argument(
+        "--clawflow", action="store_true",
+        help="DEPRECATED: use 'gaia email clawflow' instead.",
     )
-    bench_parser.add_argument(
-        "--skip-cold-start",
-        action="store_true",
-        help="Skip the first (cold-start) iteration for each model in reports.",
+    _email_bench_parser.add_argument(
+        "--clawflow-timeout", type=int, default=3600,
+        help="Timeout for ClawFlow execution.",
     )
-    bench_parser.add_argument(
-        "--fail-fast",
-        action="store_true",
-        help="Abort on first model iteration failure instead of continuing.",
+    _email_bench_parser.add_argument(
+        "--clawflow-workflow", type=str, default="inbox-zero-helper",
+        help="ClawFlow workflow name.",
     )
-    # ClawFlow integration.
-    bench_parser.add_argument(
-        "--clawflow",
-        action="store_true",
-        help="Run ClawFlow CLI after GAIA benchmark completes for comparison.",
+    _email_bench_parser.add_argument(
+        "--clawflow-path", type=str, default=None,
+        help="Explicit path to clawflow binary or script.",
     )
-    bench_parser.add_argument(
-        "--clawflow-timeout",
-        type=int,
-        default=3600,
-        help="Timeout in seconds for ClawFlow execution (default 3600).",
+
+    # ClawFlow subcommand (first-class).
+    _email_clawflow_parser = email_subparsers.add_parser(
+        "clawflow",
+        help="Run ClawFlow email triage benchmark.",
     )
-    bench_parser.add_argument(
-        "--clawflow-workflow",
-        type=str,
-        default="inbox-zero-helper",
-        help="ClawFlow workflow name (default 'inbox-zero-helper').",
+    _email_clawflow_parser.add_argument(
+        "--workflow", type=str, default="inbox-zero-helper",
+        help="ClawFlow workflow name.",
     )
-    bench_parser.add_argument(
-        "--clawflow-path",
-        type=str,
-        default=None,
-        help="Explicit path to the clawflow binary or script.",
+    _email_clawflow_parser.add_argument(
+        "--model", type=str, default=None,
+        help="Model ID for ClawFlow.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--timeout", type=int, default=3600,
+        help="Timeout in seconds.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--cli-path", type=str, default=None,
+        help="Explicit path to clawflow binary or script.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--output-dir", type=str, default="benchmark_results",
+        help="Directory to write output.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--mbox-path", type=str, default=None,
+        help="MBOX path (for report correlation).",
+    )
+
+    # Report subcommand.
+    _email_report_parser = email_subparsers.add_parser(
+        "report",
+        help="Generate reports from existing benchmark data.",
+    )
+    _email_report_parser.add_argument(
+        "--input-dir", type=str, default="benchmark_results",
+        help="Directory containing results.jsonl and optional clawflow_results.json.",
+    )
+    _email_report_parser.add_argument(
+        "--output-dir", type=str, default=None,
+        help="Directory to write reports. Defaults to --input-dir.",
+    )
+    _email_report_parser.add_argument(
+        "--charts", action="store_true",
+        help="Generate chart PNGs.",
+    )
+    _email_report_parser.add_argument(
+        "--chart-dir", type=str, default=None,
+        help="Directory for charts. Defaults to <input-dir>/charts.",
+    )
+    _email_report_parser.add_argument(
+        "--skip-cold-start", action="store_true",
+        help="Exclude cold-start runs from variance.",
+    )
+    _email_report_parser.add_argument(
+        "--compare", nargs=2, metavar=("HEURISTIC_JSON", "FULL_JSON"),
+        help="Compare heuristic and full mode results.",
+    )
+    _email_report_parser.add_argument(
+        "--ground-truth", type=str, default=None,
+        help="Path to ground truth JSON for quality scoring.",
+    )
+    _email_report_parser.add_argument(
+        "--cost-per-1m-input", type=float, default=0.0,
+        help="Cost per 1M input tokens.",
+    )
+    _email_report_parser.add_argument(
+        "--cost-per-1m-output", type=float, default=0.0,
+        help="Cost per 1M output tokens.",
     )
 
     # Add Docker app command
@@ -3930,36 +3956,25 @@ def handle_email_command(args):
     """
     log = get_logger(__name__)
 
-    # Dispatch to benchmark harness if requested.
-    if getattr(args, "email_action", None) == "bench":
-        from gaia.agents.email.bench.cli import main as bench_main
+    # Dispatch to benchmark harness subcommands (bench, clawflow, report).
+    email_action = getattr(args, "email_action", None)
+
+    if email_action == "bench":
+        from gaia.agents.email.bench.cli import main as bench_dispatch_main
 
         bench_args = []
         for key in [
-            "mbox_path",
-            "mode",
-            "experiments",
-            "batch_size",
-            "limit",
-            "model",
-            "base_url",
-            "output_dir",
-            "jsonl_path",
-            "ground_truth",
+            "mbox_path", "mode", "experiments", "batch_size", "limit",
+            "model", "base_url", "output_dir", "jsonl_path", "ground_truth",
             "chart_dir",
             # Multi-model.
-            "models",
-            "experiments_per_model",
-            "model_batch_sizes",
-            # ClawFlow.
-            "clawflow_timeout",
-            "clawflow_workflow",
-            "clawflow_path",
+            "models", "experiments_per_model", "model_batch_sizes",
+            # ClawFlow (deprecated but still forwarded for compat).
+            "clawflow_timeout", "clawflow_workflow", "clawflow_path",
         ]:
             val = getattr(args, key, None)
             if val is not None:
                 if isinstance(val, list):
-                    # --models needs --models prefix for each value.
                     for item in val:
                         bench_args.append(f"--{key.replace('_', '-')}")
                         bench_args.append(str(item))
@@ -3971,25 +3986,17 @@ def handle_email_command(args):
         cost_input = getattr(args, "cost_per_1m_input", 0.0)
         cost_output = getattr(args, "cost_per_1m_output", 0.0)
         if cost_input:
-            bench_args.append("--cost-per-1m-input")
-            bench_args.append(str(cost_input))
+            bench_args.extend(["--cost-per-1m-input", str(cost_input)])
         if cost_output:
-            bench_args.append("--cost-per-1m-output")
-            bench_args.append(str(cost_output))
+            bench_args.extend(["--cost-per-1m-output", str(cost_output)])
 
         # Boolean flags.
-        if getattr(args, "variance_only", False):
-            bench_args.append("--variance-only")
-        if getattr(args, "visualize", False):
-            bench_args.append("--visualize")
-        if getattr(args, "steps", False):
-            bench_args.append("--steps")
-        if getattr(args, "skip_cold_start", False):
-            bench_args.append("--skip-cold-start")
-        if getattr(args, "fail_fast", False):
-            bench_args.append("--fail-fast")
-        if getattr(args, "clawflow", False):
-            bench_args.append("--clawflow")
+        for flag in [
+            "variance_only", "visualize", "steps", "skip_cold_start",
+            "fail_fast", "clawflow",
+        ]:
+            if getattr(args, flag, False):
+                bench_args.append(f"--{flag.replace('_', '-')}")
 
         # Compare param (list).
         compare_paths = getattr(args, "compare", None)
@@ -3997,7 +4004,54 @@ def handle_email_command(args):
             bench_args.append("--compare")
             bench_args.extend(compare_paths)
 
-        rc = bench_main(bench_args)
+        rc = bench_dispatch_main(bench_args)
+        sys.exit(rc)
+
+    elif email_action == "clawflow":
+        from gaia.agents.email.bench.cli import main as bench_dispatch_main
+
+        cf_args = []
+        for key in ["workflow", "model", "timeout", "cli_path", "output_dir", "mbox_path"]:
+            val = getattr(args, key, None)
+            if val is not None:
+                cf_args.append(f"--{key.replace('_', '-')}")
+                cf_args.append(str(val))
+
+        rc = bench_dispatch_main(cf_args)
+        sys.exit(rc)
+
+    elif email_action == "report":
+        from gaia.agents.email.bench.cli import main as bench_dispatch_main
+
+        rpt_args = []
+        for key in [
+            "input_dir", "output_dir", "chart_dir", "ground_truth",
+        ]:
+            val = getattr(args, key, None)
+            if val is not None:
+                rpt_args.append(f"--{key.replace('_', '-')}")
+                rpt_args.append(str(val))
+
+        # Cost params.
+        cost_input = getattr(args, "cost_per_1m_input", 0.0)
+        cost_output = getattr(args, "cost_per_1m_output", 0.0)
+        if cost_input:
+            rpt_args.extend(["--cost-per-1m-input", str(cost_input)])
+        if cost_output:
+            rpt_args.extend(["--cost-per-1m-output", str(cost_output)])
+
+        # Boolean flags.
+        for flag in ["charts", "skip_cold_start"]:
+            if getattr(args, flag, False):
+                rpt_args.append(f"--{flag.replace('_', '-')}")
+
+        # Compare param (list).
+        compare_paths = getattr(args, "compare", None)
+        if compare_paths:
+            rpt_args.append("--compare")
+            rpt_args.extend(compare_paths)
+
+        rc = bench_dispatch_main(rpt_args)
         sys.exit(rc)
 
     # Initialize Lemonade — local LLM only. The email agent's config will

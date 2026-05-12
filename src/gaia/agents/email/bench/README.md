@@ -2,26 +2,33 @@
 
 Benchmark harness for the GAIA Email Triage Agent. Measures classification accuracy, token consumption, wall-clock latency, and agent behavior across three modes: **heuristic** (no LLM), **full** (single LLM turn), and **interactive** (multi-turn session).
 
+The benchmark follows the Unix philosophy of small, composable tools: one command runs the benchmark, another runs ClawFlow, and a third reads both outputs to produce all analysis, reports, and charts.
+
 ## Quick Reference
+
+| Command | Purpose | Primary output |
+|---------|---------|----------------|
+| `gaia email bench` | Run GAIA benchmarks (heuristic / full / interactive) | `results.jsonl` |
+| `gaia email clawflow` | Run ClawFlow benchmarks on the same MBOX | `clawflow_results.json` |
+| `gaia email report` | Read both results, produce analysis + charts | `report.csv`, `variance.json`, `quality.json`, `statistical_tests.json`, `framework_comparison.json`, `charts/` |
 
 | Mode | LLM? | What it measures | Speed |
 |------|------|------------------|-------|
 | `heuristic` | No | Rule-based classification speed & accuracy | < 1s |
 | `full` | Yes | End-to-end triage + summarization tokens | ~30-60s |
-| `interactive` | Yes | Multi-turn session: triage → organize → summarize | ~90-180s |
+| `interactive` | Yes | Multi-turn session: triage -> organize -> summarize | ~90-180s |
 
 ---
 
 ## 1. Heuristic Mode (Fast, No LLM)
 
-Classifies emails using only Gmail labels and header heuristics. No LLM involved — zero tokens consumed. Ideal for baseline accuracy and large MBOX files.
+Classifies emails using only Gmail labels and header heuristics. No LLM involved -- zero tokens consumed. Ideal for baseline accuracy and large MBOX files.
 
 ```bash
 gaia email bench \
   --mbox-path "path/to/your.mbox" \
   --mode heuristic \
-  --limit 100 \
-  --output-dir benchmark_results
+  --limit 100
 ```
 
 **What it measures:**
@@ -42,7 +49,7 @@ gaia email bench \
 End-to-end agent invocation: the LLM plans the triage, calls `triage_inbox`, and produces a summary. Captures token counts for the entire agent loop.
 
 ```bash
-gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10 --output-dir benchmark_results_full
+gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10
 ```
 
 **What it measures:**
@@ -54,11 +61,11 @@ gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B
 **Per-step output example:**
 ```
   Per-Step Token Breakdown:
-  ──────────────────────────────────────────────────────────────
+  ----------------------------------------------------------------------
   Step    Action        Input    Output     Total      Time
     1     llm_call        2500       150      2650       8.2s
     2     llm_call        2400       127      2527       5.1s
-  ──────────────────────────────────────────────────────────────
+  ----------------------------------------------------------------------
 ```
 
 **Use cases:**
@@ -84,7 +91,7 @@ gaia email bench \
 Simulates a realistic multi-turn email session. The agent retains context across turns, and tokens are tracked per-turn, per-step, and per-email.
 
 ```bash
-gaia email bench --mbox-path "path/to/your.mbox" --mode interactive --model "Qwen3.5-4B-GGUF" --limit 10 --output-dir benchmark_results_interactive
+gaia email bench --mbox-path "path/to/your.mbox" --mode interactive --model "Qwen3.5-4B-GGUF" --limit 10
 ```
 
 **Default scenario (4 turns):**
@@ -121,7 +128,7 @@ gaia email bench --mbox-path "path/to/your.mbox" --mode interactive --model "Qwe
 **Final summary:**
 ```
 ======================================================================
-  Interactive Benchmark — Summary
+  Interactive Benchmark -- Summary
 ======================================================================
   Run ID:    run-interactive-20260509-...
   Model:     Qwen3.5-4B-GGUF
@@ -145,235 +152,7 @@ gaia email bench --mbox-path "path/to/your.mbox" --mode interactive --model "Qwe
 
 ---
 
-## 4. Variance Analysis (Multiple Experiments)
-
-Run the same benchmark multiple times to measure consistency and variance.
-
-```bash
-gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10 --experiments 5 --output-dir benchmark_results
-```
-
-**Automatically produces:**
-- `results.json` / `results.jsonl` — appended results from all experiments
-- `variance.json` — statistical report with mean, stdev, min, max, CV%
-
-**Variance report example:**
-```
-  Variance Summary (across all runs):
-  ──────────────────────────────────────────────────────────────
-  total_duration_s              : μ=     42.00  σ=        1.20  min=   40.20  max=   43.80  CV=  2.9%
-  total_input_tokens            : μ=     2500.0  σ=        0.0  min= 2500.0  max= 2500.0  CV=  0.0%
-  total_output_tokens           : μ=      150.0  σ=        5.2  min=  142.0  max=  158.0  CV=  3.5%
-  total_tokens                  : μ=     2650.0  σ=        5.2  min= 2642.0  max= 2658.0  CV=  0.2%
-  total_emails                  : μ=       10.0  σ=        0.0  min=   10.0  max=   10.0  CV=  0.0%
-  avg_duration_per_email_s      : μ=      4.20  σ=        0.12  min=    4.02  max=    4.38  CV=  2.9%
-  avg_input_tokens_per_email    : μ=      250.0  σ=        0.0  min=  250.0  max=  250.0  CV=  0.0%
-  avg_output_tokens_per_email   : μ=       15.0  σ=        0.5  min=   14.2  max=   15.8  CV=  3.5%
-  avg_total_tokens_per_email    : μ=      265.0  σ=        0.5  min=  264.2  max=  265.8  CV=  0.2%
-  ```
-
-**Use cases:**
-- Measuring LLM output consistency across runs
-- Detecting token count drift between model versions
-- Validating that results are reproducible
-
-### Variance-only mode (re-analyze existing results)
-
-```bash
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --variance-only \
-  --jsonl-path benchmark_results/results.jsonl \
-  --output-dir benchmark_results
-```
-
----
-
-## 5. Mode Comparison (Heuristic vs Full)
-
-Diff heuristic and full mode results to see exactly what the LLM adds.
-
-```bash
-# Step 1: Run heuristic baseline
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode heuristic \
-  --limit 10 \
-  --output-dir benchmark_results_heuristic
-
-# Step 2: Run full mode
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --model "Qwen3.5-4B-GGUF" \
-  --limit 10 \
-  --output-dir benchmark_results_full
-
-# Step 3: Compare them
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --compare \
-    benchmark_results_heuristic/results.json \
-    benchmark_results_full/results.json \
-  --output-dir benchmark_results_compare
-```
-
-**Comparison output:**
-```
-======================================================================
-  GAIA Email Triage Benchmark — Mode Comparison
-======================================================================
-  MBOX:    path/to/your.mbox
-  Emails:  10 (heuristic) vs 10 (full)
-
-  ──────────────────────────────────────────────────────────────
-  Totals:
-                              heuristic          full       delta
-  ──────────────────────────────────────────────────────────────
-    Duration (ms)                    31         41907      +41876
-    Duration (s)                   0.0          41.9        +41.9
-    Input tokens                      0          2500       +2500
-    Output tokens                     0           150        +150
-    Total tokens                      0          2650       +2650
-
-  ──────────────────────────────────────────────────────────────
-  Per-Email Averages:
-                              heuristic          full
-  ──────────────────────────────────────────────────────────────
-    Time per email (ms)               3.1        4190.7
-    Time per email (s)              0.003         4.191
-    Input tokens/email                0.0         250.0
-    Output tokens/email               0.0          15.0
-    Total tokens/email                0.0         265.0
-
-  ──────────────────────────────────────────────────────────────
-  Full Mode Efficiency:
-  ──────────────────────────────────────────────────────────────
-    ms per token:        15.8
-    tokens per second:   63.2
-    Time overhead vs heuristic:  135243% slower
-
-  ──────────────────────────────────────────────────────────────
-  Category Distribution:
-                      heuristic          full       delta
-  ──────────────────────────────────────────────────────────────
-    informational                7             7         +0
-    low priority                 3             3         +0
-
-  ──────────────────────────────────────────────────────────────
-  Per-Email Classification Agreement:
-    Same category:      10/10 (100%)
-    Different category: 0/10 (0%)
-======================================================================
-```
-
-**Output file:** `comparison.json` with detailed per-email mismatches.
-
----
-
-## 6. Ground Truth Quality Scoring
-
-Provide a ground truth JSON to measure classification accuracy.
-
-```bash
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --model "Qwen3.5-4B-GGUF" \
-  --limit 10 \
-  --ground-truth "path/to/ground_truth.json" \
-  --output-dir benchmark_results
-```
-
-**Ground truth format:**
-```json
-{
-  "377bc3bc44e6a005": {"category": "informational"},
-  "60f9d4ef6bf62b7f": {"category": "low priority"}
-}
-```
-
-**Quality score:** Fraction of emails classified correctly (0.0–1.0), included in `summary.csv`.
-
----
-
-## 7. Cost Estimation
-
-For paid API models, estimate the cost of running the benchmark.
-
-```bash
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --model "claude-sonnet-4-6" \
-  --limit 100 \
-  --cost-per-1m-input 3.0 \
-  --cost-per-1m-output 15.0 \
-  --output-dir benchmark_results
-```
-
-Cost appears in `summary.csv` as `Cost Per Turn` and `Total Cost`.
-
----
-
-## 8. Charts (Visualizations)
-
-Generate static PNG charts from benchmark output for reports, dashboards, and presentations. Uses matplotlib with the Agg backend (no display required).
-
-```bash
-# Auto-generate charts after a benchmark run
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --model "Qwen3.5-4B-GGUF" \
-  --limit 10 \
-  --experiments 5 \
-  --visualize \
-  --chart-dir benchmark_charts
-
-# Post-hoc: generate charts from existing output files
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --visualize \
-  --chart-dir benchmark_charts
-
-# Standalone chart generation (no benchmark run)
-gaia email bench \
-  --visualize \
-  --json-path benchmark_results/results.json \
-  --jsonl-path benchmark_results/results.jsonl \
-  --interactive-path benchmark_results/interactive.json \
-  --chart-dir benchmark_charts
-```
-
-**Available charts (auto-selected based on data availability):**
-
-| # | Chart | Type | When Generated |
-|---|-------|------|----------------|
-| 01 | Category Distribution | Comparison (horizontal bar) | Always |
-| 02 | Token Composition | Composition (donut) | Full/interactive modes |
-| 03 | Duration vs Token Cost | Comparison (grouped column) | Full/interactive modes |
-| 04 | Per-Email Duration Histogram | Distribution (histogram) | Always |
-| 05a | LLM Latency Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
-| 05b | LLM Token Variance | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
-| 05c | Per-Email Cost Variance | Comparison (dual-axis + stats) | Multi-experiment (>= 2 runs) |
-| 05d | TTFT Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
-| 05e | TPS Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
-| 06 | Interactive Turn Breakdown | Comparison (grouped column) | Interactive mode |
-| 07 | Interactive Token Heatmap | Relationship (heatmap) | Interactive mode |
-| 08 | Category Stability | Composition (stacked bar + annotation) | Multi-experiment (>= 2 runs) |
-| 09 | Token vs Duration Scatter | Relationship (scatter + trend) | Always (>= 2 data points) |
-| 10 | Per-Step TTFT & TPS | Comparison (dual-axis line) | Full/interactive modes |
-
-**Variance charts (05a, 05b, 05c, 05d, 05e)** include a **Consistency Report** box showing μ (mean), σ (stdev), and CV% (coefficient of variation). These quantify LLM non-determinism — how much token counts and latency vary when running the *same* benchmark on the *same* emails. Low CV% = predictable cost. High CV% = volatile behavior. All duration/latency values are in seconds.
-
-**Category Stability (08)** shows that heuristic classification is deterministic — bars should be identical across runs, contrasting with LLM-based variance shown in charts 05a-c.
-
-**Output:** All charts saved as numbered PNGs in `--chart-dir/` with a `CHARTS.md` index file.
-
----
-
-## 9. Multi-Model Benchmark
+## 4. Multi-Model Benchmark
 
 Run multiple LLM models sequentially against the same MBOX file, measuring comparative performance without model-eviction churn from concurrent runs.
 
@@ -384,8 +163,7 @@ gaia email bench \
   --models "Qwen3.5-4B-GGUF" \
   --models "Qwen3.5-14B-GGUF" \
   --models "claude-sonnet-4-6" \
-  --experiments-per-model 3 \
-  --output-dir benchmark_multi_model
+  --experiments-per-model 3
 ```
 
 **Key flags:**
@@ -408,9 +186,295 @@ gaia email bench \
 
 ---
 
+## 5. ClawFlow Benchmark
+
+Run [ClawFlow](https://github.com/openclaw-eval) CLI on the same MBOX to produce framework-comparable results. This replaces the old `--clawflow` flag on `gaia email bench`.
+
+```bash
+gaia email clawflow \
+  --mbox-path "path/to/your.mbox" \
+  --workflow inbox-zero-helper \
+  --timeout 3600
+```
+
+**Key flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--mbox-path` | *(required)* Path to MBOX file |
+| `--workflow` | ClawFlow workflow name (default `inbox-zero-helper`) |
+| `--timeout` | Max seconds to wait for ClawFlow (default 3600) |
+| `--clawflow-path` | Explicit path to clawflow script or binary |
+| `--model` | Model ID for ClawFlow (if applicable) |
+
+**How it works:**
+
+1. ClawFlow CLI is invoked as a subprocess
+2. ClawFlow's JSON output is parsed and mapped to GAIA's `RunResult` schema
+3. Results are saved to `clawflow_results.json`
+
+**Invocation:** ClawFlow is invoked via `python clawflow_cli.py --workflow <name> --model <model> --json --quiet`. The adapter probes for the script at the default location (`openclaw-eval/scripts/agentic-framework-test/gaia_agents/clawflow_cli.py`) or an explicit `--clawflow-path`.
+
+**Category mapping:** ClawFlow categories are normalized to GAIA taxonomy:
+
+| ClawFlow | GAIA |
+|----------|------|
+| `URGENT` | `urgent` |
+| `NEEDS_RESPONSE` | `actionable` |
+| `FYI` | `informational` |
+| `PROMOTIONAL` | `low priority` |
+
+**Output:** `clawflow_results.json` -- raw ClawFlow output mapped to GAIA schema.
+
+---
+
+## 6. Report Generation
+
+The `gaia email report` command reads benchmark results from `gaia email bench` and `gaia email clawflow`, computes analysis, and produces all report files and charts. This replaces the old `--variance-only`, `--visualize`, and `--compare` flags.
+
+```bash
+gaia email report --input-dir benchmark_results
+```
+
+**What it reads:**
+- `results.jsonl` (from `gaia email bench`)
+- `clawflow_results.json` (from `gaia email clawflow`, if present)
+
+**What it produces:**
+
+| File | Contents |
+|------|----------|
+| `report.csv` | Per-email rows with all metrics |
+| `variance.json` | Statistical variance report (mean, stdev, min, max, CV%) |
+| `quality.json` | Ground truth accuracy scores |
+| `statistical_tests.json` | Mann-Whitney U, Cliff's delta, bootstrap CI |
+| `framework_comparison.json` | GAIA vs ClawFlow side-by-side metrics |
+| `charts/` | PNG charts + `CHARTS.md` index |
+
+### Variance Analysis
+
+When multiple experiments exist in `results.jsonl`, the report computes variance statistics automatically.
+
+**Variance report example:**
+```
+  Variance Summary (across all runs):
+  ----------------------------------------------------------------------
+  total_duration_s              : mu=     42.00  sigma=        1.20  min=   40.20  max=   43.80  CV=  2.9%
+  total_input_tokens            : mu=     2500.0  sigma=        0.0  min= 2500.0  max= 2500.0  CV=  0.0%
+  total_output_tokens           : mu=      150.0  sigma=        5.2  min=  142.0  max=  158.0  CV=  3.5%
+  total_tokens                  : mu=     2650.0  sigma=        5.2  min= 2642.0  max= 2658.0  CV=  0.2%
+  total_emails                  : mu=       10.0  sigma=        0.0  min=   10.0  max=   10.0  CV=  0.0%
+  avg_duration_per_email_s      : mu=      4.20  sigma=        0.12  min=    4.02  max=    4.38  CV=  2.9%
+  avg_input_tokens_per_email    : mu=      250.0  sigma=        0.0  min=  250.0  max=  250.0  CV=  0.0%
+  avg_output_tokens_per_email   : mu=       15.0  sigma=        0.5  min=   14.2  max=   15.8  CV=  3.5%
+  avg_total_tokens_per_email    : mu=      265.0  sigma=        0.5  min=  264.2  max=  265.8  CV=  0.2%
+  ```
+
+### Mode Comparison
+
+Compare heuristic vs full mode (or any two result sets):
+
+```bash
+# Step 1: Run heuristic baseline
+gaia email bench \
+  --mbox-path "path/to/your.mbox" \
+  --mode heuristic \
+  --limit 10
+
+# Step 2: Run full mode
+gaia email bench \
+  --mbox-path "path/to/your.mbox" \
+  --mode full \
+  --model "Qwen3.5-4B-GGUF" \
+  --limit 10
+
+# Step 3: Generate comparison report
+gaia email report \
+  --compare heuristic full \
+  --input-dir benchmark_results
+```
+
+**Comparison output:**
+```
+======================================================================
+  GAIA Email Triage Benchmark -- Mode Comparison
+======================================================================
+  MBOX:    path/to/your.mbox
+  Emails:  10 (heuristic) vs 10 (full)
+
+  ----------------------------------------------------------------------
+  Totals:
+                              heuristic          full       delta
+  ----------------------------------------------------------------------
+    Duration (ms)                    31         41907      +41876
+    Duration (s)                   0.0          41.9        +41.9
+    Input tokens                      0          2500       +2500
+    Output tokens                     0           150        +150
+    Total tokens                      0          2650       +2650
+
+  ----------------------------------------------------------------------
+  Per-Email Averages:
+                              heuristic          full
+  ----------------------------------------------------------------------
+    Time per email (ms)               3.1        4190.7
+    Time per email (s)              0.003         4.191
+    Input tokens/email                0.0         250.0
+    Output tokens/email               0.0          15.0
+    Total tokens/email                0.0         265.0
+
+  ----------------------------------------------------------------------
+  Full Mode Efficiency:
+  ----------------------------------------------------------------------
+    ms per token:        15.8
+    tokens per second:   63.2
+    Time overhead vs heuristic:  135243% slower
+
+  ----------------------------------------------------------------------
+  Category Distribution:
+                      heuristic          full       delta
+  ----------------------------------------------------------------------
+    informational                7             7         +0
+    low priority                 3             3         +0
+
+  ----------------------------------------------------------------------
+  Per-Email Classification Agreement:
+    Same category:      10/10 (100%)
+    Different category: 0/10 (0%)
+======================================================================
+```
+
+### Framework Comparison (GAIA vs ClawFlow)
+
+When both `results.jsonl` and `clawflow_results.json` are present in the input directory, the report automatically produces a framework comparison:
+
+```bash
+# Step 1: Run GAIA benchmark
+gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10
+
+# Step 2: Run ClawFlow benchmark
+gaia email clawflow --mbox-path "path/to/your.mbox" --workflow inbox-zero-helper
+
+# Step 3: Generate unified report with framework comparison
+gaia email report --input-dir benchmark_comparison
+```
+
+**Output file:** `framework_comparison.json` with detailed side-by-side metrics.
+
+---
+
+## 7. Quality Scoring
+
+Provide a ground truth JSON to measure classification accuracy.
+
+```bash
+gaia email bench \
+  --mbox-path "path/to/your.mbox" \
+  --mode full \
+  --model "Qwen3.5-4B-GGUF" \
+  --limit 10 \
+  --ground-truth "path/to/ground_truth.json"
+```
+
+**Ground truth format:**
+```json
+{
+  "377bc3bc44e6a005": {"category": "informational"},
+  "60f9d4ef6bf62b7f": {"category": "low priority"}
+}
+```
+
+**Quality score:** Fraction of emails classified correctly (0.0--1.0). Computed by `gaia email report` and saved to `quality.json`.
+
+---
+
+## 8. Cost Estimation
+
+For paid API models, estimate the cost of running the benchmark.
+
+```bash
+gaia email bench \
+  --mbox-path "path/to/your.mbox" \
+  --mode full \
+  --model "claude-sonnet-4-6" \
+  --limit 100 \
+  --cost-per-1m-input 3.0 \
+  --cost-per-1m-output 15.0
+```
+
+Cost appears in `report.csv` as `Cost Per Turn` and `Total Cost`.
+
+---
+
+## 9. Charts (Visualizations)
+
+Generate static PNG charts from benchmark output for reports, dashboards, and presentations. Uses matplotlib with the Agg backend (no display required).
+
+```bash
+# Run benchmarks first
+gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10 --experiments 5
+
+# Then generate charts from the results
+gaia email report --input-dir benchmark_results --charts
+```
+
+**Available charts (auto-selected based on data availability):**
+
+| # | Chart | Type | When Generated |
+|---|-------|------|----------------|
+| 01 | Category Distribution | Comparison (horizontal bar) | Always |
+| 02 | Token Composition | Composition (donut) | Full/interactive modes |
+| 03 | Duration vs Token Cost | Comparison (grouped column) | Full/interactive modes |
+| 04 | Per-Email Duration Histogram | Distribution (histogram) | Always |
+| 05a | LLM Latency Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
+| 05b | LLM Token Variance | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
+| 05c | Per-Email Cost Variance | Comparison (dual-axis + stats) | Multi-experiment (>= 2 runs) |
+| 05d | TTFT Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
+| 05e | TPS Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
+| 06 | Interactive Turn Breakdown | Comparison (grouped column) | Interactive mode |
+| 07 | Interactive Token Heatmap | Relationship (heatmap) | Interactive mode |
+| 08 | Category Stability | Composition (stacked bar + annotation) | Multi-experiment (>= 2 runs) |
+| 09 | Token vs Duration Scatter | Relationship (scatter + trend) | Always (>= 2 data points) |
+| 10 | Per-Step TTFT & TPS | Comparison (dual-axis line) | Full/interactive modes |
+
+**Variance charts (05a, 05b, 05c, 05d, 05e)** include a **Consistency Report** box showing mu (mean), sigma (stdev), and CV% (coefficient of variation). These quantify LLM non-determinism -- how much token counts and latency vary when running the *same* benchmark on the *same* emails. Low CV% = predictable cost. High CV% = volatile behavior. All duration/latency values are in seconds.
+
+**Category Stability (08)** shows that heuristic classification is deterministic -- bars should be identical across runs, contrasting with LLM-based variance shown in charts 05a-c.
+
+**Output:** All charts saved as numbered PNGs in `charts/` with a `CHARTS.md` index file.
+
+### Extended Charts (Charts 11-21)
+
+Multi-model and ClawFlow runs unlock additional charts for cross-framework comparison.
+
+| # | Chart | Type | When Generated |
+|---|-------|------|----------------|
+| 11 | Model Duration Comparison | Grouped column | Multi-model (>= 2 models) |
+| 12 | Model Token Cost | Stacked column | Multi-model (>= 2 models) |
+| 13 | TTFT Comparison | Horizontal bar | Multi-model (>= 2 models) |
+| 14 | TPS Comparison | Horizontal bar | Multi-model (>= 2 models) |
+| 15 | Framework Category Comparison | Side-by-side stacked bars | ClawFlow + GAIA data |
+| 16 | Architecture Radar | Radar/spider chart | ClawFlow + GAIA data |
+| 17 | Per-Model Variance Trend | Multi-line | Multi-model (>= 3 experiments) |
+| 18 | Cold-Start Impact | Scatter with annotation | Multi-model with cold-start data |
+| 19 | Model x Architecture Duration | Grouped column | ClawFlow + GAIA data (>= 1 model) |
+| 20 | Model x Architecture Token Cost | Grouped stacked column | ClawFlow + GAIA data (>= 1 model) |
+| 21 | Architecture Performance Dashboard | 4-panel faceted | ClawFlow + GAIA data (>= 1 model) |
+
+**Architecture Radar (Chart 16)** plots GAIA and ClawFlow across six dimensions: Duration, Tokens, TTFT, TPS, Classification Accuracy, and Category Coverage -- normalized to 0-100 scale for visual comparison.
+
+**Cold-Start Impact (Chart 18)** visualizes the first-experiment TTFT contamination effect, showing how model loading time inflates latency on the first run versus warm subsequent runs.
+
+**Model x Architecture charts (19-21)** display performance metrics across models and frameworks in a unified view. All charts use consistent architecture colors:
+- **GAIA**: `#ED6C02` (AMD orange)
+- **ClawFlow**: `#3182CE` (blue)
+
+**Architecture Performance Dashboard (Chart 21)** is a 4-panel faceted chart showing TTFT, throughput (TPS), total duration, and token cost -- all grouped by model and colored by architecture for at-a-glance comparison.
+
+---
+
 ## 10. Statistical Tests
 
-When multiple models are benchmarked with sufficient experiments (>= 2 per model), the harness automatically runs non-parametric statistical tests to determine if performance differences are significant.
+When multiple models are benchmarked with sufficient experiments (>= 2 per model), the report automatically runs non-parametric statistical tests to determine if performance differences are significant.
 
 **Tests performed:**
 
@@ -431,6 +495,8 @@ gaia email bench \
   --mode full \
   --models "model-a" --models "model-b" \
   --experiments-per-model 5
+
+gaia email report --input-dir benchmark_results
 ```
 
 **Console output:**
@@ -445,91 +511,47 @@ Results are saved to `statistical_tests.json` for programmatic access.
 
 ---
 
-## 11. ClawFlow Integration (Cross-Framework Comparison)
+## 11. Output Files
 
-Run [ClawFlow](https://github.com/openclaw-eval) CLI after GAIA benchmark completes, producing a unified framework comparison on the same MBOX.
+The three subcommands produce distinct outputs:
 
-```bash
-gaia email bench \
-  --mbox-path "path/to/your.mbox" \
-  --mode full \
-  --models "Qwen3.5-4B-GGUF" \
-  --clawflow \
-  --clawflow-workflow inbox-zero-helper \
-  --clawflow-timeout 3600 \
-  --output-dir benchmark_comparison
-```
+### `gaia email bench`
 
-**How it works:**
+| File | Format | When |
+|------|--------|------|
+| `results.jsonl` | JSONL | Every run (append-only log, all models, all experiments) |
+| `results.json` | JSON | Single-run detail (when `--experiments-per-model 1`) |
+| `interactive.json` | JSON | Interactive mode only |
 
-1. GAIA runs its benchmark loop (all models, all experiments)
-2. After GAIA completes, ClawFlow CLI is invoked as a subprocess
-3. ClawFlow's JSON output is parsed and mapped to GAIA's `RunResult` schema
-4. A framework comparison report is printed and saved as `framework_comparison.json`
-5. ClawFlow results are appended to `results.jsonl` for unified chart generation
+### `gaia email clawflow`
 
-**ClawFlow flags:**
+| File | Format | When |
+|------|--------|------|
+| `clawflow_results.json` | JSON | Every run |
 
-| Flag | Description |
-|------|-------------|
-| `--clawflow` | Enable ClawFlow execution after GAIA benchmark |
-| `--clawflow-timeout` | Max seconds to wait for ClawFlow (default 3600) |
-| `--clawflow-workflow` | ClawFlow workflow name (default `inbox-zero-helper`) |
-| `--clawflow-path` | Explicit path to clawflow script or binary |
+### `gaia email report`
 
-**Invocation:** ClawFlow is invoked via `python clawflow_cli.py --workflow <name> --model <model> --json --quiet`. The adapter probes for the script at the default location (`openclaw-eval/scripts/agentic-framework-test/gaia_agents/clawflow_cli.py`) or an explicit `--clawflow-path`.
+| File | Format | When |
+|------|--------|------|
+| `report.csv` | CSV | Every report (per-email rows) |
+| `variance.json` | JSON | Multi-experiment (>= 2 runs) |
+| `variance_by_model.json` | JSON | Multi-model (>= 2 models) |
+| `quality.json` | JSON | Ground truth provided |
+| `statistical_tests.json` | JSON | Multi-model with >= 2 experiments each |
+| `comparison.json` | JSON | `--compare` mode |
+| `framework_comparison.json` | JSON | ClawFlow + GAIA data present |
+| `charts/*.png` | PNG | `--charts` flag |
+| `charts/CHARTS.md` | Markdown | Chart index (when charts generated) |
 
-**Category mapping:** ClawFlow categories are normalized to GAIA taxonomy:
+### CSV Column Layout
 
-| ClawFlow | GAIA |
-|----------|------|
-| `URGENT` | `urgent` |
-| `NEEDS_RESPONSE` | `actionable` |
-| `FYI` | `informational` |
-| `PROMOTIONAL` | `low priority` |
-
-**Output files:**
-
-| File | Contents |
-|------|----------|
-| `clawflow_results.json` | Raw ClawFlow output mapped to GAIA schema |
-| `framework_comparison.json` | Side-by-side GAIA vs ClawFlow metrics |
-
-**Charts:** When `--visualize` is used with `--clawflow`, Charts 15-16 (Framework Category Comparison, Architecture Radar) are automatically generated.
+The `report.csv` matches openclaw-eval column layout with 40+ columns including: `run_id`, `timestamp`, `model`, `provider`, `email_id`, `subject`, `sender`, `gaia_category`, `openclaw_category`, `is_spam`, `is_phishing`, `confident`, `reason`, `duration_per_email_ms`, and cumulative token counts.
 
 ---
 
-## 12. Extended Charts (Charts 11-18)
+## 12. CLI Reference
 
-Multi-model and ClawFlow runs unlock additional charts for cross-framework comparison.
-
-| # | Chart | Type | When Generated |
-|---|-------|------|----------------|
-| 11 | Model Duration Comparison | Grouped column | Multi-model (>= 2 models) |
-| 12 | Model Token Cost | Stacked column | Multi-model (>= 2 models) |
-| 13 | TTFT Comparison | Horizontal bar | Multi-model (>= 2 models) |
-| 14 | TPS Comparison | Horizontal bar | Multi-model (>= 2 models) |
-| 15 | Framework Category Comparison | Side-by-side stacked bars | ClawFlow + GAIA data |
-| 16 | Architecture Radar | Radar/spider chart | ClawFlow + GAIA data |
-| 17 | Per-Model Variance Trend | Multi-line | Multi-model (>= 3 experiments) |
-| 18 | Cold-Start Impact | Scatter with annotation | Multi-model with cold-start data |
-| 19 | Model x Architecture Duration | Grouped column | ClawFlow + GAIA data (>= 1 model) |
-| 20 | Model x Architecture Token Cost | Grouped stacked column | ClawFlow + GAIA data (>= 1 model) |
-| 21 | Architecture Performance Dashboard | 4-panel faceted | ClawFlow + GAIA data (>= 1 model) |
-
-**Architecture Radar (Chart 16)** plots GAIA and ClawFlow across six dimensions: Duration, Tokens, TTFT, TPS, Classification Accuracy, and Category Coverage — normalized to 0-100 scale for visual comparison.
-
-**Cold-Start Impact (Chart 18)** visualizes the first-experiment TTFT contamination effect, showing how model loading time inflates latency on the first run versus warm subsequent runs.
-
-**Model x Architecture charts (19-21)** display performance metrics across models and frameworks in a unified view. All charts use consistent architecture colors:
-- **GAIA**: `#ED6C02` (AMD orange)
-- **ClawFlow**: `#3182CE` (blue)
-
-**Architecture Performance Dashboard (Chart 21)** is a 4-panel faceted chart showing TTFT, throughput (TPS), total duration, and token cost — all grouped by model and colored by architecture for at-a-glance comparison.
-
----
-
-## CLI Reference
+### `gaia email bench` -- Run GAIA Benchmarks
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -545,50 +567,69 @@ Multi-model and ClawFlow runs unlock additional charts for cross-framework compa
 | `--model-batch-sizes` | *(none)* | `model:batch_size` pairs, e.g. `"m1:10,m2:20"` |
 | `--skip-cold-start` | false | Exclude first (cold-start) experiment from reports |
 | `--fail-fast` | false | Abort on first model failure |
-| `--output-dir` | `benchmark_results` | Output directory |
-| `--variance-only` | false | Re-analyze existing JSONL |
-| `--jsonl-path` | (auto) | JSONL path for variance-only |
-| `--compare` | none | Compare two JSON files |
 | `--ground-truth` | none | Ground truth JSON for quality scoring |
 | `--cost-per-1m-input` | 0.0 | Cost per 1M input tokens |
 | `--cost-per-1m-output` | 0.0 | Cost per 1M output tokens |
 | `--steps` | false | Print per-step token breakdown |
-| `--visualize` | false | Generate chart PNGs |
-| `--chart-dir` | `benchmark_charts` | Directory for chart output |
-| `--clawflow` | false | Run ClawFlow CLI after GAIA benchmark |
-| `--clawflow-timeout` | 3600 | Seconds to wait for ClawFlow |
-| `--clawflow-workflow` | `inbox-zero-helper` | ClawFlow workflow name |
+
+**Deprecated flags** (moved to `gaia email report`):
+- `--variance-only` -- use `gaia email report --input-dir <dir>` instead
+- `--visualize` -- use `gaia email report --charts --input-dir <dir>` instead
+- `--compare` -- use `gaia email report --compare <a> <b> --input-dir <dir>` instead
+- `--clawflow`, `--clawflow-timeout`, `--clawflow-workflow`, `--clawflow-path` -- use `gaia email clawflow` instead
+
+### `gaia email clawflow` -- Run ClawFlow Benchmarks
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--mbox-path` | *(required)* | Path to MBOX file |
+| `--workflow` | `inbox-zero-helper` | ClawFlow workflow name |
+| `--timeout` | 3600 | Max seconds to wait for ClawFlow |
 | `--clawflow-path` | *(auto)* | Explicit path to clawflow script/binary |
+| `--model` | *(auto)* | Model ID for ClawFlow |
 
----
+### `gaia email report` -- Generate Reports and Charts
 
-## Output Files
-
-Every benchmark run produces these files in `--output-dir`:
-
-| File | Format | When |
-|------|--------|------|
-| `results.csv` | CSV | Every run (per-email rows) |
-| `results.json` | JSON | Every run (full detail) |
-| `results.jsonl` | JSONL | Append-only log (all runs, all models) |
-| `summary.csv` | CSV | Every run (summary metrics) |
-| `variance.json` | JSON | Multi-experiment (>= 2 runs) |
-| `variance_by_model.json` | JSON | Multi-model (>= 2 models) |
-| `statistical_tests.json` | JSON | Multi-model with >= 2 experiments each |
-| `comparison.json` | JSON | `--compare` mode |
-| `interactive.json` | JSON | Interactive mode |
-| `clawflow_results.json` | JSON | `--clawflow` enabled |
-| `framework_comparison.json` | JSON | `--clawflow` + GAIA data present |
-| `charts/*.png` | PNG | `--visualize` enabled |
-| `charts/CHARTS.md` | Markdown | Chart index
-
-### CSV Column Layout
-
-The `results.csv` matches openclaw-eval column layout with 40+ columns including: `run_id`, `timestamp`, `model`, `provider`, `email_id`, `subject`, `sender`, `gaia_category`, `openclaw_category`, `is_spam`, `is_phishing`, `confident`, `reason`, `duration_per_email_ms`, and cumulative token counts.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--input-dir` | `benchmark_results` | Directory containing benchmark output files |
+| `--charts` | false | Generate chart PNGs in `charts/` subdirectory |
+| `--compare` | none | Compare two result sets, e.g. `--compare heuristic full` |
+| `--ground-truth` | none | Ground truth JSON for quality scoring |
+| `--cost-per-1m-input` | 0.0 | Cost per 1M input tokens |
+| `--cost-per-1m-output` | 0.0 | Cost per 1M output tokens |
 
 ---
 
 ## Architecture
+
+The email benchmark follows the Unix philosophy: three focused commands, each doing one job well, composed via shared output files.
+
+```
+gaia email bench       ---->  results.jsonl / interactive.json
+gaia email clawflow    ---->  clawflow_results.json
+                               |
+gaia email report  <----  reads both, produces:
+                               report.csv
+                               variance.json
+                               quality.json
+                               statistical_tests.json
+                               framework_comparison.json
+                               charts/
+```
+
+This design separates concerns cleanly:
+- **Runner** (`bench`) -- executes benchmarks, collects raw metrics
+- **Data** (`clawflow`) -- runs external framework, maps to unified schema
+- **Report generator** (`report`) -- reads all data, computes analysis, produces charts
+
+Benefits:
+- Each command can run independently and be re-run without re-executing benchmarks
+- Results are inspectable between steps for debugging
+- New analysis methods can be added to `report` without touching the runner
+- CI pipelines can parallelize bench and clawflow, then combine in report
+
+### Source Layout
 
 ```
 src/gaia/agents/email/bench/
@@ -596,28 +637,28 @@ src/gaia/agents/email/bench/
 ├── output.py           # CSV/JSON/JSONL formatters, summary generation
 ├── compare.py          # Cross-mode comparison (heuristic vs full, framework)
 ├── variance.py         # Statistical variance + tests (Mann-Whitney U, Cliff's delta, bootstrap CI)
-├── visualize.py        # Chart generation (18 charts, matplotlib Agg backend)
+├── visualize.py        # Chart generation (21 charts, matplotlib Agg backend)
 ├── clawflow_adapter.py # ClawFlow CLI probe, invoke, parse -> GAIA RunResult
-├── cli.py              # CLI entry point (gaia email bench)
+├── cli.py              # CLI entry point (gaia email {bench|clawflow|report})
 └── __init__.py
 ```
 
 ### Data Shapes
 
-- `EmailResult` — single email classification
-- `BatchResult` — batch of emails with aggregated metrics
-- `RunResult` — complete benchmark run (GAIA or ClawFlow, unified schema)
-- `StepResult` — single LLM call with token/duration stats
-- `TurnResult` — single turn in interactive session
-- `ModeComparison` — heuristic vs full diff report
-- `VarianceSummary` — statistical summary across runs
-- `ClawflowRun` — ClawFlow BenchmarkRun mapped to GAIA `RunResult` shape
+- `EmailResult` -- single email classification
+- `BatchResult` -- batch of emails with aggregated metrics
+- `RunResult` -- complete benchmark run (GAIA or ClawFlow, unified schema)
+- `StepResult` -- single LLM call with token/duration stats
+- `TurnResult` -- single turn in interactive session
+- `ModeComparison` -- heuristic vs full diff report
+- `VarianceSummary` -- statistical summary across runs
+- `ClawflowRun` -- ClawFlow BenchmarkRun mapped to GAIA `RunResult` shape
 
 ### Statistical Tests
 
-- **Mann-Whitney U** — non-parametric test for distribution difference (normal approximation)
-- **Cliff's delta** — effect size estimator (small > 0.147, medium > 0.33, large > 0.474)
-- **Bootstrap 95% CI** — confidence interval for mean difference (1000 resamples)
+- **Mann-Whitney U** -- non-parametric test for distribution difference (normal approximation)
+- **Cliff's delta** -- effect size estimator (small > 0.147, medium > 0.33, large > 0.474)
+- **Bootstrap 95% CI** -- confidence interval for mean difference (1000 resamples)
 
 ### How token tracking works
 
