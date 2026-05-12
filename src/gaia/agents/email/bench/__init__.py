@@ -17,13 +17,9 @@ from gaia.agents.email.bench.clawflow_adapter import (
 )
 from gaia.agents.email.bench.compare import (
     FrameworkComparison,
-    ModeComparison,
     compare_frameworks,
-    compare_modes,
     print_framework_comparison,
-    print_mode_comparison,
     save_framework_comparison,
-    save_mode_comparison,
 )
 from gaia.agents.email.bench.output import (
     load_jsonl,
@@ -41,7 +37,6 @@ from gaia.agents.email.bench.runner import (
     RunResult,
     StepResult,
     TurnResult,
-    run_heuristic_benchmark,
     run_interactive_benchmark,
 )
 from gaia.agents.email.bench.variance import (
@@ -83,7 +78,6 @@ __all__ = [
     "RunResult",
     "StepResult",
     "TurnResult",
-    "run_heuristic_benchmark",
     "run_interactive_benchmark",
     # Output
     "load_jsonl",
@@ -103,15 +97,11 @@ __all__ = [
     "compare_runs_by_model",
     "mann_whitney_u",
     "to_dict",
-    # Compare
+    # Compare (GAIA vs ClawFlow only)
     "FrameworkComparison",
-    "ModeComparison",
     "compare_frameworks",
-    "compare_modes",
     "print_framework_comparison",
-    "print_mode_comparison",
     "save_framework_comparison",
-    "save_mode_comparison",
     # Visualize
     "generate_charts",
     "plot_architecture_radar",

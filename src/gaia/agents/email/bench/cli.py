@@ -42,9 +42,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench_parser.add_argument(
         "--mode",
-        choices=["heuristic", "full", "interactive"],
-        default="heuristic",
-        help="Benchmark mode: 'heuristic' (fast, no LLM), 'full' (single LLM turn), or 'interactive' (multi-turn session).",
+        choices=["full", "interactive"],
+        default="full",
+        help="Benchmark mode: 'full' (single LLM turn), or 'interactive' (multi-turn session).",
     )
     bench_parser.add_argument(
         "--model",
@@ -116,27 +116,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="DEPRECATED: use 'gaia email report --input-dir <dir>' instead.",
     )
     bench_parser.add_argument(
-        "--jsonl-path",
-        type=str,
-        default=None,
-        help="DEPRECATED: use 'gaia email report --input-dir <dir>' instead.",
-    )
-    bench_parser.add_argument(
         "--visualize",
         action="store_true",
         help="DEPRECATED: use 'gaia email report --charts --input-dir <dir>' instead.",
-    )
-    bench_parser.add_argument(
-        "--chart-dir",
-        type=str,
-        default="benchmark_charts",
-        help="Directory for chart PNGs (used with legacy --visualize).",
-    )
-    bench_parser.add_argument(
-        "--compare",
-        nargs=2,
-        metavar=("HEURISTIC_JSON", "FULL_JSON"),
-        help="DEPRECATED: use 'gaia email report --compare <path1> <path2>' instead.",
     )
     bench_parser.add_argument(
         "--ground-truth",
@@ -237,12 +219,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exclude cold-start runs from variance analysis.",
     )
     rpt_parser.add_argument(
-        "--compare",
-        nargs=2,
-        metavar=("HEURISTIC_JSON", "FULL_JSON"),
-        help="Compare heuristic and full mode results (two JSON files).",
-    )
-    rpt_parser.add_argument(
         "--ground-truth",
         type=str,
         default=None,
@@ -270,7 +246,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.bench_action == "bench":
         # Check for legacy flags that should delegate to report_generator.
-        if args.variance_only or args.visualize or args.compare:
+        if args.variance_only or args.visualize:
             _handle_legacy_delegations(args)
 
         # Warn about silently-ignored cost/quality flags on bench subcommand.
@@ -322,8 +298,6 @@ def _handle_legacy_delegations(args) -> None:
             input_dir=output_dir,
             output_dir=output_dir,
             generate_charts=args.visualize,
-            chart_dir=Path(args.chart_dir) if args.chart_dir else None,
-            skip_cold_start=args.skip_cold_start,
         )
         sys.exit(0)
 
@@ -332,45 +306,13 @@ def _handle_legacy_delegations(args) -> None:
             "WARNING: --visualize is deprecated. Use 'gaia email report --charts --input-dir <dir>' instead.",
             file=sys.stderr,
         )
-        # Still delegate to report for chart generation.
         from gaia.agents.email.bench.report_generator import generate_reports
 
         generate_reports(
             input_dir=output_dir,
             output_dir=output_dir,
             generate_charts=True,
-            chart_dir=Path(args.chart_dir) if args.chart_dir else None,
         )
-        sys.exit(0)
-
-    if args.compare:
-        print(
-            "WARNING: --compare is deprecated. Use 'gaia email report --compare <path1> <path2>' instead.",
-            file=sys.stderr,
-        )
-        from gaia.agents.email.bench.compare import (
-            print_mode_comparison,
-            save_mode_comparison,
-        )
-
-        h_path = Path(args.compare[0])
-        f_path = Path(args.compare[1])
-        if not h_path.exists():
-            print(f"Error: heuristic JSON not found: {h_path}", file=sys.stderr)
-            sys.exit(1)
-        if not f_path.exists():
-            print(f"Error: full JSON not found: {f_path}", file=sys.stderr)
-            sys.exit(1)
-
-        import json
-
-        with open(h_path, "r", encoding="utf-8") as fh:
-            heuristic = json.load(fh)
-        with open(f_path, "r", encoding="utf-8") as ff:
-            full = json.load(ff)
-
-        report = print_mode_comparison(heuristic, full)
-        save_mode_comparison(report, output_dir / "comparison.json")
         sys.exit(0)
 
 
@@ -438,8 +380,6 @@ def _build_report_args(args) -> list[str]:
         rpt_args.extend(["--chart-dir", args.chart_dir])
     if args.skip_cold_start:
         rpt_args.append("--skip-cold-start")
-    if args.compare:
-        rpt_args.extend(["--compare", args.compare[0], args.compare[1]])
     if args.ground_truth:
         rpt_args.extend(["--ground-truth", args.ground_truth])
     if args.cost_per_1m_input:

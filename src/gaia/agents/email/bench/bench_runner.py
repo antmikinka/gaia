@@ -26,10 +26,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mbox-path", required=True)
     parser.add_argument(
         "--mode",
-        choices=["heuristic", "full", "interactive"],
-        default="heuristic",
+        choices=["full", "interactive"],
+        default="full",
     )
-    parser.add_argument("--model", type=str, default="heuristic-only")
+    parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--models", action="append", default=None)
     parser.add_argument("--experiments-per-model", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=20)
@@ -61,7 +61,6 @@ def _parse_model_batch_sizes(arg: str | None) -> dict[str, int]:
 def _run_single_iteration(
     mbox_path: str,
     *,
-    mode: str,
     batch_size: int,
     limit: int,
     model: str,
@@ -69,31 +68,18 @@ def _run_single_iteration(
     is_cold_start: bool = False,
 ):
     """Run a single benchmark iteration."""
-    if mode == "heuristic":
-        from gaia.agents.email.bench.runner import run_heuristic_benchmark
+    from gaia.agents.email.bench.runner import _run_full_agent
 
-        result = run_heuristic_benchmark(
-            mbox_path,
-            limit=limit,
-            batch_size=batch_size,
-            model=model,
-        )
-        result.is_cold_start = is_cold_start
-        result.source_framework = "gaia"
-        return result
-    else:
-        from gaia.agents.email.bench.runner import _run_full_agent
-
-        run = _run_full_agent(
-            mbox_path,
-            model_id=model,
-            base_url=_base_url,
-            limit=limit,
-            _batch_size=batch_size,
-        )
-        run.is_cold_start = is_cold_start
-        run.source_framework = "gaia"
-        return run
+    run = _run_full_agent(
+        mbox_path,
+        model_id=model,
+        base_url=_base_url,
+        limit=limit,
+        _batch_size=batch_size,
+    )
+    run.is_cold_start = is_cold_start
+    run.source_framework = "gaia"
+    return run
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -180,8 +166,11 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.models:
         model_list = args.models
-    else:
+    elif args.model:
         model_list = [args.model]
+    else:
+        print("Error: --model or --models is required.")
+        return 1
 
     batch_size_map = _parse_model_batch_sizes(args.model_batch_sizes)
     exps = args.experiments_per_model
@@ -205,7 +194,6 @@ def main(argv: Optional[list[str]] = None) -> int:
             try:
                 result = _run_single_iteration(
                     args.mbox_path,
-                    mode=args.mode,
                     batch_size=batch_size,
                     limit=args.limit,
                     model=model_id,

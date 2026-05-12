@@ -61,12 +61,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Exclude cold-start runs from variance analysis.",
     )
     parser.add_argument(
-        "--compare",
-        nargs=2,
-        metavar=("HEURISTIC_JSON", "FULL_JSON"),
-        help="Compare heuristic and full mode results.",
-    )
-    parser.add_argument(
         "--ground-truth",
         type=str,
         default=None,
@@ -380,36 +374,6 @@ def _generate_charts(
     )
 
 
-def _handle_mode_comparison(
-    heuristic_path: str,
-    full_path: str,
-    output_dir: Path,
-) -> int:
-    """Handle --compare: heuristic vs full mode comparison."""
-    from gaia.agents.email.bench.compare import (
-        print_mode_comparison,
-        save_mode_comparison,
-    )
-
-    h_path = Path(heuristic_path)
-    f_path = Path(full_path)
-    if not h_path.exists():
-        print(f"Error: heuristic JSON not found: {h_path}")
-        return 1
-    if not f_path.exists():
-        print(f"Error: full JSON not found: {f_path}")
-        return 1
-
-    with open(h_path, "r", encoding="utf-8") as fh:
-        heuristic = json.load(fh)
-    with open(f_path, "r", encoding="utf-8") as ff:
-        full = json.load(ff)
-
-    report = print_mode_comparison(heuristic, full)
-    save_mode_comparison(report, output_dir / "comparison.json")
-    return 0
-
-
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
@@ -508,10 +472,6 @@ def main(argv: Optional[list[str]] = None) -> int:
     input_dir = Path(args.input_dir)
     output_dir = Path(args.output_dir) if args.output_dir else input_dir
     output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Handle --compare mode.
-    if args.compare:
-        return _handle_mode_comparison(args.compare[0], args.compare[1], output_dir)
 
     # Generate all reports.
     generate_reports(

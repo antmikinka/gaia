@@ -4,11 +4,10 @@
 Core benchmark runner for the GAIA Email Triage Agent.
 
 Supports two modes:
-- ``heuristic`` — Fast path, no LLM. Classifies each email via the
-  pre-processing heuristic pipeline.
 - ``full`` — End-to-end. Instantiates ``EmailTriageAgent`` with
   ``FakeGmailBackend`` injected, calls ``triage_inbox``, and captures
   token/duration metrics from the LLM round-trips.
+- ``interactive`` — Multi-turn session with context retention across turns.
 """
 
 from __future__ import annotations
@@ -16,10 +15,6 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-
-from gaia.agents.email.tools.triage_heuristics import (
-    classify_category_heuristic,
-)
 
 # ---------------------------------------------------------------------------
 # Data shapes
@@ -215,69 +210,6 @@ def load_emails_from_mbox(
         )
 
     return emails
-
-
-# ---------------------------------------------------------------------------
-# Heuristic mode
-# ---------------------------------------------------------------------------
-
-
-def _run_heuristic_batch(
-    emails: list[dict],
-    batch_num: int,
-    total_batches: int,
-) -> BatchResult:
-    """Classify a batch of emails using the heuristic pipeline only."""
-    batch = BatchResult(
-        batch_number=batch_num,
-        batch_size=len(emails),
-        total_batches=total_batches,
-    )
-    start = time.monotonic()
-
-    for email in emails:
-        e_start = time.monotonic()
-        try:
-            result = classify_category_heuristic(
-                subject=email["subject"],
-                sender=email["sender"],
-                label_ids=email["label_ids"],
-            )
-            elapsed = int((time.monotonic() - e_start) * 1000)
-            batch.email_results.append(
-                EmailResult(
-                    email_id=email["id"],
-                    subject=email["subject"],
-                    sender=email["sender"],
-                    label_ids=email["label_ids"],
-                    category=result.category,
-                    is_spam=result.is_spam,
-                    is_phishing=result.is_phishing,
-                    confident=result.confident,
-                    reason=result.reason,
-                    duration_ms=elapsed,
-                )
-            )
-        except Exception as exc:
-            batch.email_results.append(
-                EmailResult(
-                    email_id=email["id"],
-                    subject=email["subject"],
-                    sender=email["sender"],
-                    status="error",
-                    error=str(exc),
-                    duration_ms=int((time.monotonic() - e_start) * 1000),
-                )
-            )
-
-    batch.duration_ms = int((time.monotonic() - start) * 1000)
-    # Extract categories used.
-    categories = set()
-    for er in batch.email_results:
-        if er.category:
-            categories.add(er.category)
-    batch.categories = sorted(categories)
-    return batch
 
 
 # ---------------------------------------------------------------------------
@@ -836,76 +768,5 @@ def run_interactive_benchmark(
 
 
 # ---------------------------------------------------------------------------
-# Public API
+# Interactive benchmark — multi-turn session tracking
 # ---------------------------------------------------------------------------
-
-
-def run_heuristic_benchmark(
-    mbox_path: str,
-    *,
-    limit: int = 100,
-    batch_size: int = 20,
-    model: str = "heuristic-only",
-    provider: str = "none",
-) -> RunResult:
-    """Run the heuristic benchmark against an MBOX file.
-
-    This is the fast path — no LLM calls. Returns structured results
-    ready for CSV/JSON/JSONL output.
-    """
-    import uuid
-    from datetime import datetime, timezone
-
-    run_id = f"run-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{model.replace('/', '-')}-{uuid.uuid4().hex[:6]}"
-    timestamp = datetime.now(timezone.utc).isoformat()
-
-    # Wall-clock timing — captures MBOX load, parsing, classification, and aggregation.
-    start = time.monotonic()
-
-    emails = load_emails_from_mbox(mbox_path, limit=limit)
-    if not emails:
-        return RunResult(
-            run_id=run_id,
-            timestamp=timestamp,
-            model=model,
-            provider=provider,
-            mbox_path=mbox_path,
-            mode="heuristic",
-            status="error",
-            error="No emails found in MBOX file",
-            total_duration_ms=int((time.monotonic() - start) * 1000),
-        )
-
-    # Split into batches.
-    batches = []
-    for i in range(0, len(emails), batch_size):
-        batch_emails = emails[i : i + batch_size]
-        batch_num = i // batch_size + 1
-        total_batches = (len(emails) + batch_size - 1) // batch_size
-        batches.append(_run_heuristic_batch(batch_emails, batch_num, total_batches))
-
-    # Aggregate.
-    category_counts: dict[str, int] = {}
-    for b in batches:
-        for er in b.email_results:
-            if er.category:
-                category_counts[er.category] = category_counts.get(er.category, 0) + 1
-
-    # Wall-clock total — captures everything from MBOX load through aggregation.
-    total_duration_ms = int((time.monotonic() - start) * 1000)
-    total_tokens = 0  # Heuristic mode has no tokens.
-
-    return RunResult(
-        run_id=run_id,
-        timestamp=timestamp,
-        model=model,
-        provider=provider,
-        mbox_path=mbox_path,
-        mode="heuristic",
-        batch_results=batches,
-        total_emails=sum(len(b.email_results) for b in batches),
-        total_duration_ms=total_duration_ms,
-        total_tokens=total_tokens,
-        category_counts=category_counts,
-        status="completed",
-    )
