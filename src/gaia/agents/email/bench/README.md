@@ -575,3 +575,30 @@ src/gaia/agents/email/bench/
 1. Each LLM call stores performance stats as a `system` message with `type: "stats"` in the conversation
 2. `StepResult` extraction walks the conversation and pulls `input_tokens`, `output_tokens`, `total_tokens`, and `duration` from each stats entry
 3. For interactive mode, steps are accumulated across all turns
+
+---
+
+## Appendix: ClawFlow / OpenClaw Architecture
+
+The `gaia email clawflow` command invokes the **actual OpenClaw** Python agent classes from `openclaw-eval`, not a mock or simulation. The invocation chain:
+
+```
+gaia email clawflow
+  → clawflow_adapter.py (subprocess)
+    → python clawflow_cli.py --workflow inbox-zero-helper --model <model> --json --quiet
+      → InboxZeroAgent (Python agent from openclaw-eval)
+        → Lemonade Server (external LLM backend)
+```
+
+**Key findings:**
+
+| Aspect | Detail |
+|--------|--------|
+| **Agent classes** | `InboxZeroAgent`, `NewsDigestAgent`, `SecurityAdvisoryAgent` — real Python agents from `C:\Users\antmi\openclaw-eval\scripts\agentic-framework-test\gaia_agents\` |
+| **Model** | Fully specifiable via `--model` flag (default: `Qwen3.5-4B-GGUF`) |
+| **MBOX path** | Currently read from `data/email_loader.py`'s `DEFAULT_MBOX_PATH` — the `--mbox-path` CLI flag is recorded in output but not passed to the subprocess |
+| **OpenClaw Node.js** | NOT invoked — ClawFlow runs as a standalone Python subprocess, separate from the `openclaw.mjs` gateway daemon |
+| **LLM server** | `skip_lemonade: True` — expects Lemonade Server to be running externally |
+| **OpenClaw integration** | OpenClaw can trigger ClawFlow via cron/automation YAMLs (shell commands), but the benchmark command bypasses this and calls the Python agents directly |
+
+**OpenClaw relationship:** OpenClaw (`openclaw-eval/`) is a Node.js gateway with YAML-defined automations. ClawFlow's Python agents were built to run within that ecosystem, but the benchmark harness invokes them directly — no OpenClaw process needs to be running.
