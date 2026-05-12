@@ -456,7 +456,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         for i in range(1, model_exps + 1):
             is_first = i == 1
             cold_start_label = " [COLD START]" if is_first else ""
-            print(f"\n  --- Iteration {i}/{model_iters}{cold_start_label} ---")
+            print(f"\n  --- Experiment {i}/{model_exps}{cold_start_label} ---")
             try:
                 result = _run_single_iteration(
                     args.mbox_path,
