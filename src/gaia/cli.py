@@ -1410,22 +1410,24 @@ def main():
         help="Benchmark mode: 'heuristic' (fast, no LLM) or 'full' (end-to-end with LLM).",
     )
     bench_parser.add_argument(
+        "--experiments",
         "--iterations",
+        dest="experiments",
         type=int,
         default=1,
-        help="Number of benchmark iterations to run (for variance analysis).",
+        help="Number of benchmark experiments to run (for variance analysis). Alias: --iterations (deprecated).",
     )
     bench_parser.add_argument(
         "--batch-size",
         type=int,
         default=20,
-        help="Number of emails to process per batch.",
+        help="Emails per batch (each batch = one LLM prompt). See --limit for total cap.",
     )
     bench_parser.add_argument(
         "--limit",
         type=int,
         default=100,
-        help="Maximum number of emails to process.",
+        help="Max total emails from MBOX (default 100, 0=no limit). Independent of --batch-size.",
     )
     bench_parser.add_argument(
         "--model",
@@ -1495,6 +1497,61 @@ def main():
         type=str,
         default="benchmark_charts",
         help="Directory to write chart PNGs (used with --visualize).",
+    )
+    # Multi-model support.
+    bench_parser.add_argument(
+        "--models",
+        action="append",
+        default=None,
+        help="Model IDs to benchmark sequentially (can be specified multiple times).",
+    )
+    bench_parser.add_argument(
+        "--experiments-per-model",
+        "--iterations-per-model",
+        dest="experiments_per_model",
+        type=int,
+        default=1,
+        help="Experiments per model in multi-model benchmark. Alias: --iterations-per-model (deprecated).",
+    )
+    bench_parser.add_argument(
+        "--model-batch-sizes",
+        type=str,
+        default=None,
+        help="Comma-separated model:batch_size pairs, e.g. 'model1:10,model2:20'.",
+    )
+    bench_parser.add_argument(
+        "--skip-cold-start",
+        action="store_true",
+        help="Skip the first (cold-start) iteration for each model in reports.",
+    )
+    bench_parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Abort on first model iteration failure instead of continuing.",
+    )
+    # ClawFlow integration.
+    bench_parser.add_argument(
+        "--clawflow",
+        action="store_true",
+        help="Run ClawFlow CLI after GAIA benchmark completes for comparison.",
+    )
+    bench_parser.add_argument(
+        "--clawflow-timeout",
+        type=int,
+        default=3600,
+        help="Timeout in seconds for ClawFlow execution (default 3600).",
+    )
+    bench_parser.add_argument(
+        "--clawflow-workflow",
+        type=str,
+        default="inbox-zero-helper",
+        help="ClawFlow workflow name (default 'inbox-zero-helper').",
+    )
+    bench_parser.add_argument(
+        "--clawflow-path",
+        type=str,
+        default=None,
+        help="Explicit path to the clawflow binary or script.",
     )
 
     # Add Docker app command
@@ -3881,7 +3938,7 @@ def handle_email_command(args):
         for key in [
             "mbox_path",
             "mode",
-            "iterations",
+            "experiments",
             "batch_size",
             "limit",
             "model",
@@ -3890,11 +3947,25 @@ def handle_email_command(args):
             "jsonl_path",
             "ground_truth",
             "chart_dir",
+            # Multi-model.
+            "models",
+            "experiments_per_model",
+            "model_batch_sizes",
+            # ClawFlow.
+            "clawflow_timeout",
+            "clawflow_workflow",
+            "clawflow_path",
         ]:
             val = getattr(args, key, None)
             if val is not None:
-                bench_args.append(f"--{key.replace('_', '-')}")
-                bench_args.append(str(val))
+                if isinstance(val, list):
+                    # --models needs --models prefix for each value.
+                    for item in val:
+                        bench_args.append(f"--{key.replace('_', '-')}")
+                        bench_args.append(str(item))
+                else:
+                    bench_args.append(f"--{key.replace('_', '-')}")
+                    bench_args.append(str(val))
 
         # Cost params.
         cost_input = getattr(args, "cost_per_1m_input", 0.0)
@@ -3913,6 +3984,12 @@ def handle_email_command(args):
             bench_args.append("--visualize")
         if getattr(args, "steps", False):
             bench_args.append("--steps")
+        if getattr(args, "skip_cold_start", False):
+            bench_args.append("--skip-cold-start")
+        if getattr(args, "fail_fast", False):
+            bench_args.append("--fail-fast")
+        if getattr(args, "clawflow", False):
+            bench_args.append("--clawflow")
 
         # Compare param (list).
         compare_paths = getattr(args, "compare", None)

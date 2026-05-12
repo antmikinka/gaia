@@ -316,15 +316,15 @@ def compare_runs(runs: list[dict]) -> ComparisonReport:
         report = ComparisonReport(runs_compared=len(runs))
         if runs:
             run = runs[0]
-            # Duration metrics: ms → mins.
+            # Duration metrics: ms → seconds.
             for metric_key in [
                 "total_duration_ms",
                 "avg_duration_per_email_ms",
             ]:
-                val = run.get(metric_key, 0) / 60_000
+                val = run.get(metric_key, 0) / 1_000
                 report.variance_summaries.append(
                     VarianceSummary(
-                        metric=metric_key.replace("_ms", "_mins"),
+                        metric=metric_key.replace("_ms", "_s"),
                         mean=val,
                         stdev=0.0,
                         min_val=val,
@@ -368,14 +368,14 @@ def compare_runs(runs: list[dict]) -> ComparisonReport:
     # Compute variance summaries across all runs.
     variance_summaries = []
 
-    # Duration metrics: convert ms → mins before computing variance.
+    # Duration metrics: convert ms → seconds before computing variance.
     duration_keys = ["total_duration_ms", "avg_duration_per_email_ms"]
     for key in duration_keys:
         values_ms = [run.get(key, 0) for run in runs]
-        values_mins = [v / 60_000 for v in values_ms]
-        display_key = key.replace("_ms", "_mins")
+        values_s = [v / 1_000 for v in values_ms]
+        display_key = key.replace("_ms", "_s")
         variance_summaries.append(
-            compute_variance(values_mins, metric_name=display_key)
+            compute_variance(values_s, metric_name=display_key)
         )
 
     # Non-duration metrics: pass through as-is.

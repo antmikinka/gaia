@@ -14,6 +14,7 @@ organized by the 4-category visualization taxonomy:
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -247,26 +248,26 @@ def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None
 
 
 def plot_duration_vs_tokens(run: dict[str, Any], output_dir: Path) -> Path | None:
-    """Side-by-side columns: total duration (mins) vs total tokens."""
+    """Side-by-side columns: total duration (seconds) vs total tokens."""
     plt_mod = _require_matplotlib()
     dur = run.get("total_duration_ms", 0)
     tok = run.get("total_tokens", 0)
     if dur == 0 and tok == 0:
         return None
 
-    dur_mins = dur / 60_000
+    dur_s = dur / 1_000
     fig, ax1 = plt_mod.subplots(figsize=(6, 4))
 
     x = [0]
     width = 0.35
     bar1 = ax1.bar(
         x[0] - width / 2,
-        dur_mins,
+        dur_s,
         width,
-        label=f"Duration: {dur_mins:.1f} min",
+        label=f"Duration: {dur_s:.1f}s",
         color=COLORS["duration"],
     )
-    ax1.set_ylabel("Duration (minutes)", color=COLORS["duration"])
+    ax1.set_ylabel("Duration (seconds)", color=COLORS["duration"])
     ax1.tick_params(axis="y", labelcolor=COLORS["duration"])
 
     ax2 = ax1.twinx()
@@ -301,7 +302,7 @@ def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path
         for email in batch.get("email_results", []):
             d = email.get("duration_ms", 0)
             if d > 0:
-                durations.append(d)
+                durations.append(d / 1_000)  # ms → seconds
 
     if not durations:
         return None
@@ -320,9 +321,9 @@ def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path
         color="black",
         linestyle="--",
         linewidth=1,
-        label=f"Mean: {mean_dur:.0f}ms",
+        label=f"Mean: {mean_dur:.1f}s",
     )
-    ax.set_xlabel("Duration per email (ms)")
+    ax.set_xlabel("Duration per email (seconds)")
     ax.set_ylabel("Frequency")
     ax.set_title("Per-Email Duration Distribution", fontweight="bold", fontsize=12)
     ax.legend(fontsize=9)
@@ -351,8 +352,8 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
     n = len(runs)
     x = list(range(1, n + 1))
 
-    # 5a: Duration trend (mins) — LLM latency consistency
-    dur_vals = [r.get("total_duration_ms", 0) / 60_000 for r in runs]
+    # 5a: Duration trend (seconds) — LLM latency consistency
+    dur_vals = [r.get("total_duration_ms", 0) / 1_000 for r in runs]
     dur_stats = _compute_stats(dur_vals)
     fig, ax = plt_mod.subplots(figsize=(8, 4))
     ax.plot(
@@ -382,11 +383,11 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
             fontsize=8,
         )
     ax.set_xlabel("Run iteration")
-    ax.set_ylabel("Duration (minutes)")
+    ax.set_ylabel("Duration (seconds)")
     ax.set_title("LLM Latency Consistency Across Runs", fontweight="bold", fontsize=12)
     ax.set_xticks(x)
     ax.grid(True, linestyle="--", alpha=0.3)
-    _add_consistency_box(ax, dur_stats, unit="min", label="Latency Variance", n_runs=n)
+    _add_consistency_box(ax, dur_stats, unit="s", label="Latency Variance", n_runs=n)
     fig.tight_layout(rect=[0, 0.06, 1, 1])
     _add_subtitle(
         fig,
@@ -467,27 +468,28 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
     avg_dur = [r.get("avg_duration_per_email_ms", 0) for r in runs]
     avg_tok = [r.get("avg_total_tokens_per_email", 0) for r in runs]
     if any(v > 0 for v in avg_tok) or any(v > 0 for v in avg_dur):
-        avg_dur_stats = _compute_stats([v / 60_000 for v in avg_dur])
+        avg_dur_s = [v / 1_000 for v in avg_dur]
+        avg_dur_stats = _compute_stats(avg_dur_s)
         avg_tok_stats = _compute_stats([float(v) for v in avg_tok])
         fig, ax1 = plt_mod.subplots(figsize=(8, 4))
         ax1.plot(
             x,
-            avg_dur,
+            avg_dur_s,
             marker="o",
             linestyle="-",
             linewidth=2,
             color=COLORS["duration"],
-            label="Avg duration/email (ms)",
+            label="Avg duration/email (s)",
         )
         ax1.axhline(
-            avg_dur_stats["mean"] * 60_000,
+            avg_dur_stats["mean"],
             color=COLORS["duration"],
             linestyle="--",
             alpha=0.4,
             linewidth=1,
         )
         ax1.set_xlabel("Run iteration")
-        ax1.set_ylabel("Avg duration/email (ms)", color=COLORS["duration"])
+        ax1.set_ylabel("Avg duration/email (s)", color=COLORS["duration"])
         ax1.tick_params(axis="y", labelcolor=COLORS["duration"])
 
         ax2 = ax1.twinx()
@@ -519,7 +521,7 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         ax1.grid(True, linestyle="--", alpha=0.3)
         # Dual consistency boxes
         _add_consistency_box(
-            ax1, avg_dur_stats, unit="ms", label="Duration/Email", n_runs=n
+            ax1, avg_dur_stats, unit="s", label="Duration/Email", n_runs=n
         )
         _add_consistency_box(
             ax1,
@@ -537,7 +539,7 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         paths.append(_save_chart(fig, output_dir, "05c_per_email_trend"))
 
     # 5d: TTFT trend — model load/prefill latency consistency
-    ttft_vals = [r.get("avg_time_to_first_token_ms", 0) for r in runs]
+    ttft_vals = [r.get("avg_time_to_first_token_ms", 0) / 1_000 for r in runs]
     if any(v > 0 for v in ttft_vals):
         ttft_stats = _compute_stats([float(v) for v in ttft_vals])
         fig, ax = plt_mod.subplots(figsize=(8, 4))
@@ -548,14 +550,14 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
             linestyle="-",
             linewidth=2,
             color="#E53E3E",
-            label="Avg TTFT (ms)",
+            label="Avg TTFT (s)",
         )
         ax.axhline(
             ttft_stats["mean"], color="#E53E3E", linestyle="--", alpha=0.4, linewidth=1
         )
         for i, v in enumerate(ttft_vals):
             ax.annotate(
-                f"{v:.0f}",
+                f"{v:.2f}",
                 (x[i], v),
                 textcoords="offset points",
                 xytext=(0, 10),
@@ -563,11 +565,11 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
                 fontsize=8,
             )
         ax.set_xlabel("Run iteration")
-        ax.set_ylabel("Avg TTFT (ms)")
+        ax.set_ylabel("Avg TTFT (seconds)")
         ax.set_title("TTFT Consistency Across Runs", fontweight="bold", fontsize=12)
         ax.set_xticks(x)
         ax.grid(True, linestyle="--", alpha=0.3)
-        _add_consistency_box(ax, ttft_stats, unit="ms", label="TTFT Variance", n_runs=n)
+        _add_consistency_box(ax, ttft_stats, unit="s", label="TTFT Variance", n_runs=n)
         fig.tight_layout(rect=[0, 0.06, 1, 1])
         _add_subtitle(
             fig,
@@ -850,7 +852,7 @@ def plot_token_duration_scatter(run: dict[str, Any], output_dir: Path) -> Path |
     points = []
     for batch in run.get("batch_results", []):
         for email in batch.get("email_results", []):
-            d = email.get("duration_ms", 0)
+            d = email.get("duration_ms", 0) / 1_000  # ms → seconds
             t = email.get("total_tokens", 0)
             if d > 0 or t > 0:
                 points.append((d, t))
@@ -879,7 +881,7 @@ def plot_token_duration_scatter(run: dict[str, Any], output_dir: Path) -> Path |
         )
         ax.legend(fontsize=9)
 
-    ax.set_xlabel("Duration per email (ms)")
+    ax.set_xlabel("Duration per email (seconds)")
     ax.set_ylabel("Tokens per email")
     ax.set_title("Token vs Duration Relationship", fontweight="bold", fontsize=12)
     ax.grid(True, linestyle="--", alpha=0.3)
@@ -899,7 +901,7 @@ def plot_step_performance(run: dict[str, Any], output_dir: Path) -> Path | None:
     if not steps:
         return None
 
-    ttft_vals = [s.get("time_to_first_token_ms", 0) for s in steps]
+    ttft_vals = [s.get("time_to_first_token_ms", 0) / 1_000 for s in steps]
     tps_vals = [s.get("tokens_per_second", 0) for s in steps]
     if not any(v > 0 for v in ttft_vals) and not any(v > 0 for v in tps_vals):
         return None
@@ -914,9 +916,9 @@ def plot_step_performance(run: dict[str, Any], output_dir: Path) -> Path | None:
         linestyle="-",
         linewidth=2,
         color="#E53E3E",
-        label="TTFT (ms)",
+        label="TTFT (s)",
     )
-    ax1.set_ylabel("Time to First Token (ms)", color="#E53E3E")
+    ax1.set_ylabel("Time to First Token (seconds)", color="#E53E3E")
     ax1.tick_params(axis="y", labelcolor="#E53E3E")
 
     ax2 = ax1.twinx()
@@ -961,7 +963,7 @@ def plot_model_duration_comparison(
     model_durations: dict[str, list[float]] = {}
     for r in runs:
         model = r.get("model", "unknown")
-        dur = r.get("total_duration_ms", 0) / 60_000  # to minutes
+        dur = r.get("total_duration_ms", 0) / 1_000  # ms → seconds
         model_durations.setdefault(model, []).append(dur)
 
     if len(model_durations) < 2:
@@ -993,7 +995,7 @@ def plot_model_duration_comparison(
 
     ax.set_xticks(x)
     ax.set_xticklabels([m[:20] for m in models], rotation=30, ha="right")
-    ax.set_ylabel("Duration (minutes)")
+    ax.set_ylabel("Duration (seconds)")
     ax.set_title("Model Duration Comparison", fontweight="bold", fontsize=12)
     ax.legend(fontsize=9)
     ax.grid(axis="y", linestyle="--", alpha=0.3)
@@ -1069,7 +1071,7 @@ def plot_ttft_comparison(runs: list[dict[str, Any]], output_dir: Path) -> Path |
     model_ttft: dict[str, list[float]] = {}
     for r in runs:
         model = r.get("model", "unknown")
-        ttft = r.get("avg_time_to_first_token_ms", 0)
+        ttft = r.get("avg_time_to_first_token_ms", 0) / 1_000  # ms → seconds
         if ttft > 0:
             model_ttft.setdefault(model, []).append(ttft)
 
@@ -1084,13 +1086,13 @@ def plot_ttft_comparison(runs: list[dict[str, Any]], output_dir: Path) -> Path |
     bars = ax.barh(models, means, color=colors, edgecolor="white", height=0.5)
     for bar, val in zip(bars, means):
         ax.text(
-            bar.get_width() + 1,
+            bar.get_width() + 0.01,
             bar.get_y() + bar.get_height() / 2,
-            f"{val:.0f}ms",
+            f"{val:.2f}s",
             va="center",
             fontsize=9,
         )
-    ax.set_xlabel("Avg TTFT (ms)")
+    ax.set_xlabel("Avg TTFT (seconds)")
     ax.set_title("TTFT Comparison Across Models", fontweight="bold", fontsize=12)
     ax.grid(axis="x", linestyle="--", alpha=0.3)
     fig.tight_layout()
@@ -1446,6 +1448,418 @@ def plot_cold_start_impact(runs: list[dict[str, Any]], output_dir: Path) -> Path
     return _save_chart(fig, output_dir, "18_cold_start_impact")
 
 
+# ---------------------------------------------------------------------------
+# Chart 19: Model x Architecture Duration (Grouped Column)
+# ---------------------------------------------------------------------------
+
+
+def plot_model_architecture_duration(
+    gaia_runs: list[dict[str, Any]],
+    clawflow_runs: list[dict[str, Any]],
+    output_dir: Path,
+) -> Path | None:
+    """Grouped column chart: duration per model, colored by architecture.
+
+    For each model on the x-axis, shows two bars: GAIA (orange) and
+    ClawFlow (blue). Duration is in seconds.
+    """
+    plt_mod = _require_matplotlib()
+    if not gaia_runs and not clawflow_runs:
+        return None
+
+    # Aggregate per (model, framework).
+    data: dict[str, dict[str, list[float]]] = {}
+    for r in gaia_runs:
+        model = r.get("model", "unknown")
+        dur = r.get("total_duration_ms", 0) / 1_000
+        data.setdefault(model, {}).setdefault("gaia", []).append(dur)
+    for r in clawflow_runs:
+        model = r.get("model", "unknown")
+        dur = r.get("total_duration_ms", 0) / 1_000
+        data.setdefault(model, {}).setdefault("clawflow", []).append(dur)
+
+    if not data:
+        return None
+
+    models = sorted(data.keys())
+    x = list(range(len(models)))
+    width = 0.35
+
+    gaia_means = []
+    cf_means = []
+    has_gaia = False
+    has_cf = False
+    for m in models:
+        g = data[m].get("gaia", [])
+        c = data[m].get("clawflow", [])
+        gaia_means.append(sum(g) / len(g) if g else 0)
+        cf_means.append(sum(c) / len(c) if c else 0)
+        if g:
+            has_gaia = True
+        if c:
+            has_cf = True
+
+    fig, ax = plt_mod.subplots(figsize=(max(6, len(models) * 2), 4))
+
+    bars_g = []
+    bars_c = []
+    if has_gaia:
+        bars_g = ax.bar(
+            [i - width / 2 for i in x],
+            gaia_means,
+            width,
+            label="GAIA",
+            color=COLORS["gaia"],
+            alpha=0.85,
+        )
+    if has_cf:
+        bars_c = ax.bar(
+            [i + width / 2 for i in x],
+            cf_means,
+            width,
+            label="ClawFlow",
+            color=COLORS["clawflow"],
+            alpha=0.85,
+        )
+
+    # Value labels on bars.
+    for bars, vals in [(bars_g, gaia_means), (bars_c, cf_means)]:
+        for bar, val in zip(bars, vals):
+            if val > 0:
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.1,
+                    f"{val:.1f}s",
+                    ha="center",
+                    va="bottom",
+                    fontsize=7,
+                )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([m[:25] for m in models], rotation=30, ha="right")
+    ax.set_ylabel("Duration (seconds)")
+    ax.set_title(
+        "Duration by Model & Architecture", fontweight="bold", fontsize=12
+    )
+    ax.legend(fontsize=9)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "19_model_architecture_duration")
+
+
+# ---------------------------------------------------------------------------
+# Chart 20: Model x Architecture Token Efficiency (Stacked Grouped Column)
+# ---------------------------------------------------------------------------
+
+
+def plot_model_architecture_tokens(
+    gaia_runs: list[dict[str, Any]],
+    clawflow_runs: list[dict[str, Any]],
+    output_dir: Path,
+) -> Path | None:
+    """Grouped column chart: token cost per model, colored by architecture.
+
+    Each column is stacked: Input tokens (solid) + Output tokens (lighter
+    shade). Grouped by framework within each model.
+    """
+    plt_mod = _require_matplotlib()
+    if not gaia_runs and not clawflow_runs:
+        return None
+
+    data: dict[str, dict[str, dict[str, list[float]]]] = {}
+    for r in gaia_runs:
+        model = r.get("model", "unknown")
+        in_tok = r.get("total_input_tokens", 0)
+        out_tok = r.get("total_output_tokens", 0)
+        data.setdefault(model, {}).setdefault("gaia", {"in": [], "out": []})
+        data[model]["gaia"]["in"].append(in_tok)
+        data[model]["gaia"]["out"].append(out_tok)
+    for r in clawflow_runs:
+        model = r.get("model", "unknown")
+        in_tok = r.get("total_input_tokens", 0)
+        out_tok = r.get("total_output_tokens", 0)
+        data.setdefault(model, {}).setdefault("clawflow", {"in": [], "out": []})
+        data[model]["clawflow"]["in"].append(in_tok)
+        data[model]["clawflow"]["out"].append(out_tok)
+
+    if not data:
+        return None
+
+    models = sorted(data.keys())
+    x = list(range(len(models)))
+    width = 0.35
+
+    gaia_in = []
+    gaia_out = []
+    cf_in = []
+    cf_out = []
+    has_gaia = False
+    has_cf = False
+
+    for m in models:
+        g = data[m].get("gaia", {"in": [], "out": []})
+        c = data[m].get("clawflow", {"in": [], "out": []})
+        gi = sum(g["in"]) / len(g["in"]) if g["in"] else 0
+        go = sum(g["out"]) / len(g["out"]) if g["out"] else 0
+        ci = sum(c["in"]) / len(c["in"]) if c["in"] else 0
+        co = sum(c["out"]) / len(c["out"]) if c["out"] else 0
+        gaia_in.append(gi)
+        gaia_out.append(go)
+        cf_in.append(ci)
+        cf_out.append(co)
+        if g["in"] or g["out"]:
+            has_gaia = True
+        if c["in"] or c["out"]:
+            has_cf = True
+
+    fig, ax = plt_mod.subplots(figsize=(max(6, len(models) * 2), 4))
+
+    if has_gaia:
+        ax.bar(
+            [i - width / 2 for i in x],
+            gaia_in,
+            width,
+            label="GAIA Input",
+            color=COLORS["gaia"],
+            alpha=0.85,
+        )
+        ax.bar(
+            [i - width / 2 for i in x],
+            gaia_out,
+            width,
+            bottom=gaia_in,
+            label="GAIA Output",
+            color=COLORS["gaia"],
+            alpha=0.45,
+        )
+    if has_cf:
+        ax.bar(
+            [i + width / 2 for i in x],
+            cf_in,
+            width,
+            label="ClawFlow Input",
+            color=COLORS["clawflow"],
+            alpha=0.85,
+        )
+        ax.bar(
+            [i + width / 2 for i in x],
+            cf_out,
+            width,
+            bottom=cf_in,
+            label="ClawFlow Output",
+            color=COLORS["clawflow"],
+            alpha=0.45,
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([m[:25] for m in models], rotation=30, ha="right")
+    ax.set_ylabel("Avg tokens per run")
+    ax.set_title(
+        "Token Cost by Model & Architecture", fontweight="bold", fontsize=12
+    )
+    ax.legend(fontsize=7, loc="upper right")
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(fig, output_dir, "20_model_architecture_tokens")
+
+
+# ---------------------------------------------------------------------------
+# Chart 21: Architecture Performance Dashboard (4-Panel Faceted)
+# ---------------------------------------------------------------------------
+
+
+def plot_architecture_dashboard(
+    gaia_runs: list[dict[str, Any]],
+    clawflow_runs: list[dict[str, Any]],
+    output_dir: Path,
+) -> Path | None:
+    """4-panel dashboard: TTFT, TPS, Duration, and Tokens by model & architecture.
+
+    Each panel is a grouped bar chart with consistent x-axis (models).
+    Architecture colors: GAIA=#ED6C02 (AMD orange), ClawFlow=#3182CE (blue).
+    """
+    plt_mod = _require_matplotlib()
+    if not gaia_runs and not clawflow_runs:
+        return None
+
+    # Collect all unique models.
+    all_models = set()
+    for r in gaia_runs + clawflow_runs:
+        all_models.add(r.get("model", "unknown"))
+    if len(all_models) < 1:
+        return None
+
+    models = sorted(all_models)
+    n = len(models)
+
+    # Build aggregated data per (model, framework).
+    def _agg(runs, framework):
+        result = {}
+        for r in runs:
+            m = r.get("model", "unknown")
+            result.setdefault(m, {"dur": [], "ttft": [], "tps": [], "in": [], "out": []})
+            result[m]["dur"].append(r.get("total_duration_ms", 0) / 1_000)
+            result[m]["ttft"].append(r.get("avg_time_to_first_token_ms", 0) / 1_000)
+            result[m]["tps"].append(r.get("avg_tokens_per_second", 0))
+            result[m]["in"].append(r.get("total_input_tokens", 0))
+            result[m]["out"].append(r.get("total_output_tokens", 0))
+        return result
+
+    gaia_data = _agg(gaia_runs, "gaia")
+    cf_data = _agg(clawflow_runs, "clawflow")
+
+    def _mean(d, m, key):
+        vals = d.get(m, {}).get(key, [])
+        return sum(vals) / len(vals) if vals else 0
+
+    fig, axes = plt_mod.subplots(2, 2, figsize=(max(10, n * 3), 7))
+
+    x = list(range(n))
+    width = 0.35
+
+    has_gaia = bool(gaia_runs)
+    has_cf = bool(clawflow_runs)
+
+    # Panel 1: TTFT (seconds)
+    ax = axes[0, 0]
+    if has_gaia:
+        ax.bar(
+            [i - width / 2 for i in x],
+            [_mean(gaia_data, m, "ttft") for m in models],
+            width,
+            label="GAIA",
+            color=COLORS["gaia"],
+            alpha=0.85,
+        )
+    if has_cf:
+        ax.bar(
+            [i + width / 2 for i in x],
+            [_mean(cf_data, m, "ttft") for m in models],
+            width,
+            label="ClawFlow",
+            color=COLORS["clawflow"],
+            alpha=0.85,
+        )
+    ax.set_xticks(x)
+    ax.set_xticklabels([m[:20] for m in models], rotation=30, ha="right")
+    ax.set_ylabel("Time to First Token (seconds)")
+    ax.set_title("TTFT", fontweight="bold")
+    ax.legend(fontsize=8)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+
+    # Panel 2: TPS (tokens/s)
+    ax = axes[0, 1]
+    if has_gaia:
+        ax.bar(
+            [i - width / 2 for i in x],
+            [_mean(gaia_data, m, "tps") for m in models],
+            width,
+            label="GAIA",
+            color=COLORS["gaia"],
+            alpha=0.85,
+        )
+    if has_cf:
+        ax.bar(
+            [i + width / 2 for i in x],
+            [_mean(cf_data, m, "tps") for m in models],
+            width,
+            label="ClawFlow",
+            color=COLORS["clawflow"],
+            alpha=0.85,
+        )
+    ax.set_xticks(x)
+    ax.set_xticklabels([m[:20] for m in models], rotation=30, ha="right")
+    ax.set_ylabel("Tokens Per Second")
+    ax.set_title("Throughput", fontweight="bold")
+    ax.legend(fontsize=8)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+
+    # Panel 3: Duration (seconds)
+    ax = axes[1, 0]
+    if has_gaia:
+        ax.bar(
+            [i - width / 2 for i in x],
+            [_mean(gaia_data, m, "dur") for m in models],
+            width,
+            label="GAIA",
+            color=COLORS["gaia"],
+            alpha=0.85,
+        )
+    if has_cf:
+        ax.bar(
+            [i + width / 2 for i in x],
+            [_mean(cf_data, m, "dur") for m in models],
+            width,
+            label="ClawFlow",
+            color=COLORS["clawflow"],
+            alpha=0.85,
+        )
+    ax.set_xticks(x)
+    ax.set_xticklabels([m[:20] for m in models], rotation=30, ha="right")
+    ax.set_ylabel("Duration (seconds)")
+    ax.set_title("Total Duration", fontweight="bold")
+    ax.legend(fontsize=8)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+
+    # Panel 4: Tokens (stacked: input + output)
+    ax = axes[1, 1]
+    if has_gaia:
+        in_vals = [_mean(gaia_data, m, "in") for m in models]
+        out_vals = [_mean(gaia_data, m, "out") for m in models]
+        ax.bar(
+            [i - width / 2 for i in x],
+            in_vals,
+            width,
+            label="GAIA Input",
+            color=COLORS["gaia"],
+            alpha=0.85,
+        )
+        ax.bar(
+            [i - width / 2 for i in x],
+            out_vals,
+            width,
+            bottom=in_vals,
+            label="GAIA Output",
+            color=COLORS["gaia"],
+            alpha=0.45,
+        )
+    if has_cf:
+        in_vals = [_mean(cf_data, m, "in") for m in models]
+        out_vals = [_mean(cf_data, m, "out") for m in models]
+        ax.bar(
+            [i + width / 2 for i in x],
+            in_vals,
+            width,
+            label="CF Input",
+            color=COLORS["clawflow"],
+            alpha=0.85,
+        )
+        ax.bar(
+            [i + width / 2 for i in x],
+            out_vals,
+            width,
+            bottom=in_vals,
+            label="CF Output",
+            color=COLORS["clawflow"],
+            alpha=0.45,
+        )
+    ax.set_xticks(x)
+    ax.set_xticklabels([m[:20] for m in models], rotation=30, ha="right")
+    ax.set_ylabel("Tokens")
+    ax.set_title("Token Cost", fontweight="bold")
+    ax.legend(fontsize=7, loc="upper right")
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+
+    fig.suptitle(
+        "Architecture Performance Dashboard",
+        fontweight="bold",
+        fontsize=14,
+        y=0.98,
+    )
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    return _save_chart(fig, output_dir, "21_architecture_dashboard")
+
+
 def generate_charts(
     json_path: Path | None = None,
     jsonl_path: Path | None = None,
@@ -1662,9 +2076,10 @@ def generate_charts(
 
     # --- Framework comparison charts ---
     if clawflow_result and gaia_result_for_comparison:
-        # Chart 15: Framework category comparison
         gaia_list = [gaia_result_for_comparison]
         cf_list = [clawflow_result]
+
+        # Chart 15: Framework category comparison
         p = plot_framework_category_comparison(gaia_list, cf_list, output_dir)
         if p:
             paths.append(p)
@@ -1685,6 +2100,44 @@ def generate_charts(
                 (
                     p.name,
                     "Architecture Radar — Spider chart comparing GAIA vs ClawFlow on multiple normalized dimensions",
+                )
+            )
+
+        # Build combined run lists: GAIA multi-model + ClawFlow single run.
+        gaia_comp_runs = list(multi_model_runs) if multi_model_runs else []
+        if not gaia_comp_runs and gaia_result_for_comparison:
+            gaia_comp_runs = [gaia_result_for_comparison]
+
+        # Chart 19: Model x Architecture Duration
+        p = plot_model_architecture_duration(gaia_comp_runs, cf_list, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Model x Architecture Duration — Grouped column: duration per model, GAIA (orange) vs ClawFlow (blue)",
+                )
+            )
+
+        # Chart 20: Model x Architecture Token Cost
+        p = plot_model_architecture_tokens(gaia_comp_runs, cf_list, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Model x Architecture Token Cost — Grouped stacked column: input/output tokens per model by architecture",
+                )
+            )
+
+        # Chart 21: Architecture Performance Dashboard (4-panel)
+        p = plot_architecture_dashboard(gaia_comp_runs, cf_list, output_dir)
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Architecture Performance Dashboard — 4-panel: TTFT, Throughput, Duration, Token Cost by model & architecture",
                 )
             )
 

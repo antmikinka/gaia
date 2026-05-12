@@ -4,7 +4,7 @@
 CLI entry point for the GAIA Email Triage Agent benchmark.
 
 Usage:
-    gaia email bench --mbox-path <path> [--mode heuristic|full] [--iterations N]
+    gaia email bench --mbox-path <path> [--mode heuristic|full] [--experiments N]
 """
 
 from __future__ import annotations
@@ -45,22 +45,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Benchmark mode: 'heuristic' (fast, no LLM), 'full' (single LLM turn), or 'interactive' (multi-turn session).",
     )
     parser.add_argument(
+        "--experiments",
         "--iterations",
+        dest="experiments",
         type=int,
         default=1,
-        help="Number of benchmark iterations to run (for variance analysis).",
+        help="Number of benchmark experiments to run per model (for variance analysis). Alias: --iterations (deprecated).",
     )
     parser.add_argument(
         "--batch-size",
         type=int,
         default=20,
-        help="Number of emails to process per batch.",
+        help="Number of emails per processing batch. Each batch is sent as one LLM prompt. "
+        "Does NOT limit total emails — see --limit for that.",
     )
     parser.add_argument(
         "--limit",
         type=int,
         default=100,
-        help="Maximum number of emails to process.",
+        help="Maximum total emails to read from the MBOX file. After this cap, no more emails "
+        "are processed regardless of batch size. Default 100; use 0 for no limit.",
     )
     parser.add_argument(
         "--model",
@@ -139,10 +143,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Model IDs to benchmark sequentially (can be specified multiple times).",
     )
     parser.add_argument(
+        "--experiments-per-model",
         "--iterations-per-model",
+        dest="experiments_per_model",
         type=int,
         default=1,
-        help="Number of iterations per model (default 1).",
+        help="Number of experiments per model in multi-model benchmark. Alias: --iterations-per-model (deprecated).",
     )
     parser.add_argument(
         "--model-batch-sizes",
@@ -428,10 +434,10 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Parse per-model batch sizes.
     batch_size_map = _parse_model_batch_sizes(args.model_batch_sizes)
 
-    # Determine iterations: --iterations still works for single-model (backwards compat).
-    iters = args.iterations_per_model
-    if not args.models and args.iterations != 1:
-        iters = args.iterations
+    # Determine experiments: --experiments-per-model is primary (backwards compat via alias).
+    exps = args.experiments_per_model
+    if not args.models and args.experiments != 1:
+        exps = args.experiments
 
     # Track all runs across all models.
     all_runs: list = []
@@ -440,14 +446,14 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     for model_id in model_list:
         batch_size = batch_size_map.get(model_id, args.batch_size)
-        model_iters = iters
+        model_exps = exps
 
         print(f"\n{'='*70}")
         print(f"  Model: {model_id}")
-        print(f"  Iterations: {model_iters}  |  Batch size: {batch_size}")
+        print(f"  Experiments: {model_exps}  |  Batch size: {batch_size}")
         print(f"{'='*70}")
 
-        for i in range(1, model_iters + 1):
+        for i in range(1, model_exps + 1):
             is_first = i == 1
             cold_start_label = " [COLD START]" if is_first else ""
             print(f"\n  --- Iteration {i}/{model_iters}{cold_start_label} ---")
@@ -470,7 +476,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                 # Save outputs for this iteration.
                 model_safe = model_id.replace("/", "-")
                 run_suffix = (
-                    f"-{model_safe}-iter{i}" if len(model_list) > 1 or iters > 1 else ""
+                    f"-{model_safe}-iter{i}" if len(model_list) > 1 or exps > 1 else ""
                 )
                 save_csv(result, output_dir / f"results{run_suffix}.csv")
                 save_json(result, output_dir / f"results{run_suffix}.json")
@@ -493,7 +499,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                     return 1
 
         # Skip cold-start reporting: filter out the first run of this model.
-        if args.skip_cold_start and iters > 1:
+        if args.skip_cold_start and exps > 1:
             from gaia.agents.email.bench.output import load_jsonl
 
             jsonl_path = output_dir / "results.jsonl"
@@ -627,7 +633,6 @@ def main(argv: Optional[list[str]] = None) -> int:
                 clawflow_raw = run_clawflow(
                     workflow=args.clawflow_workflow,
                     model=model_list[-1] if model_list else None,
-                    mbox_path=args.mbox_path,
                     timeout=args.clawflow_timeout,
                     cli_path=args.clawflow_path,
                 )

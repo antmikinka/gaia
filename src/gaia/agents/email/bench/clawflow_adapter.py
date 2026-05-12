@@ -5,6 +5,13 @@ ClawFlow CLI adapter for the GAIA Email Triage benchmark.
 
 Probe, invoke, and parse ClawFlow CLI results, mapping them into GAIA
 benchmark data shapes for cross-framework comparison.
+
+Invocation strategy (tried in order):
+1. Direct Python script: ``python clawflow_cli.py --workflow <name> --json``
+2. PATH entry point: ``clawflow --workflow <name> --json`` (if pip-installed)
+
+MBOX path is configured inside ClawFlow's ``data/email_loader.py`` and is
+not passed as a CLI argument.
 """
 
 from __future__ import annotations
@@ -12,6 +19,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -20,13 +28,18 @@ from typing import Any
 # Constants
 # ---------------------------------------------------------------------------
 
-# Known ClawFlow CLI executable name.
-CLAWFLOW_CLI_NAME = "clawflow"
+# Known ClawFlow CLI entry-point names.
+CLAWFLOW_CLI_NAMES = ("clawflow", "clawflows")
 
-# Default path to the ClawFlow PowerShell runner (fallback if CLI not on PATH).
-DEFAULT_CLAWFLOW_PS1 = Path(
-    r"C:\Users\antmi\openclaw-eval\scripts\agentic-framework-test\run-tasks.ps1"
+# Default path to the standalone ClawFlow Python script.
+# This is the primary invocation method — bypasses the broken pip entry point.
+DEFAULT_CLAWFLOW_SCRIPT = Path(
+    r"C:\Users\antmi\openclaw-eval\scripts\agentic-framework-test"
+    r"\gaia_agents\clawflow_cli.py"
 )
+
+# Working directory for ClawFlow invocation (needed so sys.path resolves).
+CLAWFLOW_CWD = DEFAULT_CLAWFLOW_SCRIPT.parent.parent
 
 # ---------------------------------------------------------------------------
 # Category mapping (mirrors output.py OPENCLAW_TO_GAIA)
@@ -58,24 +71,18 @@ def probe_clawflow(cli_path: str | None = None) -> dict[str, Any]:
     """Check whether the ClawFlow CLI is available on this machine.
 
     Args:
-        cli_path: Optional explicit path to the ``clawflow`` binary/script.
+        cli_path: Optional explicit path to the clawflow script or binary.
 
     Returns:
-        Dict with ``available`` (bool), ``method`` ("cli" | "ps1" | "none"),
+        Dict with ``available`` (bool), ``method`` ("script" | "cli" | "none"),
         and ``path`` (str) indicating how ClawFlow can be invoked.
     """
-    # 1. Check for explicit path.
+    # 1. Check for explicit path (can be a .py script or a binary).
     if cli_path:
         p = Path(cli_path)
         if p.is_file():
-            return {"available": True, "method": "cli", "path": str(p)}
-        # Maybe a directory? Check for clawflow inside.
-        if (p / CLAWFLOW_CLI_NAME).is_file():
-            return {
-                "available": True,
-                "method": "cli",
-                "path": str(p / CLAWFLOW_CLI_NAME),
-            }
+            method = "script" if p.suffix == ".py" else "cli"
+            return {"available": True, "method": method, "path": str(p)}
         return {
             "available": False,
             "method": "none",
@@ -83,25 +90,44 @@ def probe_clawflow(cli_path: str | None = None) -> dict[str, Any]:
             "reason": "path not found",
         }
 
-    # 2. Check for clawflow on PATH.
-    found = shutil.which(CLAWFLOW_CLI_NAME)
-    if found:
-        return {"available": True, "method": "cli", "path": found}
+    # 2. Check for the standalone Python script at the default location.
+    if DEFAULT_CLAWFLOW_SCRIPT.is_file():
+        return {
+            "available": True,
+            "method": "script",
+            "path": str(DEFAULT_CLAWFLOW_SCRIPT),
+        }
 
-    # 3. Check for PowerShell runner fallback.
-    if DEFAULT_CLAWFLOW_PS1.is_file():
-        return {"available": True, "method": "ps1", "path": str(DEFAULT_CLAWFLOW_PS1)}
+    # 3. Check for clawflow/clawflows on PATH (pip-installed entry point).
+    for name in CLAWFLOW_CLI_NAMES:
+        found = shutil.which(name)
+        if found:
+            # Verify the entry point actually works.
+            try:
+                test = subprocess.run(
+                    [found, "--help"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if test.returncode == 0:
+                    return {"available": True, "method": "cli", "path": found}
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
 
     return {
         "available": False,
         "method": "none",
         "path": None,
-        "reason": "clawflow not found",
+        "reason": (
+            f"clawflow_cli.py not found at {DEFAULT_CLAWFLOW_SCRIPT} and no "
+            "working 'clawflow' entry point on PATH"
+        ),
     }
 
 
 # ---------------------------------------------------------------------------
-# Invoke: run ClawFlow via PowerShell subprocess
+# Invoke: run ClawFlow via Python subprocess
 # ---------------------------------------------------------------------------
 
 
@@ -109,7 +135,6 @@ def run_clawflow(
     workflow: str = "inbox-zero-helper",
     *,
     model: str | None = None,
-    mbox_path: str | None = None,
     timeout: int = 3600,
     quiet: bool = True,
     cli_path: str | None = None,
@@ -119,10 +144,9 @@ def run_clawflow(
     Args:
         workflow: ClawFlow workflow name (e.g. "inbox-zero-helper").
         model: Optional model ID override.
-        mbox_path: Optional MBOX file path override.
         timeout: Maximum seconds to wait for ClawFlow to complete.
         quiet: Suppress ClawFlow progress output (only capture JSON).
-        cli_path: Optional explicit path to the clawflow binary.
+        cli_path: Optional explicit path to the clawflow script.
 
     Returns:
         Parsed JSON dict from ClawFlow (BenchmarkRun shape).
@@ -134,32 +158,35 @@ def run_clawflow(
     if not probe["available"]:
         raise RuntimeError(
             f"ClawFlow CLI not found: {probe.get('reason', 'unknown')}. "
-            "Install with: pip install -e <openclaw-eval path>"
+            "Ensure clawflow_cli.py exists at the openclaw-eval directory."
         )
 
     # Build the command.
     cmd_parts: list[str] = []
+    cwd: str | None = None
 
-    if probe["method"] == "ps1":
-        # Use PowerShell to run the .ps1 script.
-        ps1_path = probe["path"]
+    if probe["method"] == "script":
+        # Direct Python script invocation (primary method).
         cmd_parts = [
-            "pwsh",
-            "-NoProfile",
-            "-NonInteractive",
-            "-Command",
-            f'& "{ps1_path}" -Workflow "{workflow}" -Json',
+            sys.executable,  # Same Python that has 'gaia' installed
+            probe["path"],
+            "--workflow", workflow,
+            "--json",
         ]
-    else:
-        # Direct CLI invocation.
-        cli_exe = probe["path"]
-        cmd_parts = [cli_exe, "--workflow", workflow, "--json"]
         if quiet:
             cmd_parts.append("--quiet")
         if model:
             cmd_parts.extend(["--model", model])
-        if mbox_path:
-            cmd_parts.extend(["--mbox", mbox_path])
+        # MBOX path is configured in ClawFlow's data/email_loader.py —
+        # not passed as a CLI argument.
+        cwd = str(CLAWFLOW_CWD)
+    else:
+        # PATH entry point (fallback if pip-installed correctly).
+        cmd_parts = [probe["path"], "--workflow", workflow, "--json"]
+        if quiet:
+            cmd_parts.append("--quiet")
+        if model:
+            cmd_parts.extend(["--model", model])
 
     # Execute.
     start = time.monotonic()
@@ -168,13 +195,17 @@ def run_clawflow(
             cmd_parts,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
+            cwd=cwd,
         )
     except subprocess.TimeoutExpired:
         raise RuntimeError(f"ClawFlow workflow '{workflow}' timed out after {timeout}s")
     except FileNotFoundError:
         raise RuntimeError(
-            f"Executable not found: {cmd_parts[0]}. " "Is PowerShell (pwsh) installed?"
+            f"Executable not found: {cmd_parts[0]}. "
+            f"Is Python ({sys.executable}) installed?"
         )
 
     duration_ms = int((time.monotonic() - start) * 1000)
@@ -182,7 +213,6 @@ def run_clawflow(
     # Parse JSON from stdout.
     stdout = result.stdout.strip()
     if not stdout:
-        # Sometimes ClawFlow writes JSON to stderr in error cases.
         stderr = result.stderr.strip()
         raise RuntimeError(
             f"ClawFlow returned empty stdout (exit code {result.returncode}). "
@@ -314,7 +344,6 @@ def parse_clawflow_output(
         for task in tasks:
             batch_num += 1
             perf = task.get("performance", {})
-            outputs = task.get("outputs", {})
 
             # Try to extract emails from outputs.
             batch_email_results = []

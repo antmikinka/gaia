@@ -145,28 +145,28 @@ gaia email bench --mbox-path "path/to/your.mbox" --mode interactive --model "Qwe
 
 ---
 
-## 4. Variance Analysis (Multiple Iterations)
+## 4. Variance Analysis (Multiple Experiments)
 
 Run the same benchmark multiple times to measure consistency and variance.
 
 ```bash
-gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10 --iterations 5 --output-dir benchmark_results
+gaia email bench --mbox-path "path/to/your.mbox" --mode full --model "Qwen3.5-4B-GGUF" --limit 10 --experiments 5 --output-dir benchmark_results
 ```
 
 **Automatically produces:**
-- `results.json` / `results.jsonl` — appended results from all iterations
+- `results.json` / `results.jsonl` — appended results from all experiments
 - `variance.json` — statistical report with mean, stdev, min, max, CV%
 
 **Variance report example:**
 ```
   Variance Summary (across all runs):
   ──────────────────────────────────────────────────────────────
-  total_duration_mins           : μ=      0.70  σ=        0.02  min=    0.67  max=    0.73  CV=  2.9%
+  total_duration_s              : μ=     42.00  σ=        1.20  min=   40.20  max=   43.80  CV=  2.9%
   total_input_tokens            : μ=     2500.0  σ=        0.0  min= 2500.0  max= 2500.0  CV=  0.0%
   total_output_tokens           : μ=      150.0  σ=        5.2  min=  142.0  max=  158.0  CV=  3.5%
   total_tokens                  : μ=     2650.0  σ=        5.2  min= 2642.0  max= 2658.0  CV=  0.2%
   total_emails                  : μ=       10.0  σ=        0.0  min=   10.0  max=   10.0  CV=  0.0%
-  avg_duration_per_email_mins   : μ=      0.07  σ=        0.00  min=    0.07  max=    0.07  CV=  2.9%
+  avg_duration_per_email_s      : μ=      4.20  σ=        0.12  min=    4.02  max=    4.38  CV=  2.9%
   avg_input_tokens_per_email    : μ=      250.0  σ=        0.0  min=  250.0  max=  250.0  CV=  0.0%
   avg_output_tokens_per_email   : μ=       15.0  σ=        0.5  min=   14.2  max=   15.8  CV=  3.5%
   avg_total_tokens_per_email    : μ=      265.0  σ=        0.5  min=  264.2  max=  265.8  CV=  0.2%
@@ -327,7 +327,7 @@ gaia email bench \
   --mode full \
   --model "Qwen3.5-4B-GGUF" \
   --limit 10 \
-  --iterations 5 \
+  --experiments 5 \
   --visualize \
   --chart-dir benchmark_charts
 
@@ -354,19 +354,178 @@ gaia email bench \
 | 02 | Token Composition | Composition (donut) | Full/interactive modes |
 | 03 | Duration vs Token Cost | Comparison (grouped column) | Full/interactive modes |
 | 04 | Per-Email Duration Histogram | Distribution (histogram) | Always |
-| 05a | LLM Latency Consistency | Comparison (line + stats box) | Multi-iteration (>= 2 runs) |
-| 05b | LLM Token Variance | Comparison (line + stats box) | Multi-iteration (>= 2 runs) |
-| 05c | Per-Email Cost Variance | Comparison (dual-axis + stats) | Multi-iteration (>= 2 runs) |
+| 05a | LLM Latency Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
+| 05b | LLM Token Variance | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
+| 05c | Per-Email Cost Variance | Comparison (dual-axis + stats) | Multi-experiment (>= 2 runs) |
+| 05d | TTFT Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
+| 05e | TPS Consistency | Comparison (line + stats box) | Multi-experiment (>= 2 runs) |
 | 06 | Interactive Turn Breakdown | Comparison (grouped column) | Interactive mode |
 | 07 | Interactive Token Heatmap | Relationship (heatmap) | Interactive mode |
-| 08 | Category Stability | Composition (stacked bar + annotation) | Multi-iteration (>= 2 runs) |
+| 08 | Category Stability | Composition (stacked bar + annotation) | Multi-experiment (>= 2 runs) |
 | 09 | Token vs Duration Scatter | Relationship (scatter + trend) | Always (>= 2 data points) |
+| 10 | Per-Step TTFT & TPS | Comparison (dual-axis line) | Full/interactive modes |
 
-**Variance charts (05a, 05b, 05c)** include a **Consistency Report** box showing μ (mean), σ (stdev), and CV% (coefficient of variation). These quantify LLM non-determinism — how much token counts and latency vary when running the *same* benchmark on the *same* emails. Low CV% = predictable cost. High CV% = volatile behavior.
+**Variance charts (05a, 05b, 05c, 05d, 05e)** include a **Consistency Report** box showing μ (mean), σ (stdev), and CV% (coefficient of variation). These quantify LLM non-determinism — how much token counts and latency vary when running the *same* benchmark on the *same* emails. Low CV% = predictable cost. High CV% = volatile behavior. All duration/latency values are in seconds.
 
 **Category Stability (08)** shows that heuristic classification is deterministic — bars should be identical across runs, contrasting with LLM-based variance shown in charts 05a-c.
 
 **Output:** All charts saved as numbered PNGs in `--chart-dir/` with a `CHARTS.md` index file.
+
+---
+
+## 9. Multi-Model Benchmark
+
+Run multiple LLM models sequentially against the same MBOX file, measuring comparative performance without model-eviction churn from concurrent runs.
+
+```bash
+gaia email bench \
+  --mbox-path "path/to/your.mbox" \
+  --mode full \
+  --models "Qwen3.5-4B-GGUF" \
+  --models "Qwen3.5-14B-GGUF" \
+  --models "claude-sonnet-4-6" \
+  --experiments-per-model 3 \
+  --output-dir benchmark_multi_model
+```
+
+**Key flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--models` | Model IDs to benchmark (can specify multiple times) |
+| `--experiments-per-model` | Runs per model (default 1). Alias: `--iterations-per-model` (deprecated) |
+| `--model-batch-sizes` | Per-model batch sizes, e.g. `"model1:10,model2:20"` |
+| `--skip-cold-start` | Exclude the first (cold-start) experiment from variance reports |
+| `--fail-fast` | Abort on first failure instead of continuing to next model |
+
+**Backwards compatibility:** `--experiments` (alias `--iterations`) works for single-model runs. When `--models` is not provided, `--experiments N` maps to `--experiments-per-model N`.
+
+**Cold-start tagging:** The first experiment of each model is tagged `is_cold_start: true`. Use `--skip-cold-start` to exclude these from variance analysis, avoiding first-run TTFT contamination from model loading.
+
+**Output:** All runs are appended to a single `results.jsonl` for unified cross-model variance analysis. When multiple models are present, `variance_by_model.json` contains per-model variance reports.
+
+**Serial execution guarantee:** At most one model runs at a time, preventing Lemonade Server model eviction races. Runs execute in the order specified on the command line.
+
+---
+
+## 10. Statistical Tests
+
+When multiple models are benchmarked with sufficient experiments (>= 2 per model), the harness automatically runs non-parametric statistical tests to determine if performance differences are significant.
+
+**Tests performed:**
+
+| Test | Metric | Purpose |
+|------|--------|---------|
+| Mann-Whitney U | `total_duration_ms` | Tests if two models' latency distributions differ |
+| Cliff's delta | `total_duration_ms` | Effect size: magnitude of difference between models |
+| Bootstrap 95% CI | `total_duration_ms` | Confidence interval for mean difference |
+
+**Interpreting results:**
+- **p < 0.05**: Statistically significant difference (reject null hypothesis)
+- **|Cliff's delta| > 0.147**: Small effect; **> 0.33**: medium; **> 0.474**: large
+- **Bootstrap CI excludes 0**: Confirms the direction of difference
+
+```bash
+gaia email bench \
+  --mbox-path "path/to/your.mbox" \
+  --mode full \
+  --models "model-a" --models "model-b" \
+  --experiments-per-model 5
+```
+
+**Console output:**
+```
+  model-a vs model-b:
+    Mann-Whitney U = 2.0000, p = 0.0159
+    Cliff's delta  = 0.7200
+    Bootstrap 95% CI for mean diff = [-12450.3, -3210.1]
+```
+
+Results are saved to `statistical_tests.json` for programmatic access.
+
+---
+
+## 11. ClawFlow Integration (Cross-Framework Comparison)
+
+Run [ClawFlow](https://github.com/openclaw-eval) CLI after GAIA benchmark completes, producing a unified framework comparison on the same MBOX.
+
+```bash
+gaia email bench \
+  --mbox-path "path/to/your.mbox" \
+  --mode full \
+  --models "Qwen3.5-4B-GGUF" \
+  --clawflow \
+  --clawflow-workflow inbox-zero-helper \
+  --clawflow-timeout 3600 \
+  --output-dir benchmark_comparison
+```
+
+**How it works:**
+
+1. GAIA runs its benchmark loop (all models, all experiments)
+2. After GAIA completes, ClawFlow CLI is invoked as a subprocess
+3. ClawFlow's JSON output is parsed and mapped to GAIA's `RunResult` schema
+4. A framework comparison report is printed and saved as `framework_comparison.json`
+5. ClawFlow results are appended to `results.jsonl` for unified chart generation
+
+**ClawFlow flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--clawflow` | Enable ClawFlow execution after GAIA benchmark |
+| `--clawflow-timeout` | Max seconds to wait for ClawFlow (default 3600) |
+| `--clawflow-workflow` | ClawFlow workflow name (default `inbox-zero-helper`) |
+| `--clawflow-path` | Explicit path to clawflow script or binary |
+
+**Invocation:** ClawFlow is invoked via `python clawflow_cli.py --workflow <name> --model <model> --json --quiet`. The adapter probes for the script at the default location (`openclaw-eval/scripts/agentic-framework-test/gaia_agents/clawflow_cli.py`) or an explicit `--clawflow-path`.
+
+**Category mapping:** ClawFlow categories are normalized to GAIA taxonomy:
+
+| ClawFlow | GAIA |
+|----------|------|
+| `URGENT` | `urgent` |
+| `NEEDS_RESPONSE` | `actionable` |
+| `FYI` | `informational` |
+| `PROMOTIONAL` | `low priority` |
+
+**Output files:**
+
+| File | Contents |
+|------|----------|
+| `clawflow_results.json` | Raw ClawFlow output mapped to GAIA schema |
+| `framework_comparison.json` | Side-by-side GAIA vs ClawFlow metrics |
+
+**Charts:** When `--visualize` is used with `--clawflow`, Charts 15-16 (Framework Category Comparison, Architecture Radar) are automatically generated.
+
+---
+
+## 12. Extended Charts (Charts 11-18)
+
+Multi-model and ClawFlow runs unlock additional charts for cross-framework comparison.
+
+| # | Chart | Type | When Generated |
+|---|-------|------|----------------|
+| 11 | Model Duration Comparison | Grouped column | Multi-model (>= 2 models) |
+| 12 | Model Token Cost | Stacked column | Multi-model (>= 2 models) |
+| 13 | TTFT Comparison | Horizontal bar | Multi-model (>= 2 models) |
+| 14 | TPS Comparison | Horizontal bar | Multi-model (>= 2 models) |
+| 15 | Framework Category Comparison | Side-by-side stacked bars | ClawFlow + GAIA data |
+| 16 | Architecture Radar | Radar/spider chart | ClawFlow + GAIA data |
+| 17 | Per-Model Variance Trend | Multi-line | Multi-model (>= 3 experiments) |
+| 18 | Cold-Start Impact | Scatter with annotation | Multi-model with cold-start data |
+| 19 | Model x Architecture Duration | Grouped column | ClawFlow + GAIA data (>= 1 model) |
+| 20 | Model x Architecture Token Cost | Grouped stacked column | ClawFlow + GAIA data (>= 1 model) |
+| 21 | Architecture Performance Dashboard | 4-panel faceted | ClawFlow + GAIA data (>= 1 model) |
+
+**Architecture Radar (Chart 16)** plots GAIA and ClawFlow across six dimensions: Duration, Tokens, TTFT, TPS, Classification Accuracy, and Category Coverage — normalized to 0-100 scale for visual comparison.
+
+**Cold-Start Impact (Chart 18)** visualizes the first-experiment TTFT contamination effect, showing how model loading time inflates latency on the first run versus warm subsequent runs.
+
+**Model x Architecture charts (19-21)** display performance metrics across models and frameworks in a unified view. All charts use consistent architecture colors:
+- **GAIA**: `#ED6C02` (AMD orange)
+- **ClawFlow**: `#3182CE` (blue)
+
+**Architecture Performance Dashboard (Chart 21)** is a 4-panel faceted chart showing TTFT, throughput (TPS), total duration, and token cost — all grouped by model and colored by architecture for at-a-glance comparison.
 
 ---
 
@@ -378,18 +537,28 @@ gaia email bench \
 | `--mode` | `heuristic` | `heuristic`, `full`, or `interactive` |
 | `--model` | `heuristic-only` | Model ID for LLM modes |
 | `--base-url` | env or localhost | LLM server URL |
-| `--limit` | 100 | Max emails to process |
-| `--batch-size` | 20 | Emails per batch (heuristic only) |
-| `--iterations` | 1 | Number of benchmark runs |
+| `--limit` | 100 | Max total emails from MBOX (0=no limit). Independent of `--batch-size` |
+| `--batch-size` | 20 | Emails per batch (each batch = one LLM prompt) |
+| `--experiments` | 1 | Experiments per model (alias `--iterations`, deprecated) |
+| `--models` | *(none)* | Model IDs to benchmark (multiple `--models` flags) |
+| `--experiments-per-model` | 1 | Experiments per model (alias `--iterations-per-model`, deprecated) |
+| `--model-batch-sizes` | *(none)* | `model:batch_size` pairs, e.g. `"m1:10,m2:20"` |
+| `--skip-cold-start` | false | Exclude first (cold-start) experiment from reports |
+| `--fail-fast` | false | Abort on first model failure |
 | `--output-dir` | `benchmark_results` | Output directory |
 | `--variance-only` | false | Re-analyze existing JSONL |
 | `--jsonl-path` | (auto) | JSONL path for variance-only |
 | `--compare` | none | Compare two JSON files |
-| `--ground-truth` | none | Ground truth JSON for quality |
+| `--ground-truth` | none | Ground truth JSON for quality scoring |
 | `--cost-per-1m-input` | 0.0 | Cost per 1M input tokens |
 | `--cost-per-1m-output` | 0.0 | Cost per 1M output tokens |
-| `--visualize` | false | Generate chart PNGs after the run |
+| `--steps` | false | Print per-step token breakdown |
+| `--visualize` | false | Generate chart PNGs |
 | `--chart-dir` | `benchmark_charts` | Directory for chart output |
+| `--clawflow` | false | Run ClawFlow CLI after GAIA benchmark |
+| `--clawflow-timeout` | 3600 | Seconds to wait for ClawFlow |
+| `--clawflow-workflow` | `inbox-zero-helper` | ClawFlow workflow name |
+| `--clawflow-path` | *(auto)* | Explicit path to clawflow script/binary |
 
 ---
 
@@ -397,17 +566,21 @@ gaia email bench \
 
 Every benchmark run produces these files in `--output-dir`:
 
-| File | Format | Contents |
-|------|--------|----------|
-| `results.csv` | CSV | Per-email rows + summary (openclaw-eval compatible) |
-| `results.json` | JSON | Full run detail with per-step tokens |
-| `results.jsonl` | JSONL | Append-only log for multi-iteration runs |
-| `summary.csv` | CSV | Summary spreadsheet (4-column layout) |
-| `variance.json` | JSON | Statistical report (multi-iteration only) |
-| `comparison.json` | JSON | Heuristic vs full diff |
-| `interactive.json` | JSON | Multi-turn session detail |
-| `charts/*.png` | PNG | Auto-generated visualizations |
-| `charts/CHARTS.md` | Markdown | Chart index with descriptions |
+| File | Format | When |
+|------|--------|------|
+| `results.csv` | CSV | Every run (per-email rows) |
+| `results.json` | JSON | Every run (full detail) |
+| `results.jsonl` | JSONL | Append-only log (all runs, all models) |
+| `summary.csv` | CSV | Every run (summary metrics) |
+| `variance.json` | JSON | Multi-experiment (>= 2 runs) |
+| `variance_by_model.json` | JSON | Multi-model (>= 2 models) |
+| `statistical_tests.json` | JSON | Multi-model with >= 2 experiments each |
+| `comparison.json` | JSON | `--compare` mode |
+| `interactive.json` | JSON | Interactive mode |
+| `clawflow_results.json` | JSON | `--clawflow` enabled |
+| `framework_comparison.json` | JSON | `--clawflow` + GAIA data present |
+| `charts/*.png` | PNG | `--visualize` enabled |
+| `charts/CHARTS.md` | Markdown | Chart index
 
 ### CSV Column Layout
 
@@ -419,11 +592,13 @@ The `results.csv` matches openclaw-eval column layout with 40+ columns including
 
 ```
 src/gaia/agents/email/bench/
-├── runner.py      # Core benchmark engine (heuristic, full, interactive)
-├── output.py      # CSV/JSON/JSONL formatters, summary generation
-├── compare.py     # Cross-mode comparison (heuristic vs full)
-├── variance.py    # Statistical variance analysis
-├── cli.py         # CLI entry point (gaia email bench)
+├── runner.py           # Core benchmark engine (heuristic, full, interactive)
+├── output.py           # CSV/JSON/JSONL formatters, summary generation
+├── compare.py          # Cross-mode comparison (heuristic vs full, framework)
+├── variance.py         # Statistical variance + tests (Mann-Whitney U, Cliff's delta, bootstrap CI)
+├── visualize.py        # Chart generation (18 charts, matplotlib Agg backend)
+├── clawflow_adapter.py # ClawFlow CLI probe, invoke, parse -> GAIA RunResult
+├── cli.py              # CLI entry point (gaia email bench)
 └── __init__.py
 ```
 
@@ -431,11 +606,18 @@ src/gaia/agents/email/bench/
 
 - `EmailResult` — single email classification
 - `BatchResult` — batch of emails with aggregated metrics
-- `RunResult` — complete benchmark run
+- `RunResult` — complete benchmark run (GAIA or ClawFlow, unified schema)
 - `StepResult` — single LLM call with token/duration stats
 - `TurnResult` — single turn in interactive session
 - `ModeComparison` — heuristic vs full diff report
 - `VarianceSummary` — statistical summary across runs
+- `ClawflowRun` — ClawFlow BenchmarkRun mapped to GAIA `RunResult` shape
+
+### Statistical Tests
+
+- **Mann-Whitney U** — non-parametric test for distribution difference (normal approximation)
+- **Cliff's delta** — effect size estimator (small > 0.147, medium > 0.33, large > 0.474)
+- **Bootstrap 95% CI** — confidence interval for mean difference (1000 resamples)
 
 ### How token tracking works
 
