@@ -2590,28 +2590,42 @@ Do NOT wrap conversational replies in JSON.
                         "rephrase or break the request into smaller pieces?"
                     )
                     break
+
+                # Select retry prompt based on error type.
+                is_parallel = isinstance(parse_exc, NotImplementedError)
+                assistant_msg = (
+                    "[I tried to call multiple tools at once, but only one "
+                    "tool call is allowed per turn.]"
+                    if is_parallel
+                    else "[I tried to call a tool but my arguments were "
+                    "malformed.]"
+                )
+                user_msg = (
+                    "You tried to call multiple tools in one response. "
+                    "You can only call ONE tool per turn. Please call a "
+                    "single tool, then wait for the result before calling "
+                    "the next one."
+                    if is_parallel
+                    else "Your last tool call had malformed arguments. "
+                    "Please try again. Use ONLY the documented enum "
+                    "values for each argument (e.g. 'brief', "
+                    "'detailed', 'bullets' — never a long sentence). "
+                    "If you don't need a tool, answer in plain text."
+                )
+
                 # Push a synthetic assistant turn + recovery user message so the
                 # next LLM call has context. Don't include the raw envelope to
                 # keep noise out of the conversation history.
                 messages.append(
                     {
                         "role": "assistant",
-                        "content": (
-                            "[I tried to call a tool but my arguments were "
-                            "malformed.]"
-                        ),
+                        "content": assistant_msg,
                     }
                 )
                 messages.append(
                     {
                         "role": "user",
-                        "content": (
-                            "Your last tool call had malformed arguments. "
-                            "Please try again. Use ONLY the documented enum "
-                            "values for each argument (e.g. 'brief', "
-                            "'detailed', 'bullets' — never a long sentence). "
-                            "If you don't need a tool, answer in plain text."
-                        ),
+                        "content": user_msg,
                     }
                 )
                 steps_taken += 1
