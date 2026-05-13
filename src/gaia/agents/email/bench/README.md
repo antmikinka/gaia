@@ -19,6 +19,7 @@ The benchmark follows the Unix philosophy of small, composable tools: one comman
 - [11. Output Files](#11-output-files)
 - [12. CLI Reference](#12-cli-reference)
 - [Architecture](#architecture)
+- [Triage Methodology](#triage-methodology)
 
 ## Quick Reference
 
@@ -534,6 +535,9 @@ This design separates concerns cleanly:
 - **Data** (`clawflow`) -- runs external framework, maps to unified schema
 - **Report generator** (`report`) -- reads all data, computes analysis, produces charts
 
+See [`TRIAGE-METHODOLOGY.md`](TRIAGE-METHODOLOGY.md) for how the email triage categorization
+pipeline actually works (heuristic vs LLM), what the benchmark measures, and empirical findings.
+
 Benefits:
 - Each command can run independently and be re-run without re-executing benchmarks
 - Results are inspectable between steps for debugging
@@ -575,6 +579,16 @@ src/gaia/agents/email/bench/
 1. Each LLM call stores performance stats as a `system` message with `type: "stats"` in the conversation
 2. `StepResult` extraction walks the conversation and pulls `input_tokens`, `output_tokens`, `total_tokens`, and `duration` from each stats entry
 3. For interactive mode, steps are accumulated across all turns
+
+---
+
+## Triage Methodology
+
+See [`TRIAGE-METHODOLOGY.md`](TRIAGE-METHODOLOGY.md) for a detailed analysis of:
+- How the email categorization pipeline works (heuristic + LLM fallback)
+- System prompt token count and content analysis
+- Empirical findings from real benchmark runs
+- What each chart actually measures vs what it claims to measure
 
 ---
 

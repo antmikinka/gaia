@@ -94,6 +94,9 @@ UNIFIED_CSV_COLUMNS = [
     "tokens_in",
     "tokens_out",
     "categories",
+    "heuristic_classified",
+    "llm_escalated",
+    "llm_escalation_pct",
     "status",
     "cost_usd",
     "quality_score",
@@ -131,6 +134,24 @@ def _compute_run_quality(run: dict[str, Any], ground_truth: dict[str, Any]) -> f
     return round(correct / max(total, 1), 4) if total > 0 else 0.0
 
 
+def _compute_run_escalation(run: dict[str, Any]) -> dict[str, Any]:
+    """Compute heuristic vs LLM escalation stats for a single run."""
+    total = 0
+    confident = 0
+    for batch in run.get("batch_results", []):
+        for email in batch.get("email_results", []):
+            total += 1
+            if email.get("confident", False):
+                confident += 1
+    llm_escalated = total - confident
+    pct = round(llm_escalated / max(total, 1) * 100, 1) if total > 0 else 0.0
+    return {
+        "heuristic_classified": confident,
+        "llm_escalated": llm_escalated,
+        "llm_escalation_pct": pct,
+    }
+
+
 def _generate_report_csv(
     runs: list[dict[str, Any]],
     clawflow_run: dict[str, Any] | None,
@@ -147,6 +168,7 @@ def _generate_report_csv(
     for i, run in enumerate(runs):
         cost = _compute_run_cost(run, cost_per_1m_input, cost_per_1m_output)
         quality = _compute_run_quality(run, ground_truth or {})
+        esc = _compute_run_escalation(run)
         rows.append({
             "model": run.get("model", "unknown"),
             "framework": run.get("source_framework", "gaia"),
@@ -156,6 +178,9 @@ def _generate_report_csv(
             "tokens_in": run.get("total_input_tokens", 0),
             "tokens_out": run.get("total_output_tokens", 0),
             "categories": ", ".join(run.get("category_counts", {}).keys()),
+            "heuristic_classified": esc["heuristic_classified"],
+            "llm_escalated": esc["llm_escalated"],
+            "llm_escalation_pct": esc["llm_escalation_pct"],
             "status": run.get("status", "unknown"),
             "cost_usd": cost if cost > 0 else "",
             "quality_score": quality if quality > 0 else "",
@@ -165,6 +190,7 @@ def _generate_report_csv(
     if clawflow_run:
         cost = _compute_run_cost(clawflow_run, cost_per_1m_input, cost_per_1m_output)
         quality = _compute_run_quality(clawflow_run, ground_truth or {})
+        # ClawFlow doesn't have confident flags — default to 100% LLM.
         rows.append({
             "model": clawflow_run.get("model", "unknown"),
             "framework": "clawflow",
@@ -174,6 +200,9 @@ def _generate_report_csv(
             "tokens_in": clawflow_run.get("total_input_tokens", 0),
             "tokens_out": clawflow_run.get("total_output_tokens", 0),
             "categories": ", ".join(clawflow_run.get("category_counts", {}).keys()),
+            "heuristic_classified": 0,
+            "llm_escalated": clawflow_run.get("total_emails", 0),
+            "llm_escalation_pct": 100.0,
             "status": clawflow_run.get("status", "unknown"),
             "cost_usd": cost if cost > 0 else "",
             "quality_score": quality if quality > 0 else "",
@@ -359,13 +388,24 @@ def _generate_charts(
     last_gaia_json: dict[str, Any] | None = None,
 ) -> None:
     """Generate chart PNGs."""
+    import tempfile
     from gaia.agents.email.bench.visualize import generate_charts
 
     gaia_list = [last_gaia_json] if last_gaia_json else []
     if not gaia_list and runs:
         gaia_list = [runs[-1]]
 
+    # Write last run to a temp JSON so single-run charts (1-4, 9, 10) are generated.
+    json_path = None
+    if gaia_list:
+        tmp = chart_dir / "_last_run.json"
+        tmp.parent.mkdir(parents=True, exist_ok=True)
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(gaia_list[0], f, ensure_ascii=False)
+        json_path = tmp
+
     generate_charts(
+        json_path=json_path,
         jsonl_path=jsonl_path,
         output_dir=chart_dir,
         multi_model_runs=runs if len(runs) >= 2 else None,
@@ -466,7 +506,7 @@ def generate_reports(
             runs,
             clawflow_run,
             chart_dir,
-            jsonl_path=jsonl_path,
+            jsonl_path=jsonl_paths[-1] if jsonl_paths else None,
             last_gaia_json=runs[-1] if runs else None,
         )
 

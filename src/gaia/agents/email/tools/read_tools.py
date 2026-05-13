@@ -170,6 +170,7 @@ def triage_inbox_impl(
     *,
     max_messages: int = 25,
     debug: bool = False,
+    force_llm: bool = False,
 ) -> Dict[str, Any]:
     """Triage the inbox using heuristic fast path + LLM fallback.
 
@@ -178,6 +179,10 @@ def triage_inbox_impl(
     flag the message for LLM follow-up — the LLM tool call happens in the
     agent's planning loop, not in this tool body (the heuristic alone is
     cheap; LLM round-trips are expensive and are sequenced by the agent).
+
+    When ``force_llm=True``, all heuristic results are marked
+    ``confident=False`` to force LLM classification of every email
+    (benchmarking mode for measuring true LLM inference).
 
     Returns a summary listing per-message classifications + a bucketed
     view via ``group_by_category``.
@@ -198,6 +203,9 @@ def triage_inbox_impl(
                 sender=payload_headers.get("from", ""),
                 label_ids=msg.get("labelIds", []),
             )
+            if force_llm and heuristic.confident:
+                heuristic.confident = False
+                heuristic.reason = f"forced LLM bypass (was: {heuristic.reason})"
             log_triage_dispatch(
                 message_id=msg["id"],
                 decision="heuristic" if heuristic.confident else "needs_llm",
@@ -347,9 +355,11 @@ class ReadToolsMixin:
             """
             try:
                 max_messages = max(1, min(int(max_messages or 25), 100))
+                force_llm_flag = bool(getattr(self.config, "force_llm", False))
                 return _envelope_ok(
                     triage_inbox_impl(
-                        gmail, max_messages=max_messages, debug=debug_flag
+                        gmail, max_messages=max_messages, debug=debug_flag,
+                        force_llm=force_llm_flag,
                     )
                 )
             except ConnectorsError as exc:

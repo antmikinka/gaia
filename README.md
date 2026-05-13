@@ -78,6 +78,72 @@ print(result)
 
 ---
 
+## Email Benchmark
+
+GAIA includes a benchmark suite for evaluating email triage performance across models and frameworks. The workflow has three commands:
+
+1. **`gaia email bench`** — Run benchmarks against a set of emails, producing `results_*.jsonl` files.
+2. **`gaia email clawflow`** — Run ClawFlow-specific email benchmarks for cross-framework comparison.
+3. **`gaia email report`** — Generate a unified report and visualizations from existing benchmark data.
+
+### Generating Reports
+
+```bash
+gaia email report --input-dir benchmark_results --charts --chart-dir benchmark_charts
+```
+
+**Output files:**
+
+| File | Description |
+|------|-------------|
+| `report.csv` | Unified benchmark results table |
+| `variance.json` | Statistical variance analysis (requires 2+ runs) |
+| `charts/` | PNG visualizations (auto-selected based on available data) |
+
+**Available flags:**
+
+| Flag | Purpose |
+|------|---------|
+| `--input-dir` | Directory containing benchmark `results_*.jsonl` files |
+| `--output-dir` | Directory for report files (defaults to `--input-dir`) |
+| `--charts` | Enable chart generation |
+| `--chart-dir` | Directory for chart PNGs (defaults to `<input-dir>/charts`) |
+| `--skip-cold-start` | Exclude cold-start runs from variance analysis |
+| `--ground-truth <path>` | Path to ground truth JSON for quality scoring |
+| `--cost-per-1m-input` / `--cost-per-1m-output` | Cost estimation parameters |
+
+**Chart taxonomy (21 charts, auto-selected based on data availability):**
+
+| Chart | Name | When Generated |
+|-------|------|----------------|
+| 1 | Category Distribution (horizontal bar) | Single run present |
+| 2 | Token Composition (donut) | Full/interactive mode |
+| 3 | Duration vs Tokens (grouped column) | Full/interactive mode |
+| 4 | Per-Email Duration Histogram | Single run present |
+| 5a | LLM Latency Consistency (line) | 2+ runs |
+| 5b | LLM Token Variance (line) | 2+ runs, tokens > 0 |
+| 5c | Per-Email Cost Variance (dual-axis) | 2+ runs |
+| 5d | TTFT Consistency (line) | 2+ runs, TTFT > 0 |
+| 5e | TPS Consistency (line) | 2+ runs, TPS > 0 |
+| 6 | Interactive Turn Breakdown | Interactive JSON present |
+| 7 | Interactive Token Heatmap | Interactive JSON present |
+| 8 | Category Stability (stacked bar) | 2+ runs |
+| 9 | Token vs Duration Scatter | Single run present |
+| 10 | Per-Step TTFT & TPS | Full/interactive mode, stats available |
+| 11 | Model Duration Comparison | 2+ distinct models |
+| 12 | Model Token Cost (stacked) | 2+ distinct models |
+| 13 | TTFT Comparison (horizontal bar) | 2+ models, TTFT > 0 |
+| 14 | TPS Comparison (horizontal bar) | 2+ models, TPS > 0 |
+| 15 | Framework Category Comparison | ClawFlow + GAIA present |
+| 16 | Architecture Radar | ClawFlow + GAIA present |
+| 17 | Per-Model Variance Trend | 2+ models, each with 2+ runs |
+| 18 | Cold-Start Impact (scatter) | 2+ models, has cold-start runs |
+| 19 | Model x Architecture Duration | ClawFlow + GAIA + 1+ model |
+| 20 | Model x Architecture Tokens | ClawFlow + GAIA + 1+ model |
+| 21 | Architecture Performance Dashboard | ClawFlow + GAIA + 1+ model |
+
+---
+
 ## C++ Framework
 
 A C++17 port of the GAIA base agent framework is available under [`cpp/`](cpp/README.md). It implements the same agent loop, tool registry, and MCP client interface without any Python dependency — suitable for embedding in native applications or resource-constrained environments.

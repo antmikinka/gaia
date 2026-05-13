@@ -1427,16 +1427,8 @@ def main():
         help="Experiments per model in multi-model benchmark.",
     )
     _email_bench_parser.add_argument(
-        "--batch-size", type=int, default=20,
-        help="Emails per batch.",
-    )
-    _email_bench_parser.add_argument(
         "--limit", type=int, default=100,
         help="Max total emails from MBOX (0=no limit).",
-    )
-    _email_bench_parser.add_argument(
-        "--model-batch-sizes", type=str, default=None,
-        help="Comma-separated model:batch_size pairs.",
     )
     _email_bench_parser.add_argument(
         "--base-url", type=str, default=None,
@@ -1489,6 +1481,10 @@ def main():
     _email_bench_parser.add_argument(
         "--fail-fast", action="store_true",
         help="Abort on first model iteration failure.",
+    )
+    _email_bench_parser.add_argument(
+        "--force-llm", action="store_true",
+        help="Bypass heuristic fast-path; force LLM classification of every email.",
     )
     # ClawFlow (deprecated from bench; use 'gaia email clawflow').
     _email_bench_parser.add_argument(
@@ -3962,18 +3958,21 @@ def handle_email_command(args):
     if email_action == "bench":
         from gaia.agents.email.bench.cli import main as bench_dispatch_main
 
-        bench_args = []
+        bench_args = ["bench"]
         for key in [
-            "mbox_path", "mode", "experiments", "batch_size", "limit",
+            "mbox_path", "mode", "limit",
             "model", "base_url", "output_dir", "jsonl_path", "ground_truth",
-            "chart_dir",
             # Multi-model.
-            "models", "experiments_per_model", "model_batch_sizes",
-            # ClawFlow (deprecated but still forwarded for compat).
-            "clawflow_timeout", "clawflow_workflow", "clawflow_path",
+            "models", "experiments_per_model",
         ]:
             val = getattr(args, key, None)
             if val is not None:
+                # Skip deprecated/deprecated-default values that the internal
+                # parser no longer accepts.
+                if key == "mode" and val == "heuristic":
+                    continue
+                if key == "model" and val == "heuristic-only":
+                    continue
                 if isinstance(val, list):
                     for item in val:
                         bench_args.append(f"--{key.replace('_', '-')}")
@@ -3993,7 +3992,7 @@ def handle_email_command(args):
         # Boolean flags.
         for flag in [
             "variance_only", "visualize", "steps", "skip_cold_start",
-            "fail_fast", "clawflow",
+            "fail_fast",
         ]:
             if getattr(args, flag, False):
                 bench_args.append(f"--{flag.replace('_', '-')}")
@@ -4010,7 +4009,7 @@ def handle_email_command(args):
     elif email_action == "clawflow":
         from gaia.agents.email.bench.cli import main as bench_dispatch_main
 
-        cf_args = []
+        cf_args = ["clawflow"]
         for key in ["workflow", "model", "timeout", "cli_path", "output_dir", "mbox_path"]:
             val = getattr(args, key, None)
             if val is not None:
@@ -4023,7 +4022,7 @@ def handle_email_command(args):
     elif email_action == "report":
         from gaia.agents.email.bench.cli import main as bench_dispatch_main
 
-        rpt_args = []
+        rpt_args = ["report"]
         for key in [
             "input_dir", "output_dir", "chart_dir", "ground_truth",
         ]:
@@ -4081,6 +4080,10 @@ def handle_email_command(args):
             args.query = None
         if not hasattr(args, "interactive"):
             args.interactive = False
+        if not hasattr(args, "trace"):
+            args.trace = False
+        if not hasattr(args, "show_stats"):
+            args.show_stats = False
 
         result = asyncio.run(email_main(args))
         sys.exit(result)

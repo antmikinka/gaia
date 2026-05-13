@@ -65,22 +65,10 @@ def build_parser() -> argparse.ArgumentParser:
         help="Number of experiments per model. Default 1.",
     )
     bench_parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=20,
-        help="Number of emails per processing batch. Default 20.",
-    )
-    bench_parser.add_argument(
         "--limit",
         type=int,
         default=100,
         help="Maximum total emails to read from MBOX. Default 100; 0 for no limit.",
-    )
-    bench_parser.add_argument(
-        "--model-batch-sizes",
-        type=str,
-        default=None,
-        help="Comma-separated model:batch_size pairs, e.g. 'model1:10,model2:20'.",
     )
     bench_parser.add_argument(
         "--base-url",
@@ -137,6 +125,11 @@ def build_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="Cost per 1M output tokens.",
+    )
+    bench_parser.add_argument(
+        "--force-llm",
+        action="store_true",
+        help="Bypass heuristic fast-path; force LLM classification of every email.",
     )
 
     # ------------------------------------------------------------------
@@ -329,12 +322,8 @@ def _build_bench_args(args) -> list[str]:
             bench_args.extend(["--models", m])
     if args.experiments_per_model != 1:
         bench_args.extend(["--experiments-per-model", str(args.experiments_per_model)])
-    if args.batch_size != 20:
-        bench_args.extend(["--batch-size", str(args.batch_size)])
     if args.limit != 100:
         bench_args.extend(["--limit", str(args.limit)])
-    if args.model_batch_sizes:
-        bench_args.extend(["--model-batch-sizes", args.model_batch_sizes])
     if args.base_url:
         bench_args.extend(["--base-url", args.base_url])
     if args.output_dir != "benchmark_results":
@@ -345,6 +334,8 @@ def _build_bench_args(args) -> list[str]:
         bench_args.append("--skip-cold-start")
     if args.steps:
         bench_args.append("--steps")
+    if args.force_llm:
+        bench_args.append("--force-llm")
 
     return bench_args
 

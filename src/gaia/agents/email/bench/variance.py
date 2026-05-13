@@ -356,6 +356,26 @@ def compare_runs(runs: list[dict]) -> ComparisonReport:
                     )
                 )
             report.category_stability = _compute_category_stability(runs)
+            # Single-run LLM escalation %.
+            total = 0
+            confident = 0
+            for batch in run.get("batch_results", []):
+                for email in batch.get("email_results", []):
+                    total += 1
+                    if email.get("confident", False):
+                        confident += 1
+            pct = (total - confident) / max(total, 1) * 100 if total > 0 else 0.0
+            report.variance_summaries.append(
+                VarianceSummary(
+                    metric="llm_escalation_pct",
+                    mean=pct,
+                    stdev=0.0,
+                    min_val=pct,
+                    max_val=pct,
+                    cv_pct=0.0,
+                    values=[pct],
+                )
+            )
         return report
 
     # Compute run-to-run deltas.
@@ -396,6 +416,23 @@ def compare_runs(runs: list[dict]) -> ComparisonReport:
 
     # Category stability.
     category_stability = _compute_category_stability(runs)
+
+    # LLM escalation % variance.
+    escalation_pcts = []
+    for run in runs:
+        total = 0
+        confident = 0
+        for batch in run.get("batch_results", []):
+            for email in batch.get("email_results", []):
+                total += 1
+                if email.get("confident", False):
+                    confident += 1
+        pct = (total - confident) / max(total, 1) * 100 if total > 0 else 0.0
+        escalation_pcts.append(pct)
+    if escalation_pcts:
+        variance_summaries.append(
+            compute_variance(escalation_pcts, metric_name="llm_escalation_pct")
+        )
 
     return ComparisonReport(
         runs_compared=len(runs),

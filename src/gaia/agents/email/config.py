@@ -92,6 +92,7 @@ class EmailAgentConfig:
     debug: bool = False
     silent_mode: bool = False
     show_stats: bool = False
+    force_llm: bool = False
     output_dir: Optional[str] = None
     undo_window_seconds: int = 30
     db_path: Optional[str] = None

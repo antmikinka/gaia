@@ -38,40 +38,24 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", type=str, default=None)
     parser.add_argument("--models", action="append", default=None)
     parser.add_argument("--experiments-per-model", type=int, default=1)
-    parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--limit", type=int, default=100)
-    parser.add_argument("--model-batch-sizes", type=str, default=None)
     parser.add_argument("--base-url", type=str, default=None)
     parser.add_argument("--output-dir", type=str, default="benchmark_results")
     parser.add_argument("--fail-fast", action="store_true")
     parser.add_argument("--skip-cold-start", action="store_true")
     parser.add_argument("--steps", action="store_true")
+    parser.add_argument("--force-llm", action="store_true")
     return parser
-
-
-def _parse_model_batch_sizes(arg: str | None) -> dict[str, int]:
-    if not arg:
-        return {}
-    sizes = {}
-    for pair in arg.split(","):
-        pair = pair.strip()
-        if ":" in pair:
-            model, size = pair.split(":", 1)
-            try:
-                sizes[model.strip()] = int(size.strip())
-            except ValueError:
-                pass
-    return sizes
 
 
 def _run_single_iteration(
     mbox_path: str,
     *,
-    batch_size: int,
     limit: int,
     model: str,
     _base_url: str,
     is_cold_start: bool = False,
+    force_llm: bool = False,
 ):
     """Run a single benchmark iteration."""
     from gaia.agents.email.bench.runner import _run_full_agent
@@ -81,7 +65,7 @@ def _run_single_iteration(
         model_id=model,
         base_url=_base_url,
         limit=limit,
-        _batch_size=batch_size,
+        force_llm=force_llm,
     )
     run.is_cold_start = is_cold_start
     run.source_framework = "gaia"
@@ -97,16 +81,22 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     # Interactive mode: single multi-turn session (special case, one-shot).
     if args.mode == "interactive":
-        from gaia.agents.email.bench.runner import run_interactive_benchmark
+        from gaia.agents.email.bench.runner import run_interactive_session
 
-        summary = run_interactive_benchmark(
+        model = args.model or (args.models[0] if args.models else None)
+        if not model:
+            print("Error: --model or --models is required for interactive mode.")
+            return 1
+
+        summary = run_interactive_session(
             args.mbox_path,
-            model_id=args.model,
+            model_id=model,
             base_url=args.base_url,
             limit=args.limit,
+            force_llm=getattr(args, "force_llm", False),
         )
 
-        model_slug = _slug(args.model or "unknown")
+        model_slug = _slug(model or "unknown")
         interactive_path = output_dir / f"interactive_{model_slug}.json"
         interactive_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -162,6 +152,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             "avg_time_to_first_token_ms": summary.get("avg_time_to_first_token_ms", 0),
             "avg_tokens_per_second": summary.get("avg_tokens_per_second", 0),
             "turns": [_turn_to_dict(t) for t in summary["turns"]],
+            "session_state": summary.get("session_state", {}),
         }
         with open(interactive_path, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
@@ -178,19 +169,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         print("Error: --model or --models is required.")
         return 1
 
-    batch_size_map = _parse_model_batch_sizes(args.model_batch_sizes)
     exps = args.experiments_per_model
 
     last_successful_model: str | None = None
 
     for model_id in model_list:
-        batch_size = batch_size_map.get(model_id, args.batch_size)
         model_exps = exps
         jsonl_path = output_dir / f"results_{_slug(model_id)}.jsonl"
 
         print(f"\n{'='*70}")
         print(f"  Model: {model_id}")
-        print(f"  Experiments: {model_exps}  |  Batch size: {batch_size}")
+        print(f"  Experiments: {model_exps}  |  Emails: {args.limit}")
         print(f"{'='*70}")
 
         model_had_success = False
@@ -201,11 +190,11 @@ def main(argv: Optional[list[str]] = None) -> int:
             try:
                 result = _run_single_iteration(
                     args.mbox_path,
-                    batch_size=batch_size,
                     limit=args.limit,
                     model=model_id,
                     _base_url=args.base_url,
                     is_cold_start=is_first,
+                    force_llm=args.force_llm,
                 )
 
                 # Detect structured error results (model not found, etc.).
