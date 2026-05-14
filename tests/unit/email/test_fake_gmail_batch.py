@@ -28,7 +28,6 @@ if str(_REPO_ROOT) not in sys.path:
 
 from gaia.agents.email.fake_gmail import FakeGmailBackend  # noqa: E402
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------

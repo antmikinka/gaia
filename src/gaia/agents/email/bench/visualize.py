@@ -123,12 +123,32 @@ def _detect_mode(run: dict[str, Any]) -> str:
     return run.get("mode", "heuristic")
 
 
-def _save_chart(fig, output_dir: Path, name: str, dpi: int = 150) -> Path:
+def _save_chart(
+    fig,
+    output_dir: Path,
+    name: str,
+    dpi: int = 150,
+    *,
+    run_id_suffix: str | None = None,
+) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
-    path = output_dir / f"{name}.png"
+    filename = f"{name}_{run_id_suffix}.png" if run_id_suffix else f"{name}.png"
+    path = output_dir / filename
     fig.savefig(path, dpi=dpi, bbox_inches="tight")
     plt.close(fig)
     return path
+
+
+def _extract_run_suffix(run_id: str) -> str:
+    """Extract the last hyphen-delimited segment from a run_id.
+
+    Handles: run-full-20260514-133017-Qwen3.5-4B-GGUF-a3b2c1 -> a3b2c1
+    Falls back to last 6 chars if rsplit yields empty or single-char.
+    """
+    suffix = run_id.rsplit("-", 1)[-1]
+    if len(suffix) <= 1:
+        suffix = run_id[-6:]
+    return suffix
 
 
 def _compute_stats(values: list[float]) -> dict[str, float]:
@@ -209,7 +229,9 @@ def _add_subtitle(fig, text: str, y_offset: float = 0.02) -> None:
 # ---------------------------------------------------------------------------
 
 
-def plot_category_distribution(run: dict[str, Any], output_dir: Path) -> Path | None:
+def plot_category_distribution(
+    run: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
+) -> Path | None:
     """Horizontal bar chart of category counts."""
     plt_mod = _require_matplotlib()
     cats = run.get("category_counts", {})
@@ -235,7 +257,9 @@ def plot_category_distribution(run: dict[str, Any], output_dir: Path) -> Path | 
     ax.set_title("Category Distribution", fontweight="bold", fontsize=12)
     ax.grid(axis="x", linestyle="--", alpha=0.3)
     fig.tight_layout()
-    return _save_chart(fig, output_dir, "01_category_distribution")
+    return _save_chart(
+        fig, output_dir, "01_category_distribution", run_id_suffix=run_id_suffix
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -243,7 +267,9 @@ def plot_category_distribution(run: dict[str, Any], output_dir: Path) -> Path | 
 # ---------------------------------------------------------------------------
 
 
-def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None:
+def plot_token_composition(
+    run: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
+) -> Path | None:
     """Donut chart showing input / reasoning / output token split."""
     plt_mod = _require_matplotlib()
     in_tok = run.get("total_input_tokens", 0)
@@ -300,7 +326,9 @@ def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None
     )
     ax.set_title("Token Composition", fontweight="bold", fontsize=12)
     fig.tight_layout()
-    return _save_chart(fig, output_dir, "02_token_composition")
+    return _save_chart(
+        fig, output_dir, "02_token_composition", run_id_suffix=run_id_suffix
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -308,7 +336,9 @@ def plot_token_composition(run: dict[str, Any], output_dir: Path) -> Path | None
 # ---------------------------------------------------------------------------
 
 
-def plot_duration_vs_tokens(run: dict[str, Any], output_dir: Path) -> Path | None:
+def plot_duration_vs_tokens(
+    run: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
+) -> Path | None:
     """Side-by-side columns: total duration (seconds) vs total tokens."""
     plt_mod = _require_matplotlib()
     dur = run.get("total_duration_ms", 0)
@@ -347,7 +377,9 @@ def plot_duration_vs_tokens(run: dict[str, Any], output_dir: Path) -> Path | Non
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
     ax1.grid(axis="y", linestyle="--", alpha=0.3)
     fig.tight_layout()
-    return _save_chart(fig, output_dir, "03_duration_vs_tokens")
+    return _save_chart(
+        fig, output_dir, "03_duration_vs_tokens", run_id_suffix=run_id_suffix
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -355,7 +387,9 @@ def plot_duration_vs_tokens(run: dict[str, Any], output_dir: Path) -> Path | Non
 # ---------------------------------------------------------------------------
 
 
-def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path | None:
+def plot_email_duration_histogram(
+    run: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
+) -> Path | None:
     """Bar chart of per-email average duration.
 
     Since the triage_inbox tool processes all emails in one call, we only
@@ -396,7 +430,9 @@ def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path
     )
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     fig.tight_layout()
-    return _save_chart(fig, output_dir, "04_email_duration_histogram")
+    return _save_chart(
+        fig, output_dir, "04_email_duration_histogram", run_id_suffix=run_id_suffix
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -716,7 +752,7 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
 
 
 def plot_interactive_turns(
-    interactive: dict[str, Any], output_dir: Path
+    interactive: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
 ) -> Path | None:
     """Grouped column chart: per-turn tokens and duration."""
     plt_mod = _require_matplotlib()
@@ -789,6 +825,24 @@ def plot_interactive_turns(
 
     ax1.set_xticks(x)
     ax1.set_xticklabels(turn_labels)
+
+    # Annotate turns where batch tools were used.
+    batch_flags = [
+        any("_batch" in tool for tool in t.get("tools_called", [])) for t in turns
+    ]
+    for i, is_batch in enumerate(batch_flags):
+        if is_batch:
+            ax1.text(
+                i,
+                -0.12,
+                "BATCH",
+                transform=ax1.get_xaxis_transform(),
+                ha="center",
+                fontsize=7,
+                fontweight="bold",
+                color="#38A169",
+            )
+
     ax1.set_title(
         "Interactive Session — Per-Turn Breakdown", fontweight="bold", fontsize=12
     )
@@ -798,7 +852,9 @@ def plot_interactive_turns(
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
     ax1.grid(axis="y", linestyle="--", alpha=0.3)
     fig.tight_layout()
-    return _save_chart(fig, output_dir, "06_interactive_turns")
+    return _save_chart(
+        fig, output_dir, "06_interactive_turns", run_id_suffix=run_id_suffix
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -807,7 +863,7 @@ def plot_interactive_turns(
 
 
 def plot_interactive_heatmap(
-    interactive: dict[str, Any], output_dir: Path
+    interactive: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
 ) -> Path | None:
     """Heatmap: Turn x Step matrix of token consumption."""
     plt_mod = _require_matplotlib()
@@ -864,7 +920,9 @@ def plot_interactive_heatmap(
 
     fig.colorbar(im, ax=ax, label="Total tokens")
     fig.tight_layout()
-    return _save_chart(fig, output_dir, "07_interactive_heatmap")
+    return _save_chart(
+        fig, output_dir, "07_interactive_heatmap", run_id_suffix=run_id_suffix
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -956,7 +1014,9 @@ def plot_token_duration_scatter(run: dict[str, Any], output_dir: Path) -> Path |
 # ---------------------------------------------------------------------------
 
 
-def plot_step_performance(run: dict[str, Any], output_dir: Path) -> Path | None:
+def plot_step_performance(
+    run: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
+) -> Path | None:
     """Dual-axis line chart: per-step TTFT and TPS."""
     plt_mod = _require_matplotlib()
     steps = run.get("step_results", [])
@@ -1005,7 +1065,7 @@ def plot_step_performance(run: dict[str, Any], output_dir: Path) -> Path | None:
     ax1.legend(lines1 + lines2, labels1 + labels2, loc="best")
     ax1.grid(True, linestyle="--", alpha=0.3)
     fig.tight_layout()
-    return _save_chart(fig, output_dir, "10_step_ttft_tps")
+    return _save_chart(fig, output_dir, "10_step_ttft_tps", run_id_suffix=run_id_suffix)
 
 
 # ---------------------------------------------------------------------------
@@ -2528,7 +2588,7 @@ def plot_latency_heuristic_scatter(
 
 
 def plot_interactive_llm_activity(
-    interactive: dict[str, Any], output_dir: Path
+    interactive: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
 ) -> Path | None:
     """Stacked bar: planning vs tool LLM calls per interactive turn."""
     plt_mod = _require_matplotlib()
@@ -2597,7 +2657,9 @@ def plot_interactive_llm_activity(
     ax.legend(fontsize=8, loc="upper right")
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     fig.tight_layout()
-    return _save_chart(fig, output_dir, "27_interactive_llm_activity")
+    return _save_chart(
+        fig, output_dir, "27_interactive_llm_activity", run_id_suffix=run_id_suffix
+    )
 
 
 def plot_model_performance_radar(
@@ -2839,9 +2901,12 @@ def generate_charts(
     if json_path and json_path.exists():
         run = _load_json(json_path)
         mode = _detect_mode(run)
+        single_run_suffix = (
+            _extract_run_suffix(run.get("run_id", "")) if run.get("run_id") else None
+        )
 
         # Chart 1: Category distribution (always)
-        p = plot_category_distribution(run, output_dir)
+        p = plot_category_distribution(run, output_dir, run_id_suffix=single_run_suffix)
         if p:
             paths.append(p)
             charts_index.append(
@@ -2853,7 +2918,7 @@ def generate_charts(
 
         # Chart 2: Token composition (full/interactive only)
         if mode in ("full", "interactive"):
-            p = plot_token_composition(run, output_dir)
+            p = plot_token_composition(run, output_dir, run_id_suffix=single_run_suffix)
             if p:
                 paths.append(p)
                 charts_index.append(
@@ -2864,7 +2929,9 @@ def generate_charts(
                 )
 
             # Chart 3: Duration vs tokens (full/interactive only)
-            p = plot_duration_vs_tokens(run, output_dir)
+            p = plot_duration_vs_tokens(
+                run, output_dir, run_id_suffix=single_run_suffix
+            )
             if p:
                 paths.append(p)
                 charts_index.append(
@@ -2875,7 +2942,9 @@ def generate_charts(
                 )
 
         # Chart 4: Per-email duration histogram (always)
-        p = plot_email_duration_histogram(run, output_dir)
+        p = plot_email_duration_histogram(
+            run, output_dir, run_id_suffix=single_run_suffix
+        )
         if p:
             paths.append(p)
             charts_index.append(
@@ -2898,7 +2967,7 @@ def generate_charts(
 
         # Chart 10: Per-step TTFT & TPS (full mode only)
         if mode in ("full", "interactive"):
-            p = plot_step_performance(run, output_dir)
+            p = plot_step_performance(run, output_dir, run_id_suffix=single_run_suffix)
             if p:
                 paths.append(p)
                 charts_index.append(
@@ -2937,9 +3006,16 @@ def generate_charts(
     # --- Interactive mode charts ---
     if interactive_path and interactive_path.exists():
         interactive = _load_json(interactive_path)
+        interactive_suffix = (
+            _extract_run_suffix(interactive.get("run_id", ""))
+            if interactive.get("run_id")
+            else None
+        )
 
         # Chart 6: Interactive turn breakdown
-        p = plot_interactive_turns(interactive, output_dir)
+        p = plot_interactive_turns(
+            interactive, output_dir, run_id_suffix=interactive_suffix
+        )
         if p:
             paths.append(p)
             charts_index.append(
@@ -2947,7 +3023,9 @@ def generate_charts(
             )
 
         # Chart 7: Interactive token heatmap
-        p = plot_interactive_heatmap(interactive, output_dir)
+        p = plot_interactive_heatmap(
+            interactive, output_dir, run_id_suffix=interactive_suffix
+        )
         if p:
             paths.append(p)
             charts_index.append(
@@ -2958,7 +3036,9 @@ def generate_charts(
             )
 
         # Chart 27: Interactive mode projected LLM activity
-        p = plot_interactive_llm_activity(interactive, output_dir)
+        p = plot_interactive_llm_activity(
+            interactive, output_dir, run_id_suffix=interactive_suffix
+        )
         if p:
             paths.append(p)
             charts_index.append(

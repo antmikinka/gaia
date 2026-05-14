@@ -31,19 +31,18 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
+from gaia.agents.base.tools import _TOOL_REGISTRY  # noqa: E402
 from gaia.agents.email import action_store  # noqa: E402
 from gaia.agents.email.tools.organize_tools import (  # noqa: E402
     _run_batch,
     _run_batch_with_prior,
 )
-from gaia.agents.base.tools import _TOOL_REGISTRY  # noqa: E402
 from gaia.connectors.errors import ConnectorsError  # noqa: E402
 from gaia.database.mixin import DatabaseMixin  # noqa: E402
 from tests.fixtures.email.fake_gmail import (  # noqa: E402
     FakeGmailBackend,
     FakeGmailTransport,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -53,6 +52,7 @@ from tests.fixtures.email.fake_gmail import (  # noqa: E402
 @pytest.fixture
 def db():
     """In-memory DB for pure-helper tests that don't involve the agent."""
+
     class _DB(DatabaseMixin):
         def __init__(self):
             self.init_db(":memory:")
@@ -217,9 +217,7 @@ class TestRunBatchPure:
             post = fake_gmail.get_message(mid)
             assert "UNREAD" not in post["labelIds"]
         # DB rows exist (DB write happened).
-        count = db.query(
-            "SELECT COUNT(*) AS n FROM email_actions", one=True
-        )["n"]
+        count = db.query("SELECT COUNT(*) AS n FROM email_actions", one=True)["n"]
         assert count == 2
 
     def test_exception_isolation(self, fake_gmail, db):
@@ -268,9 +266,7 @@ class TestRunBatchPure:
         assert len(out["succeeded"]) == 2
         assert len(out["failed"]) == 1
 
-    def test_run_batch_with_prior_payload_preserves_prior_labels(
-        self, fake_gmail, db
-    ):
+    def test_run_batch_with_prior_payload_preserves_prior_labels(self, fake_gmail, db):
         msg_ids = list(fake_gmail._messages.keys())[:2]
         _run_batch_with_prior(
             fake_gmail,
@@ -352,9 +348,7 @@ class TestBatchSuccessPaths:
             assert mid in succeeded_ids
 
     @pytest.mark.parametrize("tool_name", _BATCH_TOOLS)
-    def test_db_rows_written_with_batch_id(
-        self, email_agent, fake_gmail, tool_name
-    ):
+    def test_db_rows_written_with_batch_id(self, email_agent, fake_gmail, tool_name):
         """DB rows are written to the agent's DB (not a separate fixture)."""
         msg_ids = list(fake_gmail._messages.keys())[:3]
         fn = _get_tool(tool_name)
@@ -372,10 +366,10 @@ class TestBatchSuccessPaths:
         )
         assert rows["n"] == 3
 
-    @pytest.mark.parametrize("tool_name", ["archive_message_batch", "move_to_label_batch"])
-    def test_prior_labels_in_payload(
-        self, email_agent, fake_gmail, tool_name
-    ):
+    @pytest.mark.parametrize(
+        "tool_name", ["archive_message_batch", "move_to_label_batch"]
+    )
+    def test_prior_labels_in_payload(self, email_agent, fake_gmail, tool_name):
         msg_ids = list(fake_gmail._messages.keys())[:2]
         fn = _get_tool(tool_name)
         if tool_name == "move_to_label_batch":
@@ -384,7 +378,9 @@ class TestBatchSuccessPaths:
         else:
             _parse(fn(message_ids=msg_ids))
 
-        rows = email_agent.query("SELECT payload_json FROM email_actions ORDER BY rowid")
+        rows = email_agent.query(
+            "SELECT payload_json FROM email_actions ORDER BY rowid"
+        )
         for row in rows:
             payload = json.loads(row["payload_json"])
             assert "prior_labels" in payload
@@ -399,9 +395,7 @@ class TestBatchPartialFailure:
     """Mix of valid/invalid IDs for all 7 tools."""
 
     @pytest.mark.parametrize("tool_name", _BATCH_TOOLS)
-    def test_valid_items_succeed_invalid_fail(
-        self, email_agent, fake_gmail, tool_name
-    ):
+    def test_valid_items_succeed_invalid_fail(self, email_agent, fake_gmail, tool_name):
         valid = list(fake_gmail._messages.keys())[:2]
         all_ids = valid + ["nonexistent-id"]
         fn = _get_tool(tool_name)
@@ -502,9 +496,7 @@ class TestBatchAllFailure:
     """All invalid IDs for all 7 tools."""
 
     @pytest.mark.parametrize("tool_name", _BATCH_TOOLS)
-    def test_empty_succeeded_all_failed(
-        self, email_agent, fake_gmail, tool_name
-    ):
+    def test_empty_succeeded_all_failed(self, email_agent, fake_gmail, tool_name):
         fn = _get_tool(tool_name)
         if tool_name in ("label_message_batch", "move_to_label_batch"):
             new_label = fake_gmail.create_label(name=f"af-{tool_name}")
@@ -519,9 +511,7 @@ class TestBatchAllFailure:
         assert len(data["failed"]) == 2
 
     @pytest.mark.parametrize("tool_name", _BATCH_TOOLS)
-    def test_zero_db_rows_on_all_failure(
-        self, email_agent, fake_gmail, tool_name
-    ):
+    def test_zero_db_rows_on_all_failure(self, email_agent, fake_gmail, tool_name):
         fn = _get_tool(tool_name)
         pre_count = email_agent.query(
             "SELECT COUNT(*) AS n FROM email_actions", one=True
@@ -565,9 +555,7 @@ class TestBatchSingleItem:
         assert data["failed"] == []
 
     @pytest.mark.parametrize("tool_name", _BATCH_TOOLS)
-    def test_single_item_mutates_correctly(
-        self, email_agent, fake_gmail, tool_name
-    ):
+    def test_single_item_mutates_correctly(self, email_agent, fake_gmail, tool_name):
         msg_ids = list(fake_gmail._messages.keys())[:1]
         fn = _get_tool(tool_name)
         if tool_name == "mark_read_batch":
@@ -605,9 +593,7 @@ class TestBatchSingleItem:
             assert "INBOX" not in post["labelIds"]
 
     @pytest.mark.parametrize("tool_name", _BATCH_TOOLS)
-    def test_single_item_exactly_one_db_row(
-        self, email_agent, fake_gmail, tool_name
-    ):
+    def test_single_item_exactly_one_db_row(self, email_agent, fake_gmail, tool_name):
         msg_ids = list(fake_gmail._messages.keys())[:1]
         fn = _get_tool(tool_name)
         if tool_name in ("label_message_batch", "move_to_label_batch"):
@@ -647,9 +633,7 @@ class TestBatchThresholdEnforcement:
         fn = _get_tool(tool_name)
         prior_labels = {}
         for mid in msg_ids:
-            prior_labels[mid] = list(
-                fake_gmail.get_message(mid).get("labelIds", [])
-            )
+            prior_labels[mid] = list(fake_gmail.get_message(mid).get("labelIds", []))
 
         if tool_name in ("label_message_batch", "move_to_label_batch"):
             new_label = fake_gmail.create_label(name=f"te-{tool_name}")
@@ -685,10 +669,17 @@ class TestBatchThresholdEnforcement:
 
         # No batch-specific transport calls.
         batch_calls = [
-            c for c in fake_gmail.transport.calls
-            if "batch" in c[0] or c[0] in (
-                "archive_message", "mark_read", "mark_unread",
-                "add_star", "remove_star", "add_label",
+            c
+            for c in fake_gmail.transport.calls
+            if "batch" in c[0]
+            or c[0]
+            in (
+                "archive_message",
+                "mark_read",
+                "mark_unread",
+                "add_star",
+                "remove_star",
+                "add_label",
             )
         ]
         assert len(batch_calls) == 0
@@ -760,6 +751,7 @@ class TestBatchDbFailure:
         # Force DB write to fail after Gmail succeeds by patching
         # action_store.record_action at the module level.
         import gaia.agents.email.action_store as _action_store
+
         original_record = _action_store.record_action
 
         def _boom_record(db, **kwargs):
@@ -845,9 +837,7 @@ class TestBatchUndoCompatibility:
     """Individual batch actions can be undone."""
 
     @pytest.mark.parametrize("tool_name", _BATCH_TOOLS)
-    def test_succeeded_action_id_is_fetchable(
-        self, email_agent, fake_gmail, tool_name
-    ):
+    def test_succeeded_action_id_is_fetchable(self, email_agent, fake_gmail, tool_name):
         msg_ids = list(fake_gmail._messages.keys())[:3]
         fn = _get_tool(tool_name)
         if tool_name in ("label_message_batch", "move_to_label_batch"):

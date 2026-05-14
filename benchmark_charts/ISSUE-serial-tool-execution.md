@@ -51,6 +51,16 @@ The per-step token breakdown reveals the full story:
 
 ---
 
+## Intuition: The Restaurant Order Analogy
+
+**Serial flow (before batch tools):** You have 9 dishes to order, but the waiter can only take **one order at a time**. You say "bring dish #1" → waiter goes to kitchen, returns with dish #1 → you say "bring dish #2" → waiter goes to kitchen, returns → ... repeat 9 times. Each trip is a **full LLM round-trip** — the LLM sends a tool call, waits for the tool to execute and return, gets the result appended to its conversation, then must think again and send the next call.
+
+**Batch flow (after batch tools):** You hand the waiter **one order slip listing all 9 dishes**. The waiter goes to the kitchen **once**, picks up everything, comes back with a single response: `{ok: true, succeeded: [1,2,3,...,9], failed: []}`. The tool internally loops over all 9 message IDs, calls the Gmail API for each one, and returns one structured result. The LLM gets **one response** back and produces a text summary. **9 emails = 1 tool call = 2 LLM steps total.**
+
+The tool does **not** return until all 9 are done — it is synchronous. If email #5 fails, it lands in `failed[]` with the error; the loop continues. Each succeeded item has its own `action_id` for individual undo, but the operation returns one envelope.
+
+---
+
 ## Root Cause: Three-Layer Constraint Stack
 
 This is NOT a benchmark architecture problem. It is a **native property of the email agent + base agent loop** that any interactive session (`gaia email -i`) would experience identically.
