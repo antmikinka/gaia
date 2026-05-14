@@ -211,7 +211,7 @@ def main(argv: Optional[list[str]] = None) -> int:
                         return 1
                     continue
 
-                from gaia.agents.email.bench.output import save_jsonl, print_summary
+                from gaia.agents.email.bench.output import print_summary, save_jsonl
 
                 save_jsonl(result, jsonl_path)
                 print_summary(result)

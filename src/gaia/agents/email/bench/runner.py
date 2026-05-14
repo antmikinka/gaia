@@ -556,6 +556,7 @@ def run_interactive_benchmark(
 # Interactive session — user-driven with state tracking
 # ---------------------------------------------------------------------------
 
+
 def _extract_actions(agent_result: dict, state: SessionState) -> None:
     """Parse tool calls/results to update SessionState."""
     for msg in agent_result.get("conversation", []):
@@ -652,8 +653,17 @@ def _print_session_state(state: SessionState) -> None:
         print(f"  Marked read: {len(state.marked_read)} emails")
     if state.deleted:
         print(f"  Deleted:  {len(state.deleted)} emails")
-    if not any([state.triaged_emails, state.archived, state.starred,
-                state.drafted, state.sent, state.marked_read, state.deleted]):
+    if not any(
+        [
+            state.triaged_emails,
+            state.archived,
+            state.starred,
+            state.drafted,
+            state.sent,
+            state.marked_read,
+            state.deleted,
+        ]
+    ):
         print(f"  (no actions yet)")
     print(f"{'─'*60}")
 

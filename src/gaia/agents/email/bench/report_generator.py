@@ -103,7 +103,9 @@ UNIFIED_CSV_COLUMNS = [
 ]
 
 
-def _compute_run_cost(run: dict[str, Any], cost_per_1m_input: float, cost_per_1m_output: float) -> float:
+def _compute_run_cost(
+    run: dict[str, Any], cost_per_1m_input: float, cost_per_1m_output: float
+) -> float:
     """Compute estimated cost for a single run dict."""
     if cost_per_1m_input == 0.0 and cost_per_1m_output == 0.0:
         return 0.0
@@ -169,44 +171,48 @@ def _generate_report_csv(
         cost = _compute_run_cost(run, cost_per_1m_input, cost_per_1m_output)
         quality = _compute_run_quality(run, ground_truth or {})
         esc = _compute_run_escalation(run)
-        rows.append({
-            "model": run.get("model", "unknown"),
-            "framework": run.get("source_framework", "gaia"),
-            "experiment": i + 1,
-            "duration_s": round(run.get("total_duration_ms", 0) / 1000, 1),
-            "emails": run.get("total_emails", 0),
-            "tokens_in": run.get("total_input_tokens", 0),
-            "tokens_out": run.get("total_output_tokens", 0),
-            "categories": ", ".join(run.get("category_counts", {}).keys()),
-            "heuristic_classified": esc["heuristic_classified"],
-            "llm_escalated": esc["llm_escalated"],
-            "llm_escalation_pct": esc["llm_escalation_pct"],
-            "status": run.get("status", "unknown"),
-            "cost_usd": cost if cost > 0 else "",
-            "quality_score": quality if quality > 0 else "",
-        })
+        rows.append(
+            {
+                "model": run.get("model", "unknown"),
+                "framework": run.get("source_framework", "gaia"),
+                "experiment": i + 1,
+                "duration_s": round(run.get("total_duration_ms", 0) / 1000, 1),
+                "emails": run.get("total_emails", 0),
+                "tokens_in": run.get("total_input_tokens", 0),
+                "tokens_out": run.get("total_output_tokens", 0),
+                "categories": ", ".join(run.get("category_counts", {}).keys()),
+                "heuristic_classified": esc["heuristic_classified"],
+                "llm_escalated": esc["llm_escalated"],
+                "llm_escalation_pct": esc["llm_escalation_pct"],
+                "status": run.get("status", "unknown"),
+                "cost_usd": cost if cost > 0 else "",
+                "quality_score": quality if quality > 0 else "",
+            }
+        )
 
     # ClawFlow run (single).
     if clawflow_run:
         cost = _compute_run_cost(clawflow_run, cost_per_1m_input, cost_per_1m_output)
         quality = _compute_run_quality(clawflow_run, ground_truth or {})
         # ClawFlow doesn't have confident flags — default to 100% LLM.
-        rows.append({
-            "model": clawflow_run.get("model", "unknown"),
-            "framework": "clawflow",
-            "experiment": 1,
-            "duration_s": round(clawflow_run.get("total_duration_ms", 0) / 1000, 1),
-            "emails": clawflow_run.get("total_emails", 0),
-            "tokens_in": clawflow_run.get("total_input_tokens", 0),
-            "tokens_out": clawflow_run.get("total_output_tokens", 0),
-            "categories": ", ".join(clawflow_run.get("category_counts", {}).keys()),
-            "heuristic_classified": 0,
-            "llm_escalated": clawflow_run.get("total_emails", 0),
-            "llm_escalation_pct": 100.0,
-            "status": clawflow_run.get("status", "unknown"),
-            "cost_usd": cost if cost > 0 else "",
-            "quality_score": quality if quality > 0 else "",
-        })
+        rows.append(
+            {
+                "model": clawflow_run.get("model", "unknown"),
+                "framework": "clawflow",
+                "experiment": 1,
+                "duration_s": round(clawflow_run.get("total_duration_ms", 0) / 1000, 1),
+                "emails": clawflow_run.get("total_emails", 0),
+                "tokens_in": clawflow_run.get("total_input_tokens", 0),
+                "tokens_out": clawflow_run.get("total_output_tokens", 0),
+                "categories": ", ".join(clawflow_run.get("category_counts", {}).keys()),
+                "heuristic_classified": 0,
+                "llm_escalated": clawflow_run.get("total_emails", 0),
+                "llm_escalation_pct": 100.0,
+                "status": clawflow_run.get("status", "unknown"),
+                "cost_usd": cost if cost > 0 else "",
+                "quality_score": quality if quality > 0 else "",
+            }
+        )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with open(output_path, "w", encoding="utf-8", newline="") as f:
@@ -225,8 +231,8 @@ def _generate_variance_json(
     from gaia.agents.email.bench.variance import (
         compare_runs,
         compare_runs_by_model,
-        to_dict,
         print_comparison_report,
+        to_dict,
     )
 
     # Filter cold-start runs if requested.
@@ -306,10 +312,10 @@ def _generate_statistical_tests(
 ) -> None:
     """Generate statistical_tests.json with Mann-Whitney U, Cliff's delta, bootstrap CI."""
     from gaia.agents.email.bench.variance import (
+        bootstrap_ci,
+        cliffs_delta,
         compare_runs_by_model,
         mann_whitney_u,
-        cliffs_delta,
-        bootstrap_ci,
     )
 
     by_model = compare_runs_by_model(runs)
@@ -389,6 +395,7 @@ def _generate_charts(
 ) -> None:
     """Generate chart PNGs."""
     import tempfile
+
     from gaia.agents.email.bench.visualize import generate_charts
 
     gaia_list = [last_gaia_json] if last_gaia_json else []
@@ -417,6 +424,7 @@ def _generate_charts(
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
 
 def generate_reports(
     input_dir: Path,
@@ -471,11 +479,15 @@ def generate_reports(
     if cf_paths:
         with open(cf_paths[-1], "r", encoding="utf-8") as f:
             clawflow_run = json.load(f)
-        print(f"Loaded ClawFlow run from {cf_paths[-1].name} ({len(cf_paths)} file(s) found)")
+        print(
+            f"Loaded ClawFlow run from {cf_paths[-1].name} ({len(cf_paths)} file(s) found)"
+        )
 
     # 1. report.csv (with cost/quality columns if provided)
     _generate_report_csv(
-        runs, clawflow_run, output_dir / "report.csv",
+        runs,
+        clawflow_run,
+        output_dir / "report.csv",
         cost_per_1m_input=cost_per_1m_input,
         cost_per_1m_output=cost_per_1m_output,
         ground_truth=gt_data,

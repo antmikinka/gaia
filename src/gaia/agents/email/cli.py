@@ -50,7 +50,9 @@ async def main(args: Any) -> int:
 
     try:
         if getattr(args, "query", None):
-            return await _one_shot(agent, args.query, trace=getattr(args, "trace", False))
+            return await _one_shot(
+                agent, args.query, trace=getattr(args, "trace", False)
+            )
         if getattr(args, "interactive", False):
             return await _interactive(agent, trace=getattr(args, "trace", False))
         # No query and not interactive — print a helpful usage hint.

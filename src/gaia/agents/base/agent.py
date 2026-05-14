@@ -2597,8 +2597,7 @@ Do NOT wrap conversational replies in JSON.
                     "[I tried to call multiple tools at once, but only one "
                     "tool call is allowed per turn.]"
                     if is_parallel
-                    else "[I tried to call a tool but my arguments were "
-                    "malformed.]"
+                    else "[I tried to call a tool but my arguments were " "malformed.]"
                 )
                 user_msg = (
                     "You tried to call multiple tools in one response. "

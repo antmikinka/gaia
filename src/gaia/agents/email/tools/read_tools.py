@@ -358,7 +358,9 @@ class ReadToolsMixin:
                 force_llm_flag = bool(getattr(self.config, "force_llm", False))
                 return _envelope_ok(
                     triage_inbox_impl(
-                        gmail, max_messages=max_messages, debug=debug_flag,
+                        gmail,
+                        max_messages=max_messages,
+                        debug=debug_flag,
                         force_llm=force_llm_flag,
                     )
                 )

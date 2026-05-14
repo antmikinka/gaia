@@ -247,10 +247,16 @@ def main(argv: Optional[list[str]] = None) -> int:
     if args.bench_action == "bench":
         # Validate mutually exclusive data source args.
         if args.mbox_path and args.jsonl_path:
-            print("Error: --mbox-path and --jsonl-path are mutually exclusive.", file=sys.stderr)
+            print(
+                "Error: --mbox-path and --jsonl-path are mutually exclusive.",
+                file=sys.stderr,
+            )
             return 1
         if not args.mbox_path and not args.jsonl_path:
-            print("Error: one of --mbox-path or --jsonl-path is required.", file=sys.stderr)
+            print(
+                "Error: one of --mbox-path or --jsonl-path is required.",
+                file=sys.stderr,
+            )
             return 1
 
         # Check for legacy flags that should delegate to report_generator.

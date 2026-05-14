@@ -394,9 +394,7 @@ def compare_runs(runs: list[dict]) -> ComparisonReport:
         values_ms = [run.get(key, 0) for run in runs]
         values_s = [v / 1_000 for v in values_ms]
         display_key = key.replace("_ms", "_s")
-        variance_summaries.append(
-            compute_variance(values_s, metric_name=display_key)
-        )
+        variance_summaries.append(compute_variance(values_s, metric_name=display_key))
 
     # Non-duration metrics: pass through as-is.
     for metric_key in [

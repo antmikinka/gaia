@@ -29,7 +29,6 @@ from gaia.agents.email.bench.data_shapes import (
     StepResult,
 )
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -83,9 +82,7 @@ def _find_triage_results(conversation: list) -> tuple[list[dict], str]:
             text = json.dumps(content)
         elif isinstance(content, list):
             text = "".join(
-                block.get("text", "")
-                for block in content
-                if isinstance(block, dict)
+                block.get("text", "") for block in content if isinstance(block, dict)
             )
         elif isinstance(content, str):
             text = content
@@ -148,9 +145,7 @@ def _extract_step_stats(
                         total_tokens=stats.get("total_tokens", 0) or 0,
                         duration_ms=int(stats.get("duration", 0) * 1000),
                         time_to_first_token_ms=ttft_ms,
-                        tokens_per_second=float(
-                            stats.get("tokens_per_second", 0) or 0
-                        ),
+                        tokens_per_second=float(stats.get("tokens_per_second", 0) or 0),
                     )
                 )
 
@@ -273,9 +268,7 @@ def extract_from_agent_result(
         categories=sorted(category_counts.keys()),
         status="completed" if email_results else "error",
         error=(
-            "No triage results found in agent conversation"
-            if not email_results
-            else ""
+            "No triage results found in agent conversation" if not email_results else ""
         ),
     )
 
@@ -301,9 +294,7 @@ def extract_from_agent_result(
         category_counts=category_counts,
         status="completed" if email_results else "error",
         error=(
-            "No triage results found in agent conversation"
-            if not email_results
-            else ""
+            "No triage results found in agent conversation" if not email_results else ""
         ),
     )
 

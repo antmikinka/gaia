@@ -14,8 +14,8 @@ organized by the 4-category visualization taxonomy:
 from __future__ import annotations
 
 import json
-import re
 import math
+import re
 from pathlib import Path
 from typing import Any
 
@@ -84,8 +84,8 @@ def _manual_polyfit(x: list[float], y: list[float]) -> list[float]:
     sum_x = sum(x)
     sum_y = sum(y)
     sum_xy = sum(xi * yi for xi, yi in zip(x, y))
-    sum_x2 = sum(xi ** 2 for xi in x)
-    denom = n * sum_x2 - sum_x ** 2
+    sum_x2 = sum(xi**2 for xi in x)
+    denom = n * sum_x2 - sum_x**2
     if denom == 0:
         return [0.0, sum_y / n if n else 0.0]
     slope = (n * sum_xy - sum_x * sum_y) / denom
@@ -372,17 +372,27 @@ def plot_email_duration_histogram(run: dict[str, Any], output_dir: Path) -> Path
 
     fig, ax = plt_mod.subplots(figsize=(5, 3))
     ax.bar(
-        ["Per Email"], [avg_per_email],
-        color=COLORS["duration"], alpha=0.85, edgecolor="white", linewidth=1.5,
+        ["Per Email"],
+        [avg_per_email],
+        color=COLORS["duration"],
+        alpha=0.85,
+        edgecolor="white",
+        linewidth=1.5,
     )
     ax.text(
-        0, avg_per_email * 1.05, f"{avg_per_email:.2f}s",
-        ha="center", va="bottom", fontsize=11, fontweight="bold",
+        0,
+        avg_per_email * 1.05,
+        f"{avg_per_email:.2f}s",
+        ha="center",
+        va="bottom",
+        fontsize=11,
+        fontweight="bold",
     )
     ax.set_ylabel("Avg Duration per Email (seconds)")
     ax.set_title(
         f"Per-Email Duration ({emails} emails, {dur:.1f}s total)",
-        fontweight="bold", fontsize=11,
+        fontweight="bold",
+        fontsize=11,
     )
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     fig.tight_layout()
@@ -441,10 +451,16 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         )
     ax.set_xlabel("Run iteration")
     ax.set_ylabel("Duration (seconds)")
-    ax.set_title("Agent Latency Consistency (heuristic-dominated)", fontweight="bold", fontsize=12)
+    ax.set_title(
+        "Agent Latency Consistency (heuristic-dominated)",
+        fontweight="bold",
+        fontsize=12,
+    )
     ax.set_xticks(x)
     ax.grid(True, linestyle="--", alpha=0.3)
-    _add_consistency_box(ax, dur_stats, unit="s", label="Agent Overhead (heuristic path)", n_runs=n)
+    _add_consistency_box(
+        ax, dur_stats, unit="s", label="Agent Overhead (heuristic path)", n_runs=n
+    )
     fig.tight_layout(rect=[0, 0.06, 1, 1])
     _add_subtitle(
         fig,
@@ -506,13 +522,19 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         ax.set_xlabel("Run iteration")
         ax.set_ylabel("Total tokens")
         ax.set_title(
-            "Agent Token Variance (planning + rare LLM escalations)", fontweight="bold", fontsize=12
+            "Agent Token Variance (planning + rare LLM escalations)",
+            fontweight="bold",
+            fontsize=12,
         )
         ax.set_xticks(x)
         ax.legend(fontsize=9)
         ax.grid(True, linestyle="--", alpha=0.3)
         _add_consistency_box(
-            ax, tok_stats, unit="tokens", label="Agent+Heuristic Token Variance", n_runs=n
+            ax,
+            tok_stats,
+            unit="tokens",
+            label="Agent+Heuristic Token Variance",
+            n_runs=n,
         )
         fig.tight_layout(rect=[0, 0.06, 1, 1])
         _add_subtitle(
@@ -578,7 +600,11 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         ax1.grid(True, linestyle="--", alpha=0.3)
         # Dual consistency boxes
         _add_consistency_box(
-            ax1, avg_dur_stats, unit="s", label="Duration/Email (heuristic path)", n_runs=n
+            ax1,
+            avg_dur_stats,
+            unit="s",
+            label="Duration/Email (heuristic path)",
+            n_runs=n,
         )
         _add_consistency_box(
             ax1,
@@ -623,10 +649,14 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
             )
         ax.set_xlabel("Run iteration")
         ax.set_ylabel("Avg TTFT (seconds)")
-        ax.set_title("Agent TTFT Consistency (heuristic path)", fontweight="bold", fontsize=12)
+        ax.set_title(
+            "Agent TTFT Consistency (heuristic path)", fontweight="bold", fontsize=12
+        )
         ax.set_xticks(x)
         ax.grid(True, linestyle="--", alpha=0.3)
-        _add_consistency_box(ax, ttft_stats, unit="s", label="Agent TTFT (heuristic path)", n_runs=n)
+        _add_consistency_box(
+            ax, ttft_stats, unit="s", label="Agent TTFT (heuristic path)", n_runs=n
+        )
         fig.tight_layout(rect=[0, 0.06, 1, 1])
         _add_subtitle(
             fig,
@@ -672,7 +702,8 @@ def plot_variance_trend(runs: list[dict[str, Any]], output_dir: Path) -> list[Pa
         )
         fig.tight_layout(rect=[0, 0.06, 1, 1])
         _add_subtitle(
-            fig, "Inference throughput — heuristic path dominates; TPS = planning/summary LLM calls"
+            fig,
+            "Inference throughput — heuristic path dominates; TPS = planning/summary LLM calls",
         )
         paths.append(_save_chart(fig, output_dir, "05e_tps_trend"))
 
@@ -1024,8 +1055,15 @@ def plot_model_duration_comparison(
 
     # Error bars: ±1σ
     ax.errorbar(
-        x, means, yerr=stds, fmt="none", color="black",
-        capsize=8, capthick=1.5, elinewidth=2, alpha=0.8,
+        x,
+        means,
+        yerr=stds,
+        fmt="none",
+        color="black",
+        capsize=8,
+        capthick=1.5,
+        elinewidth=2,
+        alpha=0.8,
     )
 
     # Value labels on bars.
@@ -1034,17 +1072,28 @@ def plot_model_duration_comparison(
             bar.get_x() + bar.get_width() / 2,
             mean + std + 0.5,
             f"{mean:.1f}s",
-            ha="center", va="bottom", fontsize=9, fontweight="bold",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            fontweight="bold",
         )
 
     # σ annotation box.
     sigma_text = "σ (s):\n" + "\n".join(
         f"  {m[:20]:20s}: {s:.2f}" for m, s in zip(models, stds)
     )
-    props = dict(boxstyle="round,pad=0.4", facecolor="#F7FAFC", edgecolor="#CBD5E0", alpha=0.9)
+    props = dict(
+        boxstyle="round,pad=0.4", facecolor="#F7FAFC", edgecolor="#CBD5E0", alpha=0.9
+    )
     ax.text(
-        0.02, 0.95, sigma_text, transform=ax.transAxes, fontsize=7,
-        verticalalignment="top", fontfamily="monospace", bbox=props,
+        0.02,
+        0.95,
+        sigma_text,
+        transform=ax.transAxes,
+        fontsize=7,
+        verticalalignment="top",
+        fontfamily="monospace",
+        bbox=props,
     )
 
     ax.set_xticks(x)
@@ -1052,7 +1101,8 @@ def plot_model_duration_comparison(
     ax.set_ylabel("Mean Duration (seconds)")
     ax.set_title(
         "Model Duration Comparison (±1σ Error Bars)",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     fig.tight_layout()
@@ -1081,7 +1131,13 @@ def plot_model_token_cost(runs: list[dict[str, Any]], output_dir: Path) -> Path 
     for r in runs:
         model = r.get("model", "unknown")
         if model not in model_tokens:
-            model_tokens[model] = {"total": [], "input": [], "output": [], "reasoning": [], "n": 0}
+            model_tokens[model] = {
+                "total": [],
+                "input": [],
+                "output": [],
+                "reasoning": [],
+                "n": 0,
+            }
         model_tokens[model]["total"].append(r.get("total_tokens", 0))
         model_tokens[model]["input"].append(r.get("total_input_tokens", 0))
         model_tokens[model]["output"].append(r.get("total_output_tokens", 0))
@@ -1105,26 +1161,67 @@ def plot_model_token_cost(runs: list[dict[str, Any]], output_dir: Path) -> Path 
     # Stacked bars: input / output / reasoning.
     in_avg = [sum(model_tokens[m]["input"]) / model_tokens[m]["n"] for m in models]
     out_avg = [sum(model_tokens[m]["output"]) / model_tokens[m]["n"] for m in models]
-    reason_avg = [sum(model_tokens[m]["reasoning"]) / model_tokens[m]["n"] for m in models]
+    reason_avg = [
+        sum(model_tokens[m]["reasoning"]) / model_tokens[m]["n"] for m in models
+    ]
     has_reasoning = any(v > 0 for v in reason_avg)
 
-    ax.bar(x, in_avg, label="Input tokens", color=COLORS["input"], alpha=0.85, edgecolor="white", linewidth=1)
-    ax.bar(x, out_avg, bottom=in_avg, label="Output tokens", color=COLORS["output"], alpha=0.85, edgecolor="white", linewidth=1)
+    ax.bar(
+        x,
+        in_avg,
+        label="Input tokens",
+        color=COLORS["input"],
+        alpha=0.85,
+        edgecolor="white",
+        linewidth=1,
+    )
+    ax.bar(
+        x,
+        out_avg,
+        bottom=in_avg,
+        label="Output tokens",
+        color=COLORS["output"],
+        alpha=0.85,
+        edgecolor="white",
+        linewidth=1,
+    )
     if has_reasoning:
         inout = [i + o for i, o in zip(in_avg, out_avg)]
-        ax.bar(x, reason_avg, bottom=inout, label="Reasoning tokens", color=COLORS["reasoning"], alpha=0.85, edgecolor="white", linewidth=1)
+        ax.bar(
+            x,
+            reason_avg,
+            bottom=inout,
+            label="Reasoning tokens",
+            color=COLORS["reasoning"],
+            alpha=0.85,
+            edgecolor="white",
+            linewidth=1,
+        )
 
     # Error bars on total.
     ax.errorbar(
-        x, total_avg, yerr=total_stds, fmt="none", color="black",
-        capsize=8, capthick=1.5, elinewidth=2, alpha=0.8, zorder=10,
+        x,
+        total_avg,
+        yerr=total_stds,
+        fmt="none",
+        color="black",
+        capsize=8,
+        capthick=1.5,
+        elinewidth=2,
+        alpha=0.8,
+        zorder=10,
     )
 
     # Value labels.
     for i, (mean, std) in enumerate(zip(total_avg, total_stds)):
         ax.text(
-            i, mean + std + max(total_avg) * 0.02,
-            f"{mean:,.0f}", ha="center", va="bottom", fontsize=9, fontweight="bold",
+            i,
+            mean + std + max(total_avg) * 0.02,
+            f"{mean:,.0f}",
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            fontweight="bold",
         )
 
     ax.set_xticks(x)
@@ -1132,7 +1229,8 @@ def plot_model_token_cost(runs: list[dict[str, Any]], output_dir: Path) -> Path 
     ax.set_ylabel("Mean Tokens per Run")
     ax.set_title(
         "Model Token Cost (±1σ Error Bars)",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
     ax.legend(fontsize=9, loc="upper right")
     ax.grid(axis="y", linestyle="--", alpha=0.3)
@@ -1529,7 +1627,9 @@ def plot_cold_start_impact(runs: list[dict[str, Any]], output_dir: Path) -> Path
 
     ax.set_xlabel("Duration (seconds)")
     ax.set_ylabel("Total tokens")
-    ax.set_title("Cold-Start Impact: Model Loading Overhead", fontweight="bold", fontsize=12)
+    ax.set_title(
+        "Cold-Start Impact: Model Loading Overhead", fontweight="bold", fontsize=12
+    )
     ax.legend(fontsize=9)
     ax.grid(True, linestyle="--", alpha=0.3)
     fig.tight_layout()
@@ -1626,9 +1726,7 @@ def plot_model_architecture_duration(
     ax.set_xticks(x)
     ax.set_xticklabels([m[:25] for m in models], rotation=30, ha="right")
     ax.set_ylabel("Duration (seconds)")
-    ax.set_title(
-        "Duration by Model & Architecture", fontweight="bold", fontsize=12
-    )
+    ax.set_title("Duration by Model & Architecture", fontweight="bold", fontsize=12)
     ax.legend(fontsize=9)
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     fig.tight_layout()
@@ -1742,9 +1840,7 @@ def plot_model_architecture_tokens(
     ax.set_xticks(x)
     ax.set_xticklabels([m[:25] for m in models], rotation=30, ha="right")
     ax.set_ylabel("Avg tokens per run")
-    ax.set_title(
-        "Token Cost by Model & Architecture", fontweight="bold", fontsize=12
-    )
+    ax.set_title("Token Cost by Model & Architecture", fontweight="bold", fontsize=12)
     ax.legend(fontsize=7, loc="upper right")
     ax.grid(axis="y", linestyle="--", alpha=0.3)
     fig.tight_layout()
@@ -1785,7 +1881,9 @@ def plot_architecture_dashboard(
         result = {}
         for r in runs:
             m = r.get("model", "unknown")
-            result.setdefault(m, {"dur": [], "ttft": [], "tps": [], "in": [], "out": []})
+            result.setdefault(
+                m, {"dur": [], "ttft": [], "tps": [], "in": [], "out": []}
+            )
             result[m]["dur"].append(r.get("total_duration_ms", 0) / 1_000)
             result[m]["ttft"].append(r.get("avg_time_to_first_token_ms", 0) / 1_000)
             result[m]["tps"].append(r.get("avg_tokens_per_second", 0))
@@ -1982,20 +2080,32 @@ def plot_run_scatter(runs: list[dict[str, Any]], output_dir: Path) -> Path | Non
         dy = [p[1] for p in points]
         color = COLORS.get(model.lower().split("/")[0], f"C{i}")
         ax.scatter(
-            dx, dy,
-            c=color, alpha=0.85, s=100, edgecolors="white",
+            dx,
+            dy,
+            c=color,
+            alpha=0.85,
+            s=100,
+            edgecolors="white",
             label=model[:25],
         )
         # Label each point with its iteration number.
         for j, (x, y) in enumerate(zip(dx, dy), 1):
             ax.annotate(
-                f"{j}", (x, y), textcoords="offset points",
-                xytext=(5, 5), fontsize=7, alpha=0.7,
+                f"{j}",
+                (x, y),
+                textcoords="offset points",
+                xytext=(5, 5),
+                fontsize=7,
+                alpha=0.7,
             )
 
     ax.set_xlabel("Duration (seconds)")
     ax.set_ylabel("Total tokens")
-    ax.set_title("Run-Level Scatter (Tokens vs Duration, by Model)", fontweight="bold", fontsize=12)
+    ax.set_title(
+        "Run-Level Scatter (Tokens vs Duration, by Model)",
+        fontweight="bold",
+        fontsize=12,
+    )
     ax.legend(fontsize=8)
     ax.grid(True, linestyle="--", alpha=0.3)
     fig.tight_layout()
@@ -2046,12 +2156,21 @@ def plot_heuristic_vs_llm_escalation(
     y = range(len(labels))
 
     bars_heuristic = ax.barh(
-        y, heuristic_pcts, height=0.5,
-        color="#38A169", edgecolor="white", label="Heuristic (confident)",
+        y,
+        heuristic_pcts,
+        height=0.5,
+        color="#38A169",
+        edgecolor="white",
+        label="Heuristic (confident)",
     )
     bars_llm = ax.barh(
-        y, llm_pcts, height=0.5, left=heuristic_pcts,
-        color="#ED6C02", edgecolor="white", label="LLM-escalated",
+        y,
+        llm_pcts,
+        height=0.5,
+        left=heuristic_pcts,
+        color="#ED6C02",
+        edgecolor="white",
+        label="LLM-escalated",
     )
 
     # Percentage labels on bars
@@ -2061,7 +2180,10 @@ def plot_heuristic_vs_llm_escalation(
                 bar.get_x() + bar.get_width() / 2,
                 bar.get_y() + bar.get_height() / 2,
                 f"{pct:.0f}%",
-                ha="center", va="center", fontsize=8, fontweight="bold",
+                ha="center",
+                va="center",
+                fontsize=8,
+                fontweight="bold",
                 color="white",
             )
     for bar_start, pct in zip(bars_llm, llm_pcts):
@@ -2070,14 +2192,21 @@ def plot_heuristic_vs_llm_escalation(
                 bar_start.get_x() + bar_start.get_width() / 2,
                 bar_start.get_y() + bar_start.get_height() / 2,
                 f"{pct:.0f}%",
-                ha="center", va="center", fontsize=8, fontweight="bold",
+                ha="center",
+                va="center",
+                fontsize=8,
+                fontweight="bold",
                 color="white",
             )
 
     # Mean escalation reference line
     mean_llm = sum(llm_pcts) / len(llm_pcts) if llm_pcts else 0
     ax.axvline(
-        mean_llm, color="#E53E3E", linestyle="--", alpha=0.6, linewidth=1.5,
+        mean_llm,
+        color="#E53E3E",
+        linestyle="--",
+        alpha=0.6,
+        linewidth=1.5,
         label=f"Mean LLM escalation: {mean_llm:.1f}%",
     )
 
@@ -2086,7 +2215,8 @@ def plot_heuristic_vs_llm_escalation(
     ax.set_xlabel("Percentage of emails (%)")
     ax.set_title(
         "Heuristic vs LLM Escalation % per Experiment",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
     ax.legend(fontsize=8, loc="lower right")
     ax.set_xlim(0, 105)
@@ -2146,7 +2276,8 @@ def plot_planning_steps_heatmap(
     ax.set_ylabel("Email Limit")
     ax.set_title(
         "Estimated LLM Planning Steps by Model & Email Limit",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
 
     max_val = max(v for row in matrix for v in row) if matrix else 1
@@ -2156,18 +2287,29 @@ def plot_planning_steps_heatmap(
             steps = step_matrix[i][j]
             if val > 0:
                 ax.text(
-                    j, i, f"{steps}",
-                    ha="center", va="center", fontsize=9, fontweight="bold",
+                    j,
+                    i,
+                    f"{steps}",
+                    ha="center",
+                    va="center",
+                    fontsize=9,
+                    fontweight="bold",
                     color="white" if val > max_val * 0.6 else "black",
                 )
 
     # Color key annotation.
-    props = dict(boxstyle="round,pad=0.4", facecolor="#F7FAFC", edgecolor="#CBD5E0", alpha=0.9)
+    props = dict(
+        boxstyle="round,pad=0.4", facecolor="#F7FAFC", edgecolor="#CBD5E0", alpha=0.9
+    )
     ax.text(
-        0.02, 0.02,
+        0.02,
+        0.02,
         "Blue = Low (\u22642)  Yellow = Med (3-5)  Red = High (\u22656)",
-        transform=ax.transAxes, fontsize=7, va="bottom",
-        fontfamily="monospace", bbox=props,
+        transform=ax.transAxes,
+        fontsize=7,
+        va="bottom",
+        fontfamily="monospace",
+        bbox=props,
     )
 
     fig.colorbar(im, ax=ax, label="Est. Planning Steps (total_tokens / 2800)")
@@ -2175,9 +2317,7 @@ def plot_planning_steps_heatmap(
     return _save_chart(fig, output_dir, "24_planning_steps_heatmap")
 
 
-def plot_token_efficiency(
-    runs: list[dict[str, Any]], output_dir: Path
-) -> Path | None:
+def plot_token_efficiency(runs: list[dict[str, Any]], output_dir: Path) -> Path | None:
     """Grouped bar chart: tokens per email by model with heuristic % overlay."""
     import statistics as stats
 
@@ -2196,9 +2336,9 @@ def plot_token_efficiency(
         confident, total_emails = _count_confident(r)
         heuristic_pct = (confident / total_emails * 100) if total_emails > 0 else 0
 
-        model_data.setdefault(model, {
-            "in": [], "out": [], "total": [], "heuristic_pct": []
-        })
+        model_data.setdefault(
+            model, {"in": [], "out": [], "total": [], "heuristic_pct": []}
+        )
         model_data[model]["in"].append(in_tok)
         model_data[model]["out"].append(out_tok)
         model_data[model]["total"].append(total_tok)
@@ -2211,41 +2351,83 @@ def plot_token_efficiency(
     n = len(models)
     in_avg = [sum(model_data[m]["in"]) / len(model_data[m]["in"]) for m in models]
     out_avg = [sum(model_data[m]["out"]) / len(model_data[m]["out"]) for m in models]
-    total_avg = [sum(model_data[m]["total"]) / len(model_data[m]["total"]) for m in models]
-    in_stds = [stats.stdev(model_data[m]["in"]) if len(model_data[m]["in"]) >= 2 else 0 for m in models]
-    out_stds = [stats.stdev(model_data[m]["out"]) if len(model_data[m]["out"]) >= 2 else 0 for m in models]
-    total_stds = [stats.stdev(model_data[m]["total"]) if len(model_data[m]["total"]) >= 2 else 0 for m in models]
-    heuristic_avg = [sum(model_data[m]["heuristic_pct"]) / len(model_data[m]["heuristic_pct"]) for m in models]
+    total_avg = [
+        sum(model_data[m]["total"]) / len(model_data[m]["total"]) for m in models
+    ]
+    in_stds = [
+        stats.stdev(model_data[m]["in"]) if len(model_data[m]["in"]) >= 2 else 0
+        for m in models
+    ]
+    out_stds = [
+        stats.stdev(model_data[m]["out"]) if len(model_data[m]["out"]) >= 2 else 0
+        for m in models
+    ]
+    total_stds = [
+        stats.stdev(model_data[m]["total"]) if len(model_data[m]["total"]) >= 2 else 0
+        for m in models
+    ]
+    heuristic_avg = [
+        sum(model_data[m]["heuristic_pct"]) / len(model_data[m]["heuristic_pct"])
+        for m in models
+    ]
 
     fig, ax = plt_mod.subplots(figsize=(max(8, n * 3), 5))
     x = list(range(n))
     width = 0.25
 
     bars_in = ax.bar(
-        [i - width for i in x], in_avg, width,
-        label="Input tokens/email", color="#3182CE", alpha=0.85,
-        yerr=in_stds, capsize=4, edgecolor="white",
+        [i - width for i in x],
+        in_avg,
+        width,
+        label="Input tokens/email",
+        color="#3182CE",
+        alpha=0.85,
+        yerr=in_stds,
+        capsize=4,
+        edgecolor="white",
     )
     bars_out = ax.bar(
-        x, out_avg, width,
-        label="Output tokens/email", color="#DD6B20", alpha=0.85,
-        yerr=out_stds, capsize=4, edgecolor="white",
+        x,
+        out_avg,
+        width,
+        label="Output tokens/email",
+        color="#DD6B20",
+        alpha=0.85,
+        yerr=out_stds,
+        capsize=4,
+        edgecolor="white",
     )
     bars_total = ax.bar(
-        [i + width for i in x], total_avg, width,
-        label="Total tokens/email", color="#ED6C02", alpha=0.85,
-        yerr=total_stds, capsize=4, edgecolor="white",
+        [i + width for i in x],
+        total_avg,
+        width,
+        label="Total tokens/email",
+        color="#ED6C02",
+        alpha=0.85,
+        yerr=total_stds,
+        capsize=4,
+        edgecolor="white",
     )
 
     # Heuristic % overlay.
     max_height = max(
-        max(in_avg[i] + in_stds[i], out_avg[i] + out_stds[i], total_avg[i] + total_stds[i])
+        max(
+            in_avg[i] + in_stds[i],
+            out_avg[i] + out_stds[i],
+            total_avg[i] + total_stds[i],
+        )
         for i in range(n)
     )
     for i, h_pct in enumerate(heuristic_avg):
         ax.text(
-            i, max_height * 1.05, f"H: {h_pct:.0f}%",
-            ha="center", va="bottom", fontsize=8, fontweight="bold", color="#718096",
+            i,
+            max_height * 1.05,
+            f"H: {h_pct:.0f}%",
+            ha="center",
+            va="bottom",
+            fontsize=8,
+            fontweight="bold",
+            color="#718096",
         )
 
     ax.set_xticks(x)
@@ -2253,7 +2435,8 @@ def plot_token_efficiency(
     ax.set_ylabel("Tokens per Email")
     ax.set_title(
         "Tokens per Email by Model (Input / Output / Total)",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
     ax.legend(fontsize=8, loc="upper right")
     ax.grid(axis="y", linestyle="--", alpha=0.3)
@@ -2292,8 +2475,14 @@ def plot_latency_heuristic_scatter(
         sizes = [max(p[2] * 10, 30) for p in points]
         color = COLORS.get(model.lower().split("/")[0], f"C{i}")
         ax.scatter(
-            dx, dy, c=color, alpha=0.85, s=sizes,
-            edgecolors="white", linewidth=0.5, label=model[:25],
+            dx,
+            dy,
+            c=color,
+            alpha=0.85,
+            s=sizes,
+            edgecolors="white",
+            linewidth=0.5,
+            label=model[:25],
         )
 
     # Trend line.
@@ -2315,8 +2504,13 @@ def plot_latency_heuristic_scatter(
         r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
         props = dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8)
         ax.text(
-            0.05, 0.95, f"R\u00b2 = {r_squared:.3f}",
-            transform=ax.transAxes, fontsize=9, fontweight="bold", va="top",
+            0.05,
+            0.95,
+            f"R\u00b2 = {r_squared:.3f}",
+            transform=ax.transAxes,
+            fontsize=9,
+            fontweight="bold",
+            va="top",
             bbox=props,
         )
 
@@ -2324,7 +2518,8 @@ def plot_latency_heuristic_scatter(
     ax.set_ylabel("Heuristic Confidence Rate (%)")
     ax.set_title(
         "Duration vs Heuristic % (confident=true)",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
     ax.legend(fontsize=8, bbox_to_anchor=(1.02, 1), loc="upper left")
     ax.grid(True, linestyle="--", alpha=0.3)
@@ -2361,19 +2556,33 @@ def plot_interactive_llm_activity(
     width = 0.5
 
     bars_plan = ax.bar(
-        x, planning_counts, width,
-        label="Planning calls", color="#3182CE", alpha=0.85,
+        x,
+        planning_counts,
+        width,
+        label="Planning calls",
+        color="#3182CE",
+        alpha=0.85,
     )
     bars_tool = ax.bar(
-        x, tool_counts, width, bottom=planning_counts,
-        label="Tool calls", color="#DD6B20", alpha=0.85,
+        x,
+        tool_counts,
+        width,
+        bottom=planning_counts,
+        label="Tool calls",
+        color="#DD6B20",
+        alpha=0.85,
     )
 
     # Annotations.
     for i, (p, t) in enumerate(zip(planning_counts, tool_counts)):
         ax.text(
-            i, p + t + 0.1, str(p + t),
-            ha="center", va="bottom", fontsize=9, fontweight="bold",
+            i,
+            p + t + 0.1,
+            str(p + t),
+            ha="center",
+            va="bottom",
+            fontsize=9,
+            fontweight="bold",
         )
 
     ax.set_xticks(x)
@@ -2382,7 +2591,8 @@ def plot_interactive_llm_activity(
     ax.set_xlabel("Conversation Turn")
     ax.set_title(
         "Projected LLM Calls per Turn (Interactive Session)",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
     ax.legend(fontsize=8, loc="upper right")
     ax.grid(axis="y", linestyle="--", alpha=0.3)
@@ -2409,10 +2619,16 @@ def plot_model_performance_radar(
         heuristic_pct = (confident / total_emails * 100) if total_emails > 0 else 0
         escalation_pct = 100 - heuristic_pct
 
-        model_data.setdefault(model, {
-            "durations": [], "tokens": [], "steps": [],
-            "heuristic_pcts": [], "escalation_pcts": [],
-        })
+        model_data.setdefault(
+            model,
+            {
+                "durations": [],
+                "tokens": [],
+                "steps": [],
+                "heuristic_pcts": [],
+                "escalation_pcts": [],
+            },
+        )
         model_data[model]["durations"].append(duration)
         model_data[model]["tokens"].append(tokens)
         model_data[model]["steps"].append(steps)
@@ -2440,13 +2656,20 @@ def plot_model_performance_radar(
         if len(vals) >= 2:
             m_val = sum(vals) / len(vals)
             variance = sum((v - m_val) ** 2 for v in vals) / (len(vals) - 1)
-            stdev = variance ** 0.5
+            stdev = variance**0.5
             means[m]["cv_pct"] = (stdev / m_val * 100) if m_val > 0 else 0
         else:
             means[m]["cv_pct"] = 0
 
     # Normalize 0-100 per axis.
-    axes_names = ["duration", "tokens", "steps", "heuristic_pct", "cv_pct", "escalation_pct"]
+    axes_names = [
+        "duration",
+        "tokens",
+        "steps",
+        "heuristic_pct",
+        "cv_pct",
+        "escalation_pct",
+    ]
     lower_is_better = {"duration", "tokens", "steps", "cv_pct", "escalation_pct"}
 
     axis_ranges = {}
@@ -2478,15 +2701,21 @@ def plot_model_performance_radar(
         ax.fill(angles, vals, alpha=0.15, color=color)
 
     short_labels = [
-        "Duration\n(lower=better)", "Tokens\n(lower=better)", "Steps\n(lower=better)",
-        "Heuristic %\n(higher=better)", "CV%\n(lower=better)", "Escalation %\n(lower=better)",
+        "Duration\n(lower=better)",
+        "Tokens\n(lower=better)",
+        "Steps\n(lower=better)",
+        "Heuristic %\n(higher=better)",
+        "CV%\n(lower=better)",
+        "Escalation %\n(lower=better)",
     ]
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(short_labels, fontsize=8)
     ax.set_ylim(0, 100)
     ax.set_title(
         "Model Performance Radar (Normalized 0-100)",
-        fontweight="bold", fontsize=12, pad=20,
+        fontweight="bold",
+        fontsize=12,
+        pad=20,
     )
     ax.legend(loc="upper right", fontsize=7, framealpha=0.9)
     fig.tight_layout()
@@ -2542,7 +2771,8 @@ def plot_steps_scaling_heatmap(
     ax.set_ylabel("Email Limit")
     ax.set_title(
         "Total LLM Calls Scaling (Planning + Summary + Tools)",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
 
     max_val = max(v for row in matrix for v in row) if matrix else 1
@@ -2551,8 +2781,13 @@ def plot_steps_scaling_heatmap(
             val = matrix[i][j]
             if val > 0:
                 ax.text(
-                    j, i, f"{val:.1f}",
-                    ha="center", va="center", fontsize=8, fontweight="bold",
+                    j,
+                    i,
+                    f"{val:.1f}",
+                    ha="center",
+                    va="center",
+                    fontsize=8,
+                    fontweight="bold",
                     color="white" if val > max_val * 0.6 else "black",
                 )
                 ax.plot(j, i, "wo", markersize=4, alpha=0.4)
@@ -2560,11 +2795,15 @@ def plot_steps_scaling_heatmap(
     # Formula annotation.
     props = dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8)
     ax.text(
-        0.02, 0.02,
+        0.02,
+        0.02,
         "Formula: est_calls = (total_tokens / 2800) + 2\n"
         "+2 accounts for summary and final classification steps",
-        transform=ax.transAxes, fontsize=7, va="bottom",
-        fontfamily="monospace", bbox=props,
+        transform=ax.transAxes,
+        fontsize=7,
+        va="bottom",
+        fontfamily="monospace",
+        bbox=props,
     )
 
     fig.colorbar(im, ax=ax, label="Est. Total LLM Calls")

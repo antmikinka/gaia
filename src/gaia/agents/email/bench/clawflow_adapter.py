@@ -170,7 +170,8 @@ def run_clawflow(
         cmd_parts = [
             sys.executable,  # Same Python that has 'gaia' installed
             probe["path"],
-            "--workflow", workflow,
+            "--workflow",
+            workflow,
             "--json",
         ]
         if quiet:
