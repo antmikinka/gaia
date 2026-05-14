@@ -513,6 +513,65 @@ class FakeGmailBackend:
         self._transport.record("remove_label", message_id=message_id, label_id=label_id)
         return self._modify(message_id, remove=[label_id])
 
+    # -- Batch mutate -------------------------------------------------------
+
+    def mark_read_batch(self, message_ids: Iterable[str]) -> Dict[str, Any]:
+        self._transport.record("mark_read_batch", message_ids=list(message_ids))
+        results: list[Dict[str, Any]] = []
+        for mid in message_ids:
+            results.append(self.mark_read(mid))
+        return {"results": results}
+
+    def mark_unread_batch(self, message_ids: Iterable[str]) -> Dict[str, Any]:
+        self._transport.record("mark_unread_batch", message_ids=list(message_ids))
+        results: list[Dict[str, Any]] = []
+        for mid in message_ids:
+            results.append(self.mark_unread(mid))
+        return {"results": results}
+
+    def add_star_batch(self, message_ids: Iterable[str]) -> Dict[str, Any]:
+        self._transport.record("add_star_batch", message_ids=list(message_ids))
+        results: list[Dict[str, Any]] = []
+        for mid in message_ids:
+            results.append(self.add_star(mid))
+        return {"results": results}
+
+    def remove_star_batch(self, message_ids: Iterable[str]) -> Dict[str, Any]:
+        self._transport.record("remove_star_batch", message_ids=list(message_ids))
+        results: list[Dict[str, Any]] = []
+        for mid in message_ids:
+            results.append(self.remove_star(mid))
+        return {"results": results}
+
+    def archive_message_batch(self, message_ids: Iterable[str]) -> Dict[str, Any]:
+        self._transport.record("archive_message_batch", message_ids=list(message_ids))
+        results: list[Dict[str, Any]] = []
+        for mid in message_ids:
+            results.append(self.archive_message(mid))
+        return {"results": results}
+
+    def add_label_batch(
+        self, message_ids: Iterable[str], label_id: str
+    ) -> Dict[str, Any]:
+        self._transport.record(
+            "add_label_batch", message_ids=list(message_ids), label_id=label_id
+        )
+        results: list[Dict[str, Any]] = []
+        for mid in message_ids:
+            results.append(self.add_label(mid, label_id))
+        return {"results": results}
+
+    def remove_label_batch(
+        self, message_ids: Iterable[str], label_id: str
+    ) -> Dict[str, Any]:
+        self._transport.record(
+            "remove_label_batch", message_ids=list(message_ids), label_id=label_id
+        )
+        results: list[Dict[str, Any]] = []
+        for mid in message_ids:
+            results.append(self.remove_label(mid, label_id))
+        return {"results": results}
+
     def trash_message(self, message_id: str) -> Dict[str, Any]:
         self._transport.record("trash_message", message_id=message_id)
         # Live Gmail strips the message from INBOX and adds TRASH.

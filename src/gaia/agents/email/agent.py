@@ -93,6 +93,10 @@ ACTIONS:
   remove_star, label_message, move_to_label) — reversible via the undo
   log; do not require per-action confirmation, but bulk operations
   across many senders trigger a single batch-confirm.
+- Batch organize tools (archive_message_batch, mark_read_batch,
+  mark_unread_batch, add_star_batch, remove_star_batch,
+  label_message_batch, move_to_label_batch) — apply the same action
+  to 3+ messages in one call. Each item is individually undoable.
 - Trash (trash_message) is reversible via restore_message inside a 30
   second undo window; after that, use Gmail's Trash UI.
 - Destructive / external (send_draft, send_now, forward_message,

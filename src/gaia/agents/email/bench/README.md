@@ -49,7 +49,7 @@ All outputs go to the same `--output-dir` (default `benchmark_results`). Files a
 | Mode | LLM? | What it measures | Speed |
 |------|------|------------------|-------|
 | `full` | Yes | End-to-end triage + summarization tokens | ~30-60s |
-| `interactive` | Yes | Multi-turn session: triage -> organize -> summarize | ~90-180s |
+| `interactive` | Yes | Multi-turn session: triage -> organize -> summarize | ~60-180s (batch tools) / ~300-500s (serial) |
 
 ---
 
@@ -107,6 +107,8 @@ gaia email bench --mbox-path "C:\Users\antmi\Downloads\takeout-20260420T224647Z-
 | 2 | "Archive the low priority emails" | Archive promotional emails |
 | 3 | "Star any urgent or actionable messages" | Star important emails |
 | 4 | "Show me a summary of what's left in my inbox" | Final summary |
+
+**Batch organize tools:** The email agent provides batch variants of all organize tools (`mark_read_batch`, `archive_message_batch`, `add_star_batch`, etc.) that apply the same action to multiple messages in a single LLM round-trip. When the LLM uses batch tools (e.g., "mark all as read" on 9 emails), expect **2-3 LLM steps** instead of the 13-step serial loop documented in `ISSUE-serial-tool-execution.md`. The batch tools check the Phase I3 threshold at entry, count as a single operation, and produce individually undoable action rows with a shared `batch_id`.
 
 **Per-turn output example:**
 ```
@@ -510,6 +512,61 @@ The `report.csv` contains per-run rows with columns: `model`, `framework`, `expe
 | `--ground-truth` | none | Ground truth JSON for quality scoring |
 | `--cost-per-1m-input` | 0.0 | Cost per 1M input tokens |
 | `--cost-per-1m-output` | 0.0 | Cost per 1M output tokens |
+
+---
+
+## 6. Batch Organize Tools
+
+The email agent provides **7 batch organize tools** that resolve the serial tool execution problem documented in `ISSUE-serial-tool-execution.md`. Each batch tool accepts a list of message IDs and executes them in a single LLM round-trip.
+
+### Available Batch Tools
+
+| Single-ID Tool | Batch Tool | Signature |
+|---|---|---|
+| `mark_read(message_id)` | `mark_read_batch(message_ids)` | `(message_ids: list[str]) -> str` |
+| `mark_unread(message_id)` | `mark_unread_batch(message_ids)` | `(message_ids: list[str]) -> str` |
+| `add_star(message_id)` | `add_star_batch(message_ids)` | `(message_ids: list[str]) -> str` |
+| `remove_star(message_id)` | `remove_star_batch(message_ids)` | `(message_ids: list[str]) -> str` |
+| `archive_message(message_id)` | `archive_message_batch(message_ids)` | `(message_ids: list[str]) -> str` |
+| `label_message(message_id, label_id)` | `label_message_batch(message_ids, label_id)` | `(message_ids: list[str], label_id: str) -> str` |
+| `move_to_label(message_id, label_id)` | `move_to_label_batch(message_ids, label_id)` | `(message_ids: list[str], label_id: str) -> str` |
+
+### Design Properties
+
+| Property | Behavior |
+|---|---|
+| **Threshold** | Checks Phase I3 batch threshold at entry (counts as 1 operation) |
+| **Partial success** | Per-item try/except; failed items recorded in `failed[]` list |
+| **Batch ID** | Shared `batch_id` (UUID hex) across all succeeded items |
+| **Undo** | Each succeeded item is individually undoable via existing `restore_message` flow |
+| **Return envelope** | `{"ok": true/false, "data": {"batch_id", "total", "succeeded": [...], "failed": [...]}}` |
+| **Empty list** | Returns `{"ok": true, "data": {"total": 0, "succeeded": [], "failed": []}}` |
+
+### Impact on Benchmark Results
+
+| Metric | Serial (before) | Batch (after) | Improvement |
+|--------|-----------------|---------------|-------------|
+| LLM steps (9 emails) | 13 | 2-3 | 4.3-6.5x fewer |
+| Duration (9 emails) | ~488s | ~30-60s | 8-16x faster |
+| Input tokens | ~7,019 | ~800 | 8.8x fewer |
+| Output tokens | ~4,939 | ~400 | 12.3x fewer |
+| Total tokens | ~11,958 | ~1,200 | 10x fewer |
+
+**Note:** The serial-execution metrics are still valid measurements of the *baseline* agent behavior. The batch tools represent the *optimized* path. Both are native to the email agent — the benchmark observes them faithfully.
+
+### Test Coverage
+
+Batch tools are covered by **175 unit tests** across two test files:
+
+| Test File | Tests | Coverage |
+|---|---|---|
+| `tests/unit/agents/test_email_batch_organize.py` | 151 | Pure helpers, empty input, success paths, partial failure, all failure, single item, threshold enforcement, batch ID propagation, undo compatibility, error paths (ConnectorsError, RuntimeError), boundary-value threshold, Gmail-success + DB-failure |
+| `tests/unit/email/test_fake_gmail_batch.py` | 24 | FakeGmailBackend batch method parity, transport recording, state mutation |
+
+### Scope: Bench Agent vs Email Agent
+
+- **Email Agent:** The batch tools are implemented in the email agent itself (`organize_tools.py`). They are available in both live (`gaia email -i`) and benchmark (`gaia email bench --mode interactive`) usage. The LLM decides whether to use batch vs single-ID tools based on the system prompt.
+- **Bench Agent:** The benchmark harness (`runner.py`) is a passive observer — it calls `process_query()` once per turn and extracts metrics from the result. It does **not** enforce serial or batch behavior. The benchmark faithfully measures whatever the email agent produces.
 
 ---
 
