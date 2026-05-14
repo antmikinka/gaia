@@ -34,6 +34,7 @@ if str(_REPO_ROOT) not in sys.path:
 from gaia.agents.base.tools import _TOOL_REGISTRY  # noqa: E402
 from gaia.agents.email import action_store  # noqa: E402
 from gaia.agents.email.tools.organize_tools import (  # noqa: E402
+    _coerce_ids,
     _run_batch,
     _run_batch_with_prior,
 )
@@ -979,3 +980,83 @@ class TestBatchToolErrorPaths:
                 assert "ConnectorsError" in item["error"]
         finally:
             fake_gmail.mark_read = original
+
+
+# ---------------------------------------------------------------------------
+# 11. String coercion
+# ---------------------------------------------------------------------------
+
+
+class TestBatchStringCoercion:
+    """LLMs send message_ids as comma-separated strings. The wrapper must
+    coerce these to list[str] before iteration."""
+
+    def test_coerce_ids_simple_string(self, fake_gmail, db):
+        assert _coerce_ids("id1,id2,id3") == ["id1", "id2", "id3"]
+
+    def test_coerce_ids_whitespace(self, fake_gmail, db):
+        assert _coerce_ids("id1, id2 , id3") == ["id1", "id2", "id3"]
+
+    def test_coerce_ids_trailing_comma(self, fake_gmail, db):
+        assert _coerce_ids("id1,id2,") == ["id1", "id2"]
+
+    def test_coerce_ids_empty_string(self, fake_gmail, db):
+        assert _coerce_ids("") == []
+
+    def test_coerce_ids_list_passthrough(self, fake_gmail, db):
+        input_list = ["id1", "id2"]
+        result = _coerce_ids(input_list)
+        assert result == input_list
+        assert result is input_list  # same object, not a copy
+
+    def test_coerce_ids_none(self, fake_gmail, db):
+        assert _coerce_ids(None) == []
+
+    def test_coerce_ids_semicolon_separator(self, fake_gmail, db):
+        assert _coerce_ids("id1;id2;id3") == ["id1", "id2", "id3"]
+
+    def test_coerce_ids_single_id(self, fake_gmail, db):
+        assert _coerce_ids("id1") == ["id1"]
+
+    @pytest.mark.parametrize("tool_name", _BATCH_TOOLS)
+    def test_string_input_succeeds_with_correct_total(
+        self, email_agent, fake_gmail, tool_name
+    ):
+        """String input like 'id1,id2,id3' must succeed for all 3 messages
+        and report total==3 (not len(string))."""
+        msg_ids = list(fake_gmail._messages.keys())[:3]
+        comma_sep = ",".join(msg_ids)
+        fn = _get_tool(tool_name)
+        if tool_name in ("label_message_batch", "move_to_label_batch"):
+            new_label = fake_gmail.create_label(name=f"sc-{tool_name}")
+            result = _parse(fn(message_ids=comma_sep, label_id=new_label["id"]))
+        else:
+            result = _parse(fn(message_ids=comma_sep))
+
+        assert result["ok"] is True
+        data = result["data"]
+        assert data["total"] == 3
+        assert len(data["succeeded"]) == 3
+        assert data["failed"] == []
+
+    def test_string_input_with_whitespace_succeeds(self, email_agent, fake_gmail):
+        """Whitespace around commas must not break parsing."""
+        msg_ids = list(fake_gmail._messages.keys())[:3]
+        spaced = ", ".join(msg_ids) + " ,"
+        fn = _get_tool("mark_read_batch")
+        result = _parse(fn(message_ids=spaced))
+
+        assert result["ok"] is True
+        assert result["data"]["total"] == 3
+        assert len(result["data"]["succeeded"]) == 3
+
+    def test_empty_string_returns_zero_total(self, email_agent, fake_gmail):
+        """Empty string input must behave like empty list."""
+        fn = _get_tool("mark_read_batch")
+        result = _parse(fn(message_ids=""))
+
+        assert result["ok"] is True
+        data = result["data"]
+        assert data["total"] == 0
+        assert data["succeeded"] == []
+        assert data["failed"] == []

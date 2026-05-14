@@ -204,6 +204,19 @@ _BATCH_THRESHOLD_ERROR = (
 # ---------------------------------------------------------------------------
 
 
+def _coerce_ids(message_ids):
+    """Ensure message_ids is a list of strings. LLMs send comma-separated strings."""
+    if message_ids is None:
+        return []
+    if isinstance(message_ids, list):
+        return message_ids
+    if isinstance(message_ids, str):
+        return [
+            x.strip() for x in message_ids.replace(";", ",").split(",") if x.strip()
+        ]
+    return []
+
+
 def _run_batch(
     gmail,
     db,
@@ -441,6 +454,7 @@ class OrganizeToolsMixin:
             """Mark multiple messages as read in one call. Use for 3+ messages."""
             if not message_ids:
                 return _envelope_ok({"total": 0, "succeeded": [], "failed": []})
+            message_ids = _coerce_ids(message_ids)
             if (err := _check_threshold()) is not None:
                 return _envelope_err(err)
             try:
@@ -474,6 +488,7 @@ class OrganizeToolsMixin:
             """Mark multiple messages as unread in one call. Use for 3+ messages."""
             if not message_ids:
                 return _envelope_ok({"total": 0, "succeeded": [], "failed": []})
+            message_ids = _coerce_ids(message_ids)
             if (err := _check_threshold()) is not None:
                 return _envelope_err(err)
             try:
@@ -507,6 +522,7 @@ class OrganizeToolsMixin:
             """Star multiple messages in one call. Use for 3+ messages."""
             if not message_ids:
                 return _envelope_ok({"total": 0, "succeeded": [], "failed": []})
+            message_ids = _coerce_ids(message_ids)
             if (err := _check_threshold()) is not None:
                 return _envelope_err(err)
             try:
@@ -540,6 +556,7 @@ class OrganizeToolsMixin:
             """Remove star from multiple messages in one call. Use for 3+ messages."""
             if not message_ids:
                 return _envelope_ok({"total": 0, "succeeded": [], "failed": []})
+            message_ids = _coerce_ids(message_ids)
             if (err := _check_threshold()) is not None:
                 return _envelope_err(err)
             try:
@@ -573,6 +590,7 @@ class OrganizeToolsMixin:
             """Archive multiple messages (remove from INBOX) in one call. Use for 3+ messages."""
             if not message_ids:
                 return _envelope_ok({"total": 0, "succeeded": [], "failed": []})
+            message_ids = _coerce_ids(message_ids)
             if (err := _check_threshold()) is not None:
                 return _envelope_err(err)
             try:
@@ -617,6 +635,7 @@ class OrganizeToolsMixin:
             """Add a label to multiple messages in one call. Use for 3+ messages."""
             if not message_ids:
                 return _envelope_ok({"total": 0, "succeeded": [], "failed": []})
+            message_ids = _coerce_ids(message_ids)
             if (err := _check_threshold()) is not None:
                 return _envelope_err(err)
             try:
@@ -656,6 +675,7 @@ class OrganizeToolsMixin:
             """Move multiple messages out of INBOX into a label in one call. Use for 3+ messages."""
             if not message_ids:
                 return _envelope_ok({"total": 0, "succeeded": [], "failed": []})
+            message_ids = _coerce_ids(message_ids)
             if (err := _check_threshold()) is not None:
                 return _envelope_err(err)
             try:
