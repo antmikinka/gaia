@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import mailbox
 import re
 import uuid
@@ -249,6 +250,87 @@ def _estimate_size(msg: Message) -> int:
 
 
 # ---------------------------------------------------------------------------
+# JSONL -> Gmail-API translator
+# ---------------------------------------------------------------------------
+
+_JSONL_CATEGORY_TO_LABELS: dict[str, list[str]] = {
+    "URGENT": ["INBOX", "UNREAD", "IMPORTANT"],
+    "NEEDS_RESPONSE": ["INBOX", "UNREAD", "STARRED"],
+    "FYI": ["INBOX", "UNREAD"],
+    "PROMOTIONAL": ["INBOX", "UNREAD", "CATEGORY_PROMOTIONS"],
+    "PERSONAL": ["INBOX", "UNREAD", "CATEGORY_PERSONAL"],
+}
+
+
+def _parse_iso8601_to_millis(date_str: str) -> str:
+    """Parse ISO 8601 date string to millis-since-epoch string."""
+    try:
+        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        return str(int(dt.timestamp() * 1000))
+    except (ValueError, AttributeError):
+        return str(int(datetime.now(timezone.utc).timestamp() * 1000))
+
+
+def jsonl_record_to_gmail_payload(record: dict) -> Dict[str, Any]:
+    """Convert a single JSONL email record to Gmail API v1 message shape.
+
+    The output shape matches what ``mbox_message_to_gmail_payload()``
+    produces so the agent tools are completely data-source agnostic.
+    """
+    # Use the FULL UUID as-is (no truncation).
+    msg_id = record["id"]
+
+    # Thread ID: derive from thread reference or use msg_id.
+    thread_ref = record.get("variation_thread_reference", "")
+    if thread_ref:
+        thread_id = hashlib.sha256(thread_ref.encode()).hexdigest()[:16]
+    else:
+        thread_id = msg_id
+
+    # Labels from category mapping.
+    category = record.get("category", "FYI")
+    label_ids = list(_JSONL_CATEGORY_TO_LABELS.get(category, ["INBOX", "UNREAD"]))
+
+    # Parse ISO 8601 date -> internalDate (millis) and keep for header.
+    date_str = record.get("date", "")
+    internal_date = _parse_iso8601_to_millis(date_str)
+
+    # Build Gmail-style headers.
+    sender = record.get("sender", "")
+    subject = record.get("subject", "")
+    headers = [
+        {"name": "From", "value": sender},
+        {"name": "To", "value": "user@example.com"},
+        {"name": "Subject", "value": subject},
+        {"name": "Date", "value": date_str},
+    ]
+
+    # Build single-part text/plain body.
+    body_preview = record.get("body_preview", "")
+    body_bytes = body_preview.encode("utf-8")
+    body_data = _b64url(body_bytes)
+
+    payload = {
+        "mimeType": "text/plain",
+        "filename": "",
+        "headers": headers,
+        "body": {"size": len(body_bytes), "data": body_data},
+    }
+
+    snippet = _normalize_snippet(body_preview)
+
+    return {
+        "id": msg_id,
+        "threadId": thread_id,
+        "labelIds": label_ids,
+        "snippet": snippet,
+        "internalDate": internal_date,
+        "payload": payload,
+        "sizeEstimate": len(body_preview),
+    }
+
+
+# ---------------------------------------------------------------------------
 # In-memory store
 # ---------------------------------------------------------------------------
 
@@ -267,23 +349,31 @@ class FakeGmailTransport:
 
 
 class FakeGmailBackend:
-    """Implements ``GmailBackend`` against an in-memory mbox-derived store."""
+    """Implements ``GmailBackend`` against an in-memory mbox- or JSONL-derived store."""
 
     def __init__(
         self,
         mbox_path: Optional[Path] = None,
+        jsonl_path: Optional[Path] = None,
         *,
         user_email: str = "user@example.com",
         transport: Optional[FakeGmailTransport] = None,
     ):
+        if mbox_path and jsonl_path:
+            raise ValueError("Specify either mbox_path or jsonl_path, not both")
         self._user_email = user_email
         self._transport = transport or FakeGmailTransport()
         self._messages: Dict[str, Dict[str, Any]] = {}
         self._labels: List[Dict[str, Any]] = _DEFAULT_SYSTEM_LABELS[:]
         self._drafts: Dict[str, Dict[str, Any]] = {}
         self._next_draft_seq = 1
+        self._data_source: str = "none"
         if mbox_path is not None:
             self.load_mbox(mbox_path)
+            self._data_source = "mbox"
+        elif jsonl_path is not None:
+            self.load_jsonl(jsonl_path)
+            self._data_source = "jsonl"
 
     # -- Setup --------------------------------------------------------------
 
@@ -293,6 +383,17 @@ class FakeGmailBackend:
             payload = mbox_message_to_gmail_payload(msg)
             self._messages[payload["id"]] = payload
         mbox.close()
+
+    def load_jsonl(self, path: Path) -> None:
+        """Load emails from a JSONL file (one JSON object per line)."""
+        with open(path, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                record = json.loads(line)
+                payload = jsonl_record_to_gmail_payload(record)
+                self._messages[payload["id"]] = payload
 
     def add_message(self, payload: Dict[str, Any]) -> None:
         """Inject a pre-built Gmail-API-shape message (used by unit tests)."""

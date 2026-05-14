@@ -115,8 +115,10 @@ class RunResult:
     timestamp: str
     model: str
     provider: str
-    mbox_path: str
-    mode: str  # "heuristic" | "full"
+    mbox_path: str = ""
+    jsonl_path: str = ""
+    data_source: str = "mbox"  # "mbox" | "jsonl"
+    mode: str = ""  # "heuristic" | "full"
     batch_results: list[BatchResult] = field(default_factory=list)
     step_results: list[StepResult] = field(default_factory=list)
     total_emails: int = 0

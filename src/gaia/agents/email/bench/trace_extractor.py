@@ -168,7 +168,8 @@ def extract_from_agent_result(
     run_id: str,
     timestamp: str,
     model_id: str,
-    mbox_path: str,
+    mbox_path: str = "",
+    jsonl_path: str = "",
     mode: str,
     total_duration_ms: int = 0,
     force_llm: bool = False,
@@ -183,7 +184,8 @@ def extract_from_agent_result(
         run_id: Unique run identifier.
         timestamp: ISO-8601 timestamp.
         model_id: Model identifier (e.g. ``Qwen3.5-4B-GGUF``).
-        mbox_path: Path to the MBOX file used.
+        mbox_path: Path to the MBOX file used (empty if using JSONL).
+        jsonl_path: Path to the JSONL file used (empty if using MBOX).
         mode: Benchmark mode (``"full"`` or ``"interactive"``).
         total_duration_ms: Wall-clock duration if available externally.
         force_llm: Whether heuristic fast-path was bypassed.
@@ -211,6 +213,8 @@ def extract_from_agent_result(
             model=model_id,
             provider="lemonade",
             mbox_path=mbox_path,
+            jsonl_path=jsonl_path,
+            data_source="jsonl" if jsonl_path else "mbox",
             mode=mode,
             batch_results=[],
             step_results=step_results,
@@ -281,6 +285,8 @@ def extract_from_agent_result(
         model=model_id,
         provider="lemonade",
         mbox_path=mbox_path,
+        jsonl_path=jsonl_path,
+        data_source="jsonl" if jsonl_path else "mbox",
         mode=mode,
         batch_results=[batch],
         step_results=step_results,
@@ -308,7 +314,8 @@ def extract_from_trace_json(
     run_id: str,
     timestamp: str,
     model_id: str,
-    mbox_path: str,
+    mbox_path: str = "",
+    jsonl_path: str = "",
     mode: str,
     total_duration_ms: int = 0,
     force_llm: bool = False,
@@ -333,6 +340,7 @@ def extract_from_trace_json(
         timestamp=timestamp,
         model_id=model_id,
         mbox_path=mbox_path,
+        jsonl_path=jsonl_path,
         mode=mode,
         total_duration_ms=total_duration_ms,
         force_llm=force_llm,

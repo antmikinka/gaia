@@ -29,7 +29,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="gaia email bench",
         description="Run GAIA email triage benchmarks. Outputs results.jsonl.",
     )
-    parser.add_argument("--mbox-path", required=True)
+    parser.add_argument("--mbox-path", type=str, default=None)
+    parser.add_argument("--jsonl-path", type=str, default=None)
     parser.add_argument(
         "--mode",
         choices=["full", "interactive"],
@@ -49,7 +50,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _run_single_iteration(
-    mbox_path: str,
+    mbox_path: str = "",
+    jsonl_path: str = "",
     *,
     limit: int,
     model: str,
@@ -61,7 +63,8 @@ def _run_single_iteration(
     from gaia.agents.email.bench.runner import _run_full_agent
 
     run = _run_full_agent(
-        mbox_path,
+        mbox_path=mbox_path,
+        jsonl_path=jsonl_path,
         model_id=model,
         base_url=_base_url,
         limit=limit,
@@ -89,7 +92,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             return 1
 
         summary = run_interactive_session(
-            args.mbox_path,
+            args.mbox_path or "",
+            args.jsonl_path or "",
             model_id=model,
             base_url=args.base_url,
             limit=args.limit,
@@ -189,7 +193,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             print(f"\n  --- Experiment {i}/{model_exps}{cold_start_label} ---")
             try:
                 result = _run_single_iteration(
-                    args.mbox_path,
+                    args.mbox_path or "",
+                    args.jsonl_path or "",
                     limit=args.limit,
                     model=model_id,
                     _base_url=args.base_url,

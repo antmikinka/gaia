@@ -1444,7 +1444,7 @@ def main():
     )
     _email_bench_parser.add_argument(
         "--jsonl-path", type=str, default=None,
-        help="DEPRECATED: use 'gaia email report --input-dir <dir>'.",
+        help="Path to a JSONL file of emails (alternative to --mbox-path).",
     )
     _email_bench_parser.add_argument(
         "--ground-truth", type=str, default=None,
@@ -3992,7 +3992,7 @@ def handle_email_command(args):
         # Boolean flags.
         for flag in [
             "variance_only", "visualize", "steps", "skip_cold_start",
-            "fail_fast",
+            "fail_fast", "force_llm",
         ]:
             if getattr(args, flag, False):
                 bench_args.append(f"--{flag.replace('_', '-')}")

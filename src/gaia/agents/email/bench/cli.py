@@ -37,8 +37,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     bench_parser.add_argument(
         "--mbox-path",
-        required=True,
+        type=str,
+        default=None,
         help="Path to the MBOX file to benchmark against.",
+    )
+    bench_parser.add_argument(
+        "--jsonl-path",
+        type=str,
+        default=None,
+        help="Path to the JSONL file to benchmark against (mutually exclusive with --mbox-path).",
     )
     bench_parser.add_argument(
         "--mode",
@@ -238,6 +245,14 @@ def main(argv: Optional[list[str]] = None) -> int:
     args = parser.parse_args(argv)
 
     if args.bench_action == "bench":
+        # Validate mutually exclusive data source args.
+        if args.mbox_path and args.jsonl_path:
+            print("Error: --mbox-path and --jsonl-path are mutually exclusive.", file=sys.stderr)
+            return 1
+        if not args.mbox_path and not args.jsonl_path:
+            print("Error: one of --mbox-path or --jsonl-path is required.", file=sys.stderr)
+            return 1
+
         # Check for legacy flags that should delegate to report_generator.
         if args.variance_only or args.visualize:
             _handle_legacy_delegations(args)
@@ -311,7 +326,11 @@ def _handle_legacy_delegations(args) -> None:
 
 def _build_bench_args(args) -> list[str]:
     """Convert argparse Namespace to argv list for bench_runner.main()."""
-    bench_args = ["--mbox-path", args.mbox_path]
+    bench_args = []
+    if args.mbox_path:
+        bench_args.extend(["--mbox-path", args.mbox_path])
+    if args.jsonl_path:
+        bench_args.extend(["--jsonl-path", args.jsonl_path])
 
     if args.mode != "heuristic":
         bench_args.extend(["--mode", args.mode])

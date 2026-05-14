@@ -92,13 +92,50 @@ def load_emails_from_mbox(
     return emails
 
 
+def load_emails_from_jsonl(
+    jsonl_path: str,
+    *,
+    limit: int = 100,
+) -> list[dict]:
+    """Load emails from a JSONL file via FakeGmailBackend.
+
+    Returns a list of dicts with: id, subject, from, label_ids, payload.
+    The payload is in Gmail API v1 shape for direct use by the agent.
+    """
+    from gaia.agents.email.fake_gmail import FakeGmailBackend
+    from gaia.agents.email.tools.triage_heuristics import LABEL_INBOX
+
+    backend = FakeGmailBackend(jsonl_path=Path(jsonl_path))
+    listing = backend.list_messages(label_ids=[LABEL_INBOX], max_results=limit)
+
+    emails = []
+    for stub in listing.get("messages", [])[:limit]:
+        msg = backend.get_message(stub["id"])
+        headers = _extract_headers(msg.get("payload", {}))
+        emails.append(
+            {
+                "id": msg["id"],
+                "thread_id": msg.get("threadId", msg["id"]),
+                "subject": headers.get("subject", ""),
+                "sender": headers.get("from", ""),
+                "date": headers.get("date", ""),
+                "label_ids": list(msg.get("labelIds", [])),
+                "snippet": msg.get("snippet", ""),
+                "payload": msg.get("payload", {}),
+            }
+        )
+
+    return emails
+
+
 # ---------------------------------------------------------------------------
 # Full agent mode
 # ---------------------------------------------------------------------------
 
 
 def _run_full_agent(
-    mbox_path: str,
+    mbox_path: str = "",
+    jsonl_path: str = "",
     *,
     model_id: str,
     base_url: str,
@@ -110,6 +147,8 @@ def _run_full_agent(
 
     Instantiates the agent with FakeGmailBackend injected, calls
     ``triage_inbox``, and captures all token/duration metrics.
+
+    Exactly one of ``mbox_path`` or ``jsonl_path`` must be provided.
 
     When ``force_llm=True``, bypasses the heuristic fast-path, forcing
     LLM classification of every email (benchmark mode for true inference).
@@ -132,7 +171,14 @@ def _run_full_agent(
     # references to the original LiveGmailBackend/LiveCalendarBackend.
     # Passing fakes through the config ensures they are bound before
     # _register_tools() runs.
-    fake = FakeGmailBackend(mbox_path=Path(mbox_path))
+    if mbox_path and jsonl_path:
+        raise ValueError("Specify either mbox_path or jsonl_path, not both")
+    if mbox_path:
+        fake = FakeGmailBackend(mbox_path=Path(mbox_path))
+    elif jsonl_path:
+        fake = FakeGmailBackend(jsonl_path=Path(jsonl_path))
+    else:
+        raise ValueError("Either mbox_path or jsonl_path must be provided")
     fake_cal = FakeCalendarBackend()
     config = EmailAgentConfig(
         model_id=model_id,
@@ -146,7 +192,7 @@ def _run_full_agent(
     )
     agent = EmailTriageAgent(config=config)
 
-    # Wall-clock timing — captures MBOX load, agent construction, and inference.
+    # Wall-clock timing — captures data load, agent construction, and inference.
     start = time.monotonic()
     try:
         agent_result = agent.process_query(f"Triage my inbox ({limit} emails)")
@@ -157,6 +203,8 @@ def _run_full_agent(
             model=model_id,
             provider="lemonade",
             mbox_path=mbox_path,
+            jsonl_path=jsonl_path,
+            data_source="jsonl" if jsonl_path else "mbox",
             mode="full",
             status="error",
             error=str(exc),
@@ -173,6 +221,8 @@ def _run_full_agent(
             model=model_id,
             provider="lemonade",
             mbox_path=mbox_path,
+            jsonl_path=jsonl_path,
+            data_source="jsonl" if jsonl_path else "mbox",
             mode="full",
             status="error",
             error="agent returned no result",
@@ -189,6 +239,10 @@ def _run_full_agent(
         total_duration_ms=total_duration_ms,
         force_llm=force_llm,
     )
+    # Populate JSONL-specific fields.
+    if jsonl_path:
+        run.jsonl_path = jsonl_path
+        run.data_source = "jsonl"
 
     return run
 
@@ -292,7 +346,8 @@ def _extract_emails_affected(agent_result: dict) -> list[str]:
 
 
 def run_interactive_benchmark(
-    mbox_path: str,
+    mbox_path: str = "",
+    jsonl_path: str = "",
     *,
     model_id: str,
     base_url: str,
@@ -321,7 +376,14 @@ def run_interactive_benchmark(
 
     scenario = scenario or [p.format(limit=limit) for p in DEFAULT_INTERACTIVE_SCENARIO]
 
-    fake = FakeGmailBackend(mbox_path=Path(mbox_path))
+    if mbox_path and jsonl_path:
+        raise ValueError("Specify either mbox_path or jsonl_path, not both")
+    if mbox_path:
+        fake = FakeGmailBackend(mbox_path=Path(mbox_path))
+    elif jsonl_path:
+        fake = FakeGmailBackend(jsonl_path=Path(jsonl_path))
+    else:
+        raise ValueError("Either mbox_path or jsonl_path must be provided")
     fake_cal = FakeCalendarBackend()
     config = EmailAgentConfig(
         model_id=model_id,
@@ -450,6 +512,8 @@ def run_interactive_benchmark(
         "timestamp": timestamp,
         "model": model_id,
         "mbox_path": mbox_path,
+        "jsonl_path": jsonl_path,
+        "data_source": "jsonl" if jsonl_path else "mbox",
         "turns": turns,
         "total_turns": len(turns),
         "total_emails_affected": len(all_emails),
@@ -595,7 +659,8 @@ def _print_session_state(state: SessionState) -> None:
 
 
 def run_interactive_session(
-    mbox_path: str,
+    mbox_path: str = "",
+    jsonl_path: str = "",
     *,
     model_id: str,
     base_url: str,
@@ -620,7 +685,14 @@ def run_interactive_session(
     run_id = f"run-interactive-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{model_id.replace('/', '-')}-{uuid.uuid4().hex[:6]}"
     timestamp = datetime.now(timezone.utc).isoformat()
 
-    fake = FakeGmailBackend(mbox_path=Path(mbox_path))
+    if mbox_path and jsonl_path:
+        raise ValueError("Specify either mbox_path or jsonl_path, not both")
+    if mbox_path:
+        fake = FakeGmailBackend(mbox_path=Path(mbox_path))
+    elif jsonl_path:
+        fake = FakeGmailBackend(jsonl_path=Path(jsonl_path))
+    else:
+        raise ValueError("Either mbox_path or jsonl_path must be provided")
     fake_cal = FakeCalendarBackend()
     config = EmailAgentConfig(
         model_id=model_id,
@@ -638,11 +710,12 @@ def run_interactive_session(
     turns: list[TurnResult] = []
     total_start = time.monotonic()
 
+    data_label = Path(jsonl_path).name if jsonl_path else Path(mbox_path).name
     print(f"\n{'='*70}")
     print(f"  GAIA Email — Interactive Session")
     print(f"{'='*70}")
     print(f"  Model:  {model_id}")
-    print(f"  MBOX:   {Path(mbox_path).name}")
+    print(f"  Data:   {data_label}")
     print(f"  Limit:  {limit} emails")
     print(f"  Type 'quit' or 'exit' to end the session.")
     print(f"{'='*70}")
@@ -760,6 +833,8 @@ def run_interactive_session(
         "timestamp": timestamp,
         "model": model_id,
         "mbox_path": mbox_path,
+        "jsonl_path": jsonl_path,
+        "data_source": "jsonl" if jsonl_path else "mbox",
         "mode": "interactive",
         "turns": turns,
         "total_turns": len(turns),
