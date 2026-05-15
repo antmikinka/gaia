@@ -3326,12 +3326,10 @@ def main(argv: list[str] | None = None) -> int:
             if candidate.exists():
                 args.jsonl_path = str(candidate)
                 break
-        for candidate in [
-            Path("interactive.json"),
-            Path("benchmark_results/interactive.json"),
-        ]:
-            if candidate.exists():
-                args.interactive_path = str(candidate)
+        for pattern_dir in [Path(args.output_dir), Path("benchmark_results"), Path(".")]:
+            candidates = sorted(pattern_dir.glob("interactive_*.json"), key=lambda p: p.stat().st_mtime)
+            if candidates:
+                args.interactive_path = str(candidates[-1])
                 break
 
         if not any([args.json_path, args.jsonl_path, args.interactive_path]):

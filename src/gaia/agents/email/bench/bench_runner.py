@@ -19,6 +19,9 @@ from pathlib import Path
 from typing import Any, Optional
 
 
+from gaia.agents.email.bench.visualize import _extract_run_suffix
+
+
 def _slug(text: str) -> str:
     """Filesystem-safe slug from a model name."""
     return re.sub(r"[^a-z0-9._-]", "_", text.lower()).strip("_")
@@ -101,7 +104,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
 
         model_slug = _slug(model or "unknown")
-        interactive_path = output_dir / f"interactive_{model_slug}.json"
+        run_id_suffix = _extract_run_suffix(summary["run_id"]) if summary.get("run_id") else None
+        filename = f"interactive_{model_slug}_{run_id_suffix}.json" if run_id_suffix else f"interactive_{model_slug}.json"
+        interactive_path = output_dir / filename
         interactive_path.parent.mkdir(parents=True, exist_ok=True)
 
         def _turn_to_dict(t):
