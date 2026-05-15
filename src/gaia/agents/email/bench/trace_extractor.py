@@ -113,9 +113,18 @@ def _extract_step_stats(
     step_results: list[StepResult] = []
     step_num = 0
     total_reasoning_tokens = 0
+    last_tool_name = ""
 
     for msg in conversation:
         role = msg.get("role", "")
+
+        # Track tool names from role=="tool" messages.
+        if role == "tool" and msg.get("name"):
+            last_tool_name = msg["name"]
+
+        # Reset tool name when we see an assistant message (new LLM call, no tool yet).
+        if role == "assistant":
+            last_tool_name = ""
 
         # Extract reasoning tokens from assistant response text.
         if role == "assistant":
@@ -137,12 +146,17 @@ def _extract_step_stats(
                     StepResult(
                         step_number=step_num,
                         action="llm_call",
+                        tool_name=last_tool_name,
                         input_tokens=stats.get("input_tokens", 0) or 0,
                         output_tokens=stats.get("output_tokens", 0) or 0,
                         reasoning_tokens=_extract_reasoning_tokens(
                             _last_assistant_text(conversation, msg)
                         ),
-                        total_tokens=stats.get("total_tokens", 0) or 0,
+                        total_tokens=(
+                            stats.get("total_tokens", 0)
+                            or (stats.get("input_tokens", 0) or 0)
+                            + (stats.get("output_tokens", 0) or 0)
+                        ),
                         duration_ms=int(stats.get("duration", 0) * 1000),
                         time_to_first_token_ms=ttft_ms,
                         tokens_per_second=float(stats.get("tokens_per_second", 0) or 0),

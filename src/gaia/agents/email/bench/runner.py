@@ -265,9 +265,20 @@ def _extract_steps_from_result(agent_result: dict) -> list[StepResult]:
     """Extract per-step token/duration stats from an agent result."""
     steps = []
     step_num = 0
+    last_tool_name = ""
     conversation = agent_result.get("conversation", [])
     for msg in conversation:
-        if msg.get("role") == "system" and isinstance(msg.get("content"), dict):
+        role = msg.get("role", "")
+
+        # Track tool names from role=="tool" messages.
+        if role == "tool" and msg.get("name"):
+            last_tool_name = msg["name"]
+
+        # Reset tool name when we see an assistant message (new LLM call, no tool yet).
+        if role == "assistant":
+            last_tool_name = ""
+
+        if role == "system" and isinstance(msg.get("content"), dict):
             content = msg["content"]
             if content.get("type") == "stats" and "performance_stats" in content:
                 stats = content["performance_stats"]
@@ -278,12 +289,17 @@ def _extract_steps_from_result(agent_result: dict) -> list[StepResult]:
                     StepResult(
                         step_number=step_num,
                         action="llm_call",
+                        tool_name=last_tool_name,
                         input_tokens=stats.get("input_tokens", 0) or 0,
                         output_tokens=stats.get("output_tokens", 0) or 0,
                         reasoning_tokens=_extract_reasoning_tokens(
                             _last_assistant_text(conversation, msg)
                         ),
-                        total_tokens=stats.get("total_tokens", 0) or 0,
+                        total_tokens=(
+                            stats.get("total_tokens", 0)
+                            or (stats.get("input_tokens", 0) or 0)
+                            + (stats.get("output_tokens", 0) or 0)
+                        ),
                         duration_ms=int(stats.get("duration", 0) * 1000),
                         time_to_first_token_ms=ttft_ms,
                         tokens_per_second=float(stats.get("tokens_per_second", 0) or 0),
@@ -340,6 +356,10 @@ def _extract_emails_affected(agent_result: dict) -> list[str]:
                             email_ids.update(data["ids"])
                         elif "message_id" in data:
                             email_ids.add(data["message_id"])
+                        elif "succeeded" in data:
+                            for item in data["succeeded"]:
+                                if isinstance(item, dict) and "message_id" in item:
+                                    email_ids.add(item["message_id"])
             except (json.JSONDecodeError, TypeError):
                 pass
     return sorted(email_ids)
@@ -590,8 +610,8 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
                 if isinstance(item, dict) and "id" in item:
                     state.triaged_emails[item["id"]] = item.get("category", "unknown")
 
-        # archive_message — track archived IDs.
-        if tool_name == "archive_message" and isinstance(data, dict):
+        # archive_message / archive_message_batch — track archived IDs.
+        if tool_name in ("archive_message", "archive_message_batch") and isinstance(data, dict):
             msg_id = data.get("message_id", "") or data.get("id", "")
             if msg_id:
                 state.archived.add(msg_id)
@@ -607,23 +627,23 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
                 state.sent.add(msg_id)
 
         # Star/unstar.
-        if tool_name == "star_message" and isinstance(data, dict):
+        if tool_name in ("add_star", "add_star_batch") and isinstance(data, dict):
             msg_id = data.get("id", "") or data.get("message_id", "")
             if msg_id:
                 state.starred.add(msg_id)
-        if tool_name == "unstar_message" and isinstance(data, dict):
+        if tool_name in ("remove_star", "remove_star_batch") and isinstance(data, dict):
             msg_id = data.get("id", "") or data.get("message_id", "")
             if msg_id:
                 state.starred.discard(msg_id)
 
         # Mark read/unread.
-        if tool_name in ("mark_read", "mark_as_read") and isinstance(data, dict):
+        if tool_name in ("mark_read", "mark_read_batch", "mark_as_read") and isinstance(data, dict):
             msg_id = data.get("id", "") or data.get("message_id", "")
             if msg_id:
                 state.marked_read.add(msg_id)
 
         # Delete.
-        if tool_name == "delete_message" and isinstance(data, dict):
+        if tool_name == "trash_message" and isinstance(data, dict):
             msg_id = data.get("id", "") or data.get("message_id", "")
             if msg_id:
                 state.deleted.add(msg_id)
@@ -814,6 +834,12 @@ def run_interactive_session(
     total_input = sum(t.input_tokens for t in turns)
     total_output = sum(t.output_tokens for t in turns)
     total_reasoning = sum(t.reasoning_tokens for t in turns)
+    ttft_vals = [
+        t.time_to_first_token_ms for t in turns if t.time_to_first_token_ms > 0
+    ]
+    tps_vals = [t.tokens_per_second for t in turns if t.tokens_per_second > 0]
+    avg_ttft = sum(ttft_vals) / len(ttft_vals) if ttft_vals else 0.0
+    avg_tps = sum(tps_vals) / len(tps_vals) if tps_vals else 0.0
     all_emails = set()
     all_tools = []
     for t in turns:
@@ -858,6 +884,8 @@ def run_interactive_session(
         "total_tokens": total_tokens,
         "avg_tokens_per_turn": round(total_tokens / max(len(turns), 1), 1),
         "avg_duration_per_turn_ms": round(total_duration_ms / max(len(turns), 1), 0),
+        "avg_time_to_first_token_ms": round(avg_ttft, 1),
+        "avg_tokens_per_second": round(avg_tps, 1),
         "session_state": {
             "archived": sorted(state.archived),
             "starred": sorted(state.starred),
