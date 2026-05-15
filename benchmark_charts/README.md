@@ -259,7 +259,7 @@ Models that maintain yellow-to-green cells across increasing email limits exhibi
 ### Axes
 - **X-Axis:** Model names (truncated to 18 chars with param size, 25 chars without; param size in parentheses when available)
 - **Y-Axis:** Email Limit (total_emails from runs, sorted ascending)
-- **Cell Value:** Estimated total LLM calls = `(total_tokens / 2800) + 2`
+- **Cell Value:** Estimated total LLM calls = `(total_tokens / 2800) + 2` (displayed as numeric value in each cell)
 
 ### Colormap
 `viridis` (sequential)
@@ -271,7 +271,8 @@ Models that maintain yellow-to-green cells across increasing email limits exhibi
 | Purple | High total calls (16+) — extensive LLM planning and tool usage |
 
 ### Overlay
-- White circles mark cells with actual measured data points
+- White circles (alpha=0.4) provide a subtle accent on every non-zero cell
+- Each cell displays its numeric value rounded to 1 decimal place for precise reading
 - Formula annotation in bottom-left corner
 
 ### Legend
