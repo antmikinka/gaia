@@ -1,7 +1,32 @@
 # Benchmark Visualization Charts — Extended Suite (Charts 24-29)
 
-This document describes the 6 new visualization charts added to the GAIA Email Benchmark
-visualization suite. Each chart includes full specs, legends, and interpretation guidance.
+This document describes 6 new visualization charts (Charts 24-29) for the GAIA Email Benchmark
+visualization suite. All charts are implemented in the generation script; charts marked "Requires data"
+need specific benchmark runs (multi-model or interactive mode) to populate. Each chart includes full
+specs, legends, and interpretation guidance.
+
+## Status
+
+| Chart | Status | Requires |
+|-------|--------|----------|
+| 24 - Planning Steps Heatmap | Implemented | Multi-model runs with varying email limits |
+| 25 - Token Efficiency Bars | Implemented | Multi-model runs |
+| 26 - Latency vs Heuristic Scatter | Implemented | Multi-model runs |
+| 27 - Interactive LLM Activity | Implemented | Interactive mode session data (`interactive.json`) |
+| 28 - Model Performance Radar | Implemented | ≥ 2 models with complete run data |
+| 29 - Steps Scaling Heatmap | Implemented | Multi-model runs with varying email limits |
+
+## Data Requirements
+
+- **`results.jsonl`**: Standard benchmark results with multi-model runs. Required for Charts 24, 25, 26, 28, 29.
+- **`interactive.json`**: Interactive mode session data from conversational email benchmark runs. Required for Chart 27.
+- **Multi-model runs**: Charts 24, 25, 26, 28, 29 require at least 2 different models to show comparative data.
+- **Varying email limits**: Charts 24 and 29 require runs with different `total_emails` values to show scaling behavior.
+- **Chart 28 (Radar)**: Requires ≥ 2 runs per model for CV% (coefficient of variation) calculation. With a single run per model, CV% axis will show 0.
+
+---
+
+For Charts 1-23, see [CHARTS.md](CHARTS.md).
 
 ---
 
@@ -10,6 +35,14 @@ visualization suite. Each chart includes full specs, legends, and interpretation
 **Type:** Heatmap (diverging colormap)
 **Data Source:** `results.jsonl` — requires multi-model runs with varying email limits
 **File:** `24_planning_steps_heatmap.png`
+
+### Problem Statement
+
+Without this chart, there is no way to see how many LLM planning invocations each model requires at different email volumes, or whether planning cost scales linearly with inbox size. A user cannot determine if a model is relying on the heuristic fast-path or burning through LLM calls for every email.
+
+### Claim Statement
+
+Models that stay blue (≤2 planning steps) even at high email limits are successfully routing most emails through the heuristic fast-path. Models that shift from blue to red as email limits increase are failing to scale — each additional batch of emails triggers disproportionate LLM planning, revealing a fundamental classification inefficiency rather than a throughput issue.
 
 ### Axes
 - **X-Axis:** Model names (sorted alphabetically, truncated to 25 chars)
@@ -26,7 +59,7 @@ visualization suite. Each chart includes full specs, legends, and interpretation
 | Red | ≥ 6 steps | Heavy LLM planning overhead |
 
 ### Annotations
-- Each cell displays the actual `step_results` count (integer) from the run
+- Each cell displays the rounded mean `step_results` count (integer) across runs for that model/email limit combination
 - Color key at bottom-left: "Blue = Low (≤2)  Yellow = Med (3-5)  Red = High (≥6)"
 
 ### Legend
@@ -47,6 +80,14 @@ Compare across email limits to observe scaling behavior — efficient models sta
 **Type:** Grouped bar chart with error bars + heuristic % overlay
 **Data Source:** `results.jsonl` — multi-model runs
 **File:** `25_token_efficiency.png`
+
+### Problem Statement
+
+Without this chart, there is no way to decompose token consumption into input vs. output components per model, making it impossible to tell whether high token usage comes from sending too much context (large input) or from verbose LLM reasoning (large output). A user also cannot verify the claimed inverse relationship between heuristic confidence and token cost.
+
+### Claim Statement
+
+A model with a high heuristic percentage ("H: XX%") but still high total tokens indicates the heuristic is catching many emails but the escalated ones are extremely expensive — a concentrated cost pattern. Conversely, a model with low heuristic percentage and low output tokens suggests the LLM is making quick classification decisions even without heuristic help. Wide error bars reveal that token usage is non-deterministic, making cost prediction unreliable for that model.
 
 ### Axes
 - **X-Axis:** Model names (truncated to 20 chars)
@@ -89,9 +130,17 @@ Wide error bars indicate non-deterministic token consumption across runs.
 **Data Source:** `results.jsonl` — multi-model runs
 **File:** `26_latency_heuristic_scatter.png`
 
+### Problem Statement
+
+Without this chart, there is no empirical evidence linking heuristic classification rate to end-to-end benchmark duration. A user cannot determine whether faster runs are fast because the heuristic caught more emails, or because the underlying model inference is simply faster — two very different optimization targets.
+
+### Claim Statement
+
+A strong negative correlation (high R²) confirms that heuristic rate is the dominant driver of benchmark speed — improving heuristic coverage is the single most effective optimization. A weak correlation (low R²) reveals that duration is driven by other factors like model load time or network latency, meaning heuristic improvements alone will not meaningfully reduce benchmark runtime. Points in the top-left quadrant represent the Pareto-optimal combination: fast execution with high heuristic utilization.
+
 ### Axes
 - **X-Axis:** Duration (seconds) — total benchmark run time
-- **Y-Axis:** Heuristic Confidence Rate (%) — (confident emails / total emails) × 100
+- **Y-Axis:** Heuristic % — (confident emails / total emails) × 100
 
 ### Encoding
 - **Color:** One distinct color per model
@@ -114,7 +163,15 @@ Linear regression across all data points. Black dashed line with R² annotation 
 
 **Type:** Stacked bar chart with baseline reference
 **Data Source:** `interactive.json` — interactive mode session data
-**File:** `27_interactive_llm_activity.png`
+**File:** `27_interactive_llm_activity.png` (with run ID suffix when applicable, e.g., `27_interactive_llm_activity_59c3c6.png`)
+
+### Problem Statement
+
+Without this chart, there is no visibility into how LLM computational effort distributes across multi-turn conversational sessions. A user cannot tell whether later turns become more efficient as context accumulates, or whether each turn independently consumes the same number of planning and tool calls -- a critical distinction for evaluating the interactive mode's scalability to long conversations.
+
+### Claim Statement
+
+A decreasing trend in total LLM calls across turns indicates the agent is learning from accumulated context and requiring fewer planning invocations as the session progresses -- good interactive design. A flat or increasing trend indicates each turn is stateless or context-overloaded, requiring full re-planning regardless of prior conversation history. Turns dominated by tool calls (orange-heavy) versus planning calls (blue-heavy) reveal whether the session is action-oriented (managing emails) or reasoning-oriented (classifying and deciding).
 
 ### Axes
 - **X-Axis:** Conversation Turn (Turn 1 through Turn N)
@@ -145,7 +202,15 @@ Linear regression across all data points. Black dashed line with R² annotation 
 **Data Source:** `results.jsonl` — requires ≥ 2 models with complete run data
 **File:** `28_model_performance_radar.png`
 
-### Axes (6 dimensions, clockwise from top)
+### Problem Statement
+
+Without this chart, comparing models requires examining six separate metrics across different units (milliseconds, token counts, percentages), making it impossible to form a holistic view of which model performs best overall or where trade-offs exist. A user cannot quickly identify whether a model excels in one dimension at the expense of others, or whether it provides balanced performance.
+
+### Claim Statement
+
+A model with a large, symmetric polygon is the best all-around performer -- consistently efficient across speed, token economy, and classification quality. A model with a spiky, asymmetric polygon has a clear specialization (e.g., fast but token-expensive, or token-efficient but slow to escalate) and should be selected only when that specific dimension is prioritized. The radar chart makes it immediately visible whether "bigger models are always better" is true in this benchmark, or whether smaller models achieve comparable normalized scores on specific axes.
+
+### Axes (6 dimensions, arranged at equal angular intervals on polar plot, starting from top)
 
 | Axis | Direction | Description |
 |------|-----------|-------------|
@@ -153,7 +218,7 @@ Linear regression across all data points. Black dashed line with R² annotation 
 | Tokens | Lower = Better | Total token consumption |
 | Steps | Lower = Better | Number of LLM step invocations |
 | Heuristic % | Higher = Better | % of emails classified by heuristic |
-| CV% | Lower = Better | Coefficient of variation in category stability |
+| CV% | Lower = Better | Coefficient of variation in total token consumption (requires ≥ 2 runs per model; shows 0 for single-run) |
 | Escalation % | Lower = Better | % of emails escalated to LLM |
 
 ### Normalization
@@ -183,8 +248,16 @@ Model name with color coding. Legend labels include key metrics (duration, token
 **Data Source:** `results.jsonl` — multi-model runs with varying email limits
 **File:** `29_steps_scaling_heatmap.png`
 
+### Problem Statement
+
+Without this chart, there is no way to assess whether total LLM call volume (including the fixed +2 overhead for summary and final classification) grows predictably with email volume, or whether some models exhibit super-linear scaling where doubling the email count more than doubles the LLM invocations. Chart 24 shows planning steps alone; this chart captures the full operational cost including summary generation.
+
+### Claim Statement
+
+Models that maintain yellow-to-green cells across increasing email limits exhibit predictable, linear scaling -- each additional email adds a roughly constant number of LLM calls. Models that transition to purple at higher limits show super-linear scaling, meaning the system complexity grows faster than the input size -- a red flag for production deployment at scale. Purple cells at low email limits (e.g., 10-20 emails) indicate fundamental inefficiency: the model is invoking excessive LLM steps even for trivial workloads, independent of scaling behavior.
+
 ### Axes
-- **X-Axis:** Model names (with parameter size in parentheses when available)
+- **X-Axis:** Model names (truncated to 18 chars with param size, 25 chars without; param size in parentheses when available)
 - **Y-Axis:** Email Limit (total_emails from runs, sorted ascending)
 - **Cell Value:** Estimated total LLM calls = `(total_tokens / 2800) + 2`
 
