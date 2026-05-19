@@ -8,7 +8,7 @@
 
 ## Summary
 
-Implemented batched email triage architecture to eliminate body truncation while preventing context overflow. Emails are processed in batches of 5 with fresh LLM context per batch; results persist in SQLite between batches.
+Implemented batched email triage architecture to eliminate body truncation while preventing context overflow. All emails are processed in batches with a single combined LLM prompt per batch. The same agent instance is reused across batches, but each batch sends a fresh prompt via `send_messages()` which does not accumulate conversation history — no prior batch context leaks in. Results persist in SQLite between batches.
 
 ---
 
@@ -39,13 +39,33 @@ Implemented batched email triage architecture to eliminate body truncation while
 
 ### `src/gaia/agents/email/agent.py`
 - Added `process_batched_triage(max_messages=25)` — main entry point for batched flow. Generates unique `run_id`, splits heuristic triage results into batches, orchestrates processing, returns JSON summary.
-- Added `_process_single_batch(batch, batch_number, run_id)` — classifies and summarizes a single batch of emails via LLM. Fetches full message bodies, sends classification prompt, parses JSON response, stores result in SQLite. Includes error handling per email (fetch failure, LLM failure, parse failure).
+- Added `_process_single_batch(batch, batch_number, run_id)` — classifies and summarizes a single batch of emails via a **single LLM call**. Fetches full message bodies, builds one combined prompt containing all emails in the batch, sends via `send_messages()` with a custom system prompt. LLM returns a JSON array of classifications. Parses response and stores each email's result in SQLite. Includes error handling per email (fetch failure, LLM failure, parse failure).
 - Added `_produce_final_summary(run_id)` — reads all stored results from SQLite, aggregates category counts, duration, tokens, and per-email summaries. Returns summary dict.
 - `force_llm=False` hardcoded in batched mode (heuristic-first path always used).
 
 ### `src/gaia/agents/email/bench/runner.py`
-- Added `_run_batched_agent()` function — instantiates `EmailTriageAgent` with `enable_batched_mode=True`, calls `process_batched_triage()`, reads back SQLite results, constructs `RunResult` with `batch_results[]`.
+- Added `_run_batched_agent()` function — instantiates `EmailTriageAgent` with `enable_batched_mode=True`, calls `process_batched_triage()`, reads back SQLite results, constructs `RunResult` with `batch_results[]`. Each batch is isolated — no conversation history carries forward between batches.
 - Imports `BatchResult`, `EmailResult`, `fetch_triage_results` from respective modules.
+- Fixed token accounting: `total_input_tokens` now holds the summed per-email character estimates; `total_output_tokens` set to 0; `total_tokens = total_input_tokens`.
+- Fixed `estimated_steps` to `total_batches + 1` (one LLM call per batch + final summary), replacing the previous `len(email_results)` formula.
+
+### `src/gaia/agents/email/bench/bench_runner.py`
+- Added `--batch-size` CLI argument (type `int`, default `5`) to the argument parser.
+- Wired into batched dispatch: passed to `_run_batched_agent(batch_size=args.batch_size)`.
+
+### `src/gaia/agents/email/bench/data_shapes.py`
+- Added `estimated_steps: int = 0` field to `RunResult` dataclass.
+- Defaults to 0 for full/interactive modes; set to `total_batches + 1` for batched mode.
+
+### `src/gaia/agents/email/bench/visualize.py`
+- Added mode-gate to `plot_planning_steps_heatmap()` (Chart 24): batched runs use `r.get("estimated_steps", 0)`, full runs use `len(r.get("step_results", []))`.
+- Added mode-gate to `plot_model_performance_radar()` (Chart 28): same pattern.
+- Added `plot_batched_llm_activity()` — new Chart 27 variant for batched mode. Renders batch processing timeline with email count overlay. Returns `None` if no batched runs present.
+- Updated `generate_charts()` to conditionally emit Chart 27 batched variant when `mode="batched"` runs are detected.
+
+### `tests/test_batched_chart_compat.py` (new file)
+- Comprehensive test suite for batched mode chart compatibility (31 tests).
+- Covers imports, data shapes, chart generation, token accounting, and edge cases.
 
 ---
 
@@ -73,6 +93,8 @@ Implemented batched email triage architecture to eliminate body truncation while
 4. **`--force-llm` flag accepted but ignored** — The `--force-llm` CLI flag is parsed but has no effect in batched mode; no warning is emitted.
 5. **Subject/sender not populated in `EmailResult`** — The `_run_batched_agent()` constructor passes empty strings for `subject` and `sender` when building `EmailResult` from SQLite rows.
 6. **Only single model per run** — Batched mode does not support `--experiments-per-model` or `--models` multi-model runs.
+7. **Token count is approximated, not measured** — In `_process_single_batch()`, `token_count` is calculated as `len(prompt) // 4` per email. This is a character-to-token approximation, not actual token counts from the LLM provider. Batch-level token totals in `RunResult` are summed from these approximations.
+8. **`total_output_tokens` is always 0 in batched mode** — All token consumption is attributed to `total_input_tokens`. This is because `send_messages()` does not return per-call token breakdowns that are propagated back to the benchmark runner.
 
 ---
 
@@ -85,3 +107,4 @@ Implemented batched email triage architecture to eliminate body truncation while
 - Add warning when `--force-llm` is used with `--batched` (flag is currently silently ignored).
 - Support multi-model runs and `--experiments-per-model` in batched mode.
 - Consider parallel batch processing with multiple Lemonade model slots.
+- Improve token accounting to capture actual input/output token breakdowns from LLM provider responses instead of using character-length approximation.

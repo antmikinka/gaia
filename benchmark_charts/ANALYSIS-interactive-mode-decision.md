@@ -48,6 +48,8 @@ With `--force-llm=True`, every email is marked `confident=False`. The intent is 
 
 **Consequence:** `--force-llm=True` changes the `confident` label in the output, but does **not guarantee** the LLM actually fetches bodies and re-classifies. Whether it does depends entirely on the agent's autonomous planning behavior, which is non-deterministic and model-dependent.
 
+**Batched mode bypasses this issue entirely.** Since `_process_single_batch()` sends all emails in a single combined prompt with explicit classification instructions (not relying on the agent's autonomous planning), the LLM classifies every email directly. There is no `confident=False` -> `get_message` -> re-classify chain. This makes batched mode more deterministic for benchmarking but means every email incurs LLM cost regardless of heuristic confidence.
+
 ### Recommendation for `--force-llm`
 
 | Setting | What it measures | When to use |
@@ -87,13 +89,9 @@ The tool fetches full messages internally via `gmail.get_message()` but only ext
 
 ### But `get_message` DOES Send Bodies to the LLM
 
-When the agent calls `get_message` for escalated emails (where `confident=False`), the body IS sent to the LLM via `_format_message_for_llm()` at `read_tools.py:70-100`. There IS a truncation limit:
+When the agent calls `get_message` for emails, the full body IS sent to the LLM via `_format_message_for_llm()`. The truncation limit (`DEFAULT_BODY_LIMIT_CHARS = 4000`) was **removed** as part of the batched mode implementation — bodies are now sent in full. Batch size controls context instead.
 
-```python
-DEFAULT_BODY_LIMIT_CHARS = 4000   # read_tools.py:42
-```
-
-Each escalated email contributes up to ~4000 chars ≈ **~1000 tokens** of body content to the LLM context.
+**NOTE:** `DEFAULT_BODY_LIMIT_CHARS`, `_truncate()`, and `body_truncated` were deleted from `read_tools.py`. Full email bodies are passed through with untrusted-input delimiters (`wrap_untrusted_body()`).
 
 ### MBOX vs JSONL: Body Size Comparison
 
@@ -245,14 +243,14 @@ This makes `_count_confident()` usable for interactive data, enabling heuristic-
 
 ## 4. Chart Feasibility Matrix (Charts 24-29)
 
-| Chart | Full-mode JSONL | Interactive (current) | Interactive (after fix) | Additional data needed |
-|-------|----------------|----------------------|------------------------|----------------------|
-| **24 - Planning Steps Heatmap** | YES | NO | NO | Multi-run JSONL at varying limits |
-| **25 - Tokens per Email** | YES | NO | PARTIALLY | Per-email token attribution |
-| **26 - Duration vs Heuristic** | YES | NO | PARTIALLY | Turn 1 duration mapping |
-| **27 - Interactive LLM Activity** | N/A | YES | YES | Already works |
-| **28 - Model Performance Radar** | YES | NO | PARTIALLY | Multi-run for CV% axis |
-| **29 - Steps Scaling Heatmap** | YES | NO | NO | Multi-run JSONL at varying limits |
+| Chart | Full-mode JSONL | Interactive | Interactive (after fix) | **Batched Mode** | Additional data needed |
+|-------|----------------|-------------|------------------------|-----------------|----------------------|
+| **24 - Planning Steps Heatmap** | YES | NO | NO | **YES** (uses `estimated_steps`) | Multi-run at varying limits |
+| **25 - Tokens per Email** | YES | NO | PARTIALLY | **YES** (approximated tokens) | Per-email token attribution |
+| **26 - Duration vs Heuristic** | YES | NO | PARTIALLY | **YES** | Turn 1 duration mapping |
+| **27 - Interactive LLM Activity** | N/A | YES | YES | **YES** (new batched variant) | Already works |
+| **28 - Model Performance Radar** | YES | NO | PARTIALLY | **YES** (uses `estimated_steps`) | Multi-run for CV% axis |
+| **29 - Steps Scaling Heatmap** | YES | NO | NO | **YES** (batch count) | Multi-run at varying limits |
 
 ### Key Insight
 

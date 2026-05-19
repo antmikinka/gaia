@@ -54,7 +54,7 @@ user: "Triage my inbox (100 emails)"
 | **Fresh agent per batch** | Prevents conversation history accumulation. Each batch starts clean. |
 | **SQLite for intermediate storage** | Already using DatabaseMixin. New table for triage results. |
 | **Heuristic-first, LLM-second** | triage_inbox() already classifies all emails heuristically. Only confident=False need bodies. |
-| **Batch size = 5 (not 10)** | 10 MBOX emails at 5K-10K tokens each = 50K-100K > 32K context. 5 emails × 10K = 50K max, but most emails are smaller. |
+| **Batch size = 5 (not 10)** | 10 MBOX emails at 5K-10K tokens each = 50K-100K > 32K context. 5 emails × 10K = 50K max, but most emails are smaller. Configurable via `--batch-size` CLI flag. |
 
 ---
 
@@ -418,6 +418,8 @@ Total estimated changes: ~170 lines across 7 files. Zero breaking changes to exi
 - **Batched triage methods** — `process_batched_triage()`, `_process_single_batch()`, and `_produce_final_summary()` added to `EmailTriageAgent`.
 - **Benchmark runner** — `_run_batched_agent()` function added to `runner.py`, returning `RunResult` with `batch_results[]` populated from SQLite.
 - **Progress reporting** — Each batch prints `"Processing batch N of M..."` to console.
+- **Single-LLM-call-per-batch** — `_process_single_batch()` sends all emails in a batch together in one combined prompt via `self.chat.send_messages()`. The LLM returns a JSON array with one classification per email. This departs from the per-email escalation model in Section 2.1. Token count is approximated as `len(prompt) // 4`.
+- **Context isolation between batches** — The same `EmailTriageAgent` instance (`self`) is reused across batches, but each batch sends a **fresh prompt** via `send_messages()` which does NOT append to `self.chat`'s conversation history. The LLM sees only the emails in the current batch — no prior batch context leaks in. This achieves the plan's intent of "fresh agent per batch" without actually creating new agent instances.
 - **`llm_summary` field** — Added to `EmailResult` dataclass in `data_shapes.py` for carrying LLM-generated summaries.
 - **`BatchResult` dataclass** — Added to `data_shapes.py` with fields: `batch_number`, `batch_size`, `total_batches`, `email_results`, `duration_ms`, token aggregates (`total_input_tokens`, `total_output_tokens`, `total_reasoning_tokens`, `total_tokens`), `categories`, `status`, `error`.
 
@@ -425,6 +427,8 @@ Total estimated changes: ~170 lines across 7 files. Zero breaking changes to exi
 
 | Planned | Implemented | Rationale |
 |---------|-------------|-----------|
+| Per-email LLM re-classification for `confident=False` only | ALL emails processed in batches via single combined prompt per batch | `_process_single_batch()` builds one prompt containing all batch emails, sent in a single `send_messages()` call. Every email incurs LLM cost regardless of heuristic confidence. |
+| Batch size hardcoded at 5 | Configurable via `--batch-size` CLI flag (default 5) | Exposed as integer argument in `bench_runner.py`; passed to `_run_batched_agent()` and `EmailAgentConfig.batch_size`. |
 | `token_budget_per_batch: int = 25000` config field with dynamic batch size reduction | Not implemented | Batch size of 5 is a fixed guard; dynamic budgeting deferred. Most emails are well under 10K tokens. |
 | `--batched` CLI flag | Implemented | `--batched` flag wired in `cli.py` and `bench_runner.py`; outputs to `results_<model>_batched.jsonl`. |
 | Separate `BatchedResult` dataclass in `data_shapes.py` | `llm_summary` added to existing `EmailResult`; separate `BatchResult` created | Simpler — reuse existing shape, add summary field where needed. |
@@ -436,5 +440,10 @@ Total estimated changes: ~170 lines across 7 files. Zero breaking changes to exi
 - No `force_llm` in batched mode.
 - No SQLite cleanup (results persist).
 - Progress reporting during batch processing ("Batch N of M...").
+
+**Chart compatibility notes (post-chart-fixes):**
+- **`estimated_steps` field** — Added to `RunResult` dataclass. For batched mode, set to `total_batches + 1` (one LLM call per batch plus final summary). Charts 24 and 28 use mode gates: batched runs read `estimated_steps`, full runs read `len(step_results)`.
+- **Chart 27 variant** — A new `plot_batched_llm_activity()` renders a batch processing timeline (X=batch number, Y=duration ms) with email count overlay. Emitted when `mode="batched"` runs are detected.
+- **ALL emails processed** — Batched mode does not filter to `confident=False`. The `process_batched_triage()` method batches all emails from `triage_inbox_impl()` results.
 
 **Total actual changes:** ~200 lines across 6 files. Zero breaking changes to existing full mode or interactive mode.
