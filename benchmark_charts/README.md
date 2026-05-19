@@ -13,13 +13,36 @@ specs, legends, and interpretation guidance.
 | 25 - Token Efficiency Bars | Implemented | Multi-model runs |
 | 26 - Latency vs Heuristic Scatter | Implemented | Multi-model runs |
 | 27 - Interactive LLM Activity | Implemented | Interactive mode session data (`interactive.json`) |
+| 27b - Batch Processing Timeline | Implemented | Batched mode data (`results_*_batched.jsonl`) |
 | 28 - Model Performance Radar | Implemented | ≥ 2 models with complete run data |
 | 29 - Steps Scaling Heatmap | Implemented | Multi-model runs with varying email limits |
+
+## Batched Mode — How It Works
+
+Batched mode (`--batched`) processes emails in groups of N (default 5, configurable via `--batch-size`) with context isolation between batches:
+
+1. **Heuristic triage** — `triage_inbox()` classifies all emails header-only (zero LLM calls).
+2. **Batch processing** — All emails are split into batches of `--batch-size`. Each batch is sent as a **single combined LLM prompt** containing all emails in that batch. The LLM returns a JSON array with one classification per email.
+3. **Context isolation** — The same agent instance is reused across batches, but each batch sends a fresh prompt via `send_messages()` which does **not** accumulate conversation history. The LLM sees only the emails in the current batch — no prior batch context leaks in.
+4. **SQLite persistence** — After each batch, every email's result (category, confident, llm_summary) is written to the `email_triage_results` table.
+5. **Final summary** — After all batches complete, `_produce_final_summary()` reads all accumulated SQLite results and produces a consolidated output:
+   - `categories` — aggregate counts across ALL batches (e.g. `{"urgent": 3, "actionable": 12, "informational": 85}`)
+   - `total_duration_secs` — sum across all batches
+   - `total_tokens` — sum across all batches (character-length approximation)
+   - `emails` — per-email detail with email_id, category, confident, and llm_summary
+   - `batch_count` — number of batches processed
+
+The user sees one consolidated JSON covering every email from every batch. Results are saved to `results_<model>_batched.jsonl`.
+
+### Chart Compatibility
+
+All charts 24-29 work with batched mode data. Charts 24 and 28 use a mode gate: batched runs read `estimated_steps` (one LLM call per batch + summary), full runs read `len(step_results)`. Chart 27 has a batched variant (`plot_batched_llm_activity`) that shows duration per batch with email count overlay.
 
 ## Data Requirements
 
 - **`results.jsonl`**: Standard benchmark results with multi-model runs. Required for Charts 24, 25, 26, 28, 29.
 - **`interactive.json`**: Interactive mode session data from conversational email benchmark runs. Required for Chart 27.
+- **`results_*_batched.jsonl`**: Batched mode results. Required for Chart 27b (batch timeline). Compatible with Charts 24-29.
 - **Multi-model runs**: Charts 24, 25, 26, 28, 29 require at least 2 different models to show comparative data.
 - **Varying email limits**: Charts 24 and 29 require runs with different `total_emails` values to show scaling behavior.
 - **Chart 28 (Radar)**: Requires ≥ 2 runs per model for CV% (coefficient of variation) calculation. With a single run per model, CV% axis will show 0.
