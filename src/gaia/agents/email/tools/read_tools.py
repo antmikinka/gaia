@@ -36,11 +36,6 @@ from gaia.logger import get_logger
 
 log = get_logger(__name__)
 
-# Maximum body length sent to the LLM. Larger messages are truncated with
-# a ``...[truncated]`` marker. Prevents context blow-up and limits the
-# attack surface for indirect prompt injection.
-DEFAULT_BODY_LIMIT_CHARS = 4000
-
 # Wrapper used to delimit untrusted email body content. The system prompt
 # (see ``agent.py``) tells the LLM that anything inside this wrapper is
 # DATA, never an instruction to execute. Phase I1 / S2.M3.
@@ -61,20 +56,12 @@ def _envelope_err(message: str) -> str:
     return json.dumps({"ok": False, "error": message})
 
 
-def _truncate(text: str, limit: int) -> tuple[str, bool]:
-    if len(text) <= limit:
-        return text, False
-    return text[:limit] + "\n...[truncated]", True
-
-
-def _format_message_for_llm(
-    msg: Dict[str, Any], *, body_limit: int = DEFAULT_BODY_LIMIT_CHARS
-) -> Dict[str, Any]:
+def _format_message_for_llm(msg: Dict[str, Any]) -> Dict[str, Any]:
     """Reduce a Gmail-API-shape message to fields the LLM can act on.
 
     The body is decoded via the production decoder and wrapped in the
     untrusted-input delimiter so the LLM never confuses content with
-    instructions.
+    instructions. Full body is passed through — no truncation.
     """
     payload = msg.get("payload") or {}
     headers = {
@@ -82,9 +69,6 @@ def _format_message_for_llm(
         for h in payload.get("headers", [])
     }
     body, attachments = decode_message_body(payload)
-    body_truncated = False
-    if body:
-        body, body_truncated = _truncate(body, body_limit)
     return {
         "id": msg.get("id"),
         "thread_id": msg.get("threadId"),
@@ -94,8 +78,7 @@ def _format_message_for_llm(
         "date": headers.get("date", ""),
         "label_ids": list(msg.get("labelIds", [])),
         "snippet": msg.get("snippet", ""),
-        "body": wrap_untrusted_body(body),
-        "body_truncated": body_truncated,
+        "body": wrap_untrusted_body(body) if body else "",
         "attachments": attachments,
     }
 
@@ -270,7 +253,7 @@ class ReadToolsMixin:
                 JSON envelope with ``{"messages": [...]}`` per message:
                 id, thread_id, subject, from, to, date, label_ids,
                 snippet, body (wrapped in untrusted-input delimiters),
-                body_truncated, attachments.
+                attachments.
             """
             try:
                 max_results = max(1, min(int(max_results or 25), 100))

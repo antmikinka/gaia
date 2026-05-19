@@ -31,7 +31,11 @@ Phase I prompt-injection defense:
 
 from __future__ import annotations
 
+import json
 import os
+import time
+import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import ClassVar, List, Optional
 
@@ -256,6 +260,193 @@ class EmailTriageAgent(
             and len(self._organize_distinct_senders)
             > self.ORGANIZE_BATCH_SENDER_THRESHOLD
         )
+
+    # -- Batched triage mode ------------------------------------------------
+
+    def process_batched_triage(
+        self,
+        *,
+        max_messages: int = 25,
+    ) -> str:
+        """Run the batched triage flow over the user's inbox.
+
+        Returns JSON string with final summary.
+        """
+        from gaia.agents.email.action_store import (
+            fetch_triage_results,
+            record_triage_result,
+        )
+        from gaia.agents.email.tools.read_tools import triage_inbox_impl
+
+        triage_data = triage_inbox_impl(
+            self._gmail,
+            max_messages=max_messages,
+            debug=self.config.debug,
+            force_llm=False,
+        )
+        all_emails = triage_data.get("results", [])
+        if not all_emails:
+            return json.dumps({
+                "ok": True,
+                "data": {"message": "No emails found.", "total": 0},
+            })
+
+        run_id = f"batched-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        batch_size = self.config.batch_size
+        batches = [all_emails[i:i + batch_size] for i in range(0, len(all_emails), batch_size)]
+        total_batches = len(batches)
+
+        for batch_idx, batch in enumerate(batches, start=1):
+            print(f"\n  Processing batch {batch_idx} of {total_batches}...")
+            self._process_single_batch(
+                batch=batch,
+                batch_number=batch_idx,
+                run_id=run_id,
+            )
+
+        summary = self._produce_final_summary(run_id=run_id)
+        return json.dumps({"ok": True, "data": summary}, default=str)
+
+    def _process_single_batch(
+        self,
+        *,
+        batch: list[dict],
+        batch_number: int,
+        run_id: str,
+    ) -> None:
+        """Classify and summarize a single batch of emails via LLM."""
+        from gaia.agents.email.action_store import (
+            BODY_PREVIEW_MAX_CHARS,
+            record_triage_result,
+        )
+        from gaia.agents.email.tools.read_tools import get_message_impl
+        from gaia.agents.email.tools.triage_heuristics import ALL_CATEGORIES
+
+        for email_info in batch:
+            email_id = email_info.get("id", "")
+            thread_id = email_info.get("thread_id", "")
+            subject = email_info.get("subject", "")
+            sender = email_info.get("from", "")
+            start = time.monotonic()
+
+            try:
+                full_msg = get_message_impl(self._gmail, message_id=email_id, debug=self.config.debug)
+                body = (full_msg.get("body") or "").replace(
+                    "<<<UNTRUSTED_EMAIL_BODY_START>>>\n", ""
+                ).replace("\n<<<UNTRUSTED_EMAIL_BODY_END>>>", "")
+            except Exception as exc:
+                record_triage_result(
+                    self,
+                    triage_id=f"{run_id}-{batch_number}-{email_id}",
+                    run_id=run_id,
+                    batch_number=batch_number,
+                    email_id=email_id,
+                    thread_id=thread_id,
+                    category="informational",
+                    confident=False,
+                    llm_summary=f"Error fetching message: {exc}",
+                    body_preview="",
+                    token_count=0,
+                    duration_secs=round(time.monotonic() - start, 2),
+                )
+                continue
+
+            cat_list = ", ".join(ALL_CATEGORIES)
+            prompt = (
+                f"Classify this email into ONE of these categories: {cat_list}.\n\n"
+                f"Subject: {subject}\n"
+                f"From: {sender}\n\n"
+                f"Body:\n{body}\n\n"
+                f"Respond with ONLY a JSON object with keys:\n"
+                f'  "category": one of {cat_list},\n'
+                f'  "confident": boolean,\n'
+                f'  "summary": 1-2 sentence summary.\n'
+            )
+
+            try:
+                response = self.chat.send_messages(
+                    [{"role": "user", "content": prompt}],
+                    system_prompt="You are an email classification assistant. Respond with JSON only.",
+                    tools=None,
+                    temperature=0.0,
+                    max_tokens=256,
+                )
+                response_text = response.text if hasattr(response, "text") else str(response)
+
+                import re
+                json_match = re.search(r"\{.*\}", response_text, re.DOTALL)
+                if json_match:
+                    parsed = json.loads(json_match.group())
+                else:
+                    parsed = json.loads(response_text)
+
+                category = parsed.get("category", "informational")
+                confident = parsed.get("confident", False)
+                llm_summary = parsed.get("summary", "")
+
+                if category not in ALL_CATEGORIES:
+                    category = "informational"
+            except Exception as exc:
+                category = "informational"
+                confident = False
+                llm_summary = f"LLM classification failed: {exc}"
+
+            duration_secs = round(time.monotonic() - start, 2)
+            token_count = len(prompt) // 4
+            body_preview = body[:BODY_PREVIEW_MAX_CHARS]
+
+            record_triage_result(
+                self,
+                triage_id=f"{run_id}-{batch_number}-{email_id}",
+                run_id=run_id,
+                batch_number=batch_number,
+                email_id=email_id,
+                thread_id=thread_id,
+                category=category,
+                confident=confident,
+                llm_summary=llm_summary,
+                body_preview=body_preview,
+                token_count=token_count,
+                duration_secs=duration_secs,
+            )
+
+    def _produce_final_summary(self, *, run_id: str) -> dict:
+        """Read stored results and produce the final summary."""
+        from gaia.agents.email.action_store import fetch_triage_results
+
+        results = fetch_triage_results(self, run_id=run_id)
+
+        category_counts: dict[str, int] = {}
+        total_duration = 0.0
+        total_tokens = 0
+        email_summaries = []
+
+        for row in results:
+            cat = row.get("category", "unknown")
+            category_counts[cat] = category_counts.get(cat, 0) + 1
+            total_duration += row.get("duration_secs", 0) or 0
+            total_tokens += row.get("token_count", 0) or 0
+            email_summaries.append({
+                "email_id": row["email_id"],
+                "thread_id": row.get("thread_id"),
+                "category": cat,
+                "confident": row.get("confident", False),
+                "summary": row.get("llm_summary", ""),
+            })
+
+        batch_count = max(
+            (row.get("batch_number", 1) or 1 for row in results), default=1
+        )
+
+        return {
+            "run_id": run_id,
+            "total_emails": len(results),
+            "categories": category_counts,
+            "batch_count": batch_count,
+            "total_duration_secs": round(total_duration, 1),
+            "total_tokens": total_tokens,
+            "emails": email_summaries,
+        }
 
 
 __all__ = ["EmailTriageAgent", "EmailAgentConfig", "AGENT_NAMESPACED_ID"]

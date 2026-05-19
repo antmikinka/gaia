@@ -248,6 +248,118 @@ def _run_full_agent(
 
 
 # ---------------------------------------------------------------------------
+# Batched agent mode
+# ---------------------------------------------------------------------------
+
+
+def _run_batched_agent(
+    mbox_path: str = "",
+    jsonl_path: str = "",
+    *,
+    model_id: str,
+    base_url: str,
+    max_steps: int = 12,
+    limit: int = 100,
+    batch_size: int = 5,
+) -> RunResult:
+    """Run the batched EmailTriageAgent end-to-end."""
+    import uuid as _uuid
+    from datetime import datetime, timezone
+
+    from gaia.agents.email.agent import EmailTriageAgent
+    from gaia.agents.email.config import EmailAgentConfig
+    from gaia.agents.email.action_store import fetch_triage_results
+    from gaia.agents.email.fake_gmail import FakeCalendarBackend, FakeGmailBackend
+    from gaia.agents.email.bench.data_shapes import BatchResult, EmailResult
+
+    run_id = f"run-batched-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{model_id.replace('/', '-')}-{_uuid.uuid4().hex[:6]}"
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    if mbox_path and jsonl_path:
+        raise ValueError("Specify either mbox_path or jsonl_path, not both")
+    if mbox_path:
+        fake = FakeGmailBackend(mbox_path=Path(mbox_path))
+    elif jsonl_path:
+        fake = FakeGmailBackend(jsonl_path=Path(jsonl_path))
+    else:
+        raise ValueError("Either mbox_path or jsonl_path must be provided")
+    fake_cal = FakeCalendarBackend()
+    config = EmailAgentConfig(
+        model_id=model_id,
+        base_url=base_url,
+        max_steps=max_steps,
+        debug=True,
+        show_stats=True,
+        enable_batched_mode=True,
+        batch_size=batch_size,
+        gmail_backend=fake,
+        calendar_backend=fake_cal,
+    )
+    agent = EmailTriageAgent(config=config)
+
+    start = time.monotonic()
+    try:
+        result_str = agent.process_batched_triage(max_messages=limit)
+    except Exception as exc:
+        return RunResult(
+            run_id=run_id, timestamp=timestamp, model=model_id,
+            provider="lemonade", mbox_path=mbox_path, jsonl_path=jsonl_path,
+            data_source="jsonl" if jsonl_path else "mbox", mode="batched",
+            status="error", error=str(exc),
+            total_duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    total_duration_ms = int((time.monotonic() - start) * 1000)
+    results = fetch_triage_results(agent, run_id=run_id)
+
+    email_results: list[EmailResult] = []
+    category_counts: dict[str, int] = {}
+    for row in results:
+        cat = row.get("category", "informational")
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+        email_results.append(EmailResult(
+            email_id=row["email_id"], subject="", sender="",
+            category=cat, confident=row.get("confident", False),
+            reason="", llm_summary=row.get("llm_summary", ""),
+            status="ok",
+            duration_ms=int((row.get("duration_secs", 0) or 0) * 1000),
+            total_tokens=row.get("token_count", 0) or 0,
+        ))
+
+    batch_groups: dict[int, list[EmailResult]] = {}
+    for idx, row in enumerate(results):
+        bn = row.get("batch_number", 1)
+        batch_groups.setdefault(bn, []).append(email_results[idx])
+
+    total_batches = max(batch_groups.keys(), default=1)
+    batch_results_list: list[BatchResult] = []
+    for bn in sorted(batch_groups.keys()):
+        group = batch_groups[bn]
+        batch_results_list.append(BatchResult(
+            batch_number=bn, batch_size=len(group), total_batches=total_batches,
+            email_results=group,
+            duration_ms=int(sum(e.duration_ms for e in group)),
+            total_output_tokens=sum(e.total_tokens for e in group),
+            total_tokens=sum(e.total_tokens for e in group),
+            categories=list(set(e.category for e in group)),
+            status="ok",
+        ))
+
+    total_tokens = sum(e.total_tokens for e in email_results)
+
+    return RunResult(
+        run_id=run_id, timestamp=timestamp, model=model_id, provider="lemonade",
+        mbox_path=mbox_path, jsonl_path=jsonl_path,
+        data_source="jsonl" if jsonl_path else "mbox", mode="batched",
+        batch_results=batch_results_list, step_results=[],
+        total_emails=len(email_results), total_duration_ms=total_duration_ms,
+        total_output_tokens=total_tokens, total_tokens=total_tokens,
+        category_counts=category_counts,
+        status="completed" if email_results else "error",
+    )
+
+
+# ---------------------------------------------------------------------------
 # Interactive benchmark — multi-turn session tracking
 # ---------------------------------------------------------------------------
 

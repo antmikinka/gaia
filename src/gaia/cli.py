@@ -1524,6 +1524,17 @@ def main():
         action="store_true",
         help="Bypass heuristic fast-path; force LLM classification of every email.",
     )
+    _email_bench_parser.add_argument(
+        "--batched",
+        action="store_true",
+        help="Run batched triage mode (full bodies, no truncation, batches of 5).",
+    )
+    _email_bench_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=5,
+        help="Number of emails per batch in batched mode (default 5).",
+    )
     # ClawFlow (deprecated from bench; use 'gaia email clawflow').
     _email_bench_parser.add_argument(
         "--clawflow",
@@ -4077,9 +4088,14 @@ def handle_email_command(args):
             "skip_cold_start",
             "fail_fast",
             "force_llm",
+            "batched",
         ]:
             if getattr(args, flag, False):
                 bench_args.append(f"--{flag.replace('_', '-')}")
+
+        # Batch-size param (value, only meaningful with --batched).
+        if args.batched and getattr(args, "batch_size", None):
+            bench_args.extend(["--batch-size", str(args.batch_size)])
 
         # Compare param (list).
         compare_paths = getattr(args, "compare", None)

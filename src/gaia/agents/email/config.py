@@ -98,6 +98,8 @@ class EmailAgentConfig:
     db_path: Optional[str] = None
     gmail_backend: Optional[Any] = None
     calendar_backend: Optional[Any] = None
+    batch_size: int = 5
+    enable_batched_mode: bool = False
 
     def validate(self) -> None:
         """Run startup-time invariants. Called from the agent's __init__.

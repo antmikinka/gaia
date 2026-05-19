@@ -63,6 +63,7 @@ class EmailResult:
     is_phishing: bool = False
     confident: bool = False
     reason: str = ""
+    llm_summary: str = ""
     duration_ms: int = 0
     input_tokens: int = 0
     output_tokens: int = 0

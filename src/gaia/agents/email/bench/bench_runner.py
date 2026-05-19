@@ -49,6 +49,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--skip-cold-start", action="store_true")
     parser.add_argument("--steps", action="store_true")
     parser.add_argument("--force-llm", action="store_true")
+    parser.add_argument("--batched", action="store_true")
+    parser.add_argument("--batch-size", type=int, default=5)
     return parser
 
 
@@ -84,6 +86,48 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Batched mode: full bodies, no truncation, batches of N.
+    if args.batched:
+        from gaia.agents.email.bench.runner import _run_batched_agent
+
+        model = args.model or (args.models[0] if args.models else None)
+        if not model:
+            print("Error: --model or --models is required for batched mode.")
+            return 1
+
+        jsonl_path = output_dir / f"results_{_slug(model)}_batched.jsonl"
+
+        print(f"\n{'='*70}")
+        print(f"  Batched Email Triage — {model}")
+        print(f"{'='*70}")
+        print(f"  Data:     {args.mbox_path or args.jsonl_path}")
+        print(f"  Limit:    {args.limit} emails")
+        print(f"  Batch:    {args.limit // args.batch_size + 1} batches of ~{args.batch_size} emails")
+        print(f"{'='*70}")
+
+        try:
+            result = _run_batched_agent(
+                args.mbox_path or "",
+                args.jsonl_path or "",
+                model_id=model,
+                base_url=args.base_url,
+                max_steps=12,
+                limit=args.limit,
+                batch_size=args.batch_size,
+            )
+
+            if result.status == "error":
+                print(f"\n  Error: {result.error}")
+                return 1
+
+            from gaia.agents.email.bench.output import save_jsonl
+            save_jsonl(result, jsonl_path)
+            print(f"\n  Results saved to: {jsonl_path}")
+            return 0
+        except Exception as exc:
+            print(f"\n  Error: {exc}")
+            return 1
 
     # Interactive mode: single multi-turn session (special case, one-shot).
     if args.mode == "interactive":
