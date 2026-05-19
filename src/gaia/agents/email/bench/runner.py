@@ -339,13 +339,14 @@ def _run_batched_agent(
             batch_number=bn, batch_size=len(group), total_batches=total_batches,
             email_results=group,
             duration_ms=int(sum(e.duration_ms for e in group)),
-            total_output_tokens=sum(e.total_tokens for e in group),
+            total_input_tokens=sum(e.total_tokens for e in group),
+            total_output_tokens=0,
             total_tokens=sum(e.total_tokens for e in group),
             categories=list(set(e.category for e in group)),
             status="ok",
         ))
 
-    total_tokens = sum(e.total_tokens for e in email_results)
+    total_input_tokens = sum(e.total_tokens for e in email_results)
 
     return RunResult(
         run_id=run_id, timestamp=timestamp, model=model_id, provider="lemonade",
@@ -353,8 +354,10 @@ def _run_batched_agent(
         data_source="jsonl" if jsonl_path else "mbox", mode="batched",
         batch_results=batch_results_list, step_results=[],
         total_emails=len(email_results), total_duration_ms=total_duration_ms,
-        total_output_tokens=total_tokens, total_tokens=total_tokens,
+        total_input_tokens=total_input_tokens, total_output_tokens=0,
+        total_tokens=total_input_tokens,
         category_counts=category_counts,
+        estimated_steps=len(email_results),
         status="completed" if email_results else "error",
     )
 

@@ -136,3 +136,4 @@ class RunResult:
     # Multi-model / cross-framework extensions.
     is_cold_start: bool = False
     source_framework: str = "gaia"
+    estimated_steps: int = 0

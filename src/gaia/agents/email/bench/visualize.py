@@ -2300,7 +2300,11 @@ def plot_planning_steps_heatmap(
         model = r.get("model", "unknown")
         emails = r.get("total_emails", 0)
         est = r.get("total_tokens", 0) / 2800.0
-        actual = len(r.get("step_results", []))
+        actual = (
+            r.get("estimated_steps", 0)
+            if r.get("mode") == "batched"
+            else len(r.get("step_results", []))
+        )
         key = (model, emails)
         data.setdefault(key, []).append(est)
         step_counts.setdefault(key, []).append(actual)
@@ -2662,6 +2666,82 @@ def plot_interactive_llm_activity(
     )
 
 
+def plot_batched_llm_activity(
+    runs: list[dict[str, Any]], output_dir: Path, *, run_id_suffix: str | None = None
+) -> Path | None:
+    """Batch processing timeline: duration per batch with email count overlay.
+
+    X-axis: batch number, Y-axis: duration (ms). Bar height shows batch
+    processing time; a label above each bar shows the email count in that batch.
+    Multiple runs of the same model are grouped and shown with distinct colors.
+    """
+    plt_mod = _require_matplotlib()
+    batched_runs = [r for r in runs if r.get("mode") == "batched"]
+    if not batched_runs:
+        return None
+
+    # Collect per-model batch timelines.
+    model_batches: dict[str, list[dict]] = {}
+    for r in batched_runs:
+        model = r.get("model", "unknown")
+        run_label = r.get("run_id", "")[:30]
+        for b in r.get("batch_results", []):
+            model_batches.setdefault(model, []).append({
+                "batch_number": b.get("batch_number", 0),
+                "duration_ms": b.get("duration_ms", 0),
+                "batch_size": b.get("batch_size", 0),
+                "run_label": run_label,
+            })
+
+    if not model_batches:
+        return None
+
+    models = sorted(model_batches.keys())
+    max_batches = max(
+        max((b["batch_number"] for b in blist), default=1)
+        for blist in model_batches.values()
+    )
+
+    model_color_map = {m: COLORS.get(m, f"C{i}") for i, m in enumerate(models)}
+
+    fig, ax = plt_mod.subplots(figsize=(max(8, max_batches * 2), 5))
+    width = 0.6 / max(len(models), 1)
+
+    for mi, model in enumerate(models):
+        blist = model_batches[model]
+        offsets = [b["batch_number"] + (mi - len(models) / 2 + 0.5) * width for b in blist]
+        durations = [b["duration_ms"] for b in blist]
+        sizes = [b["batch_size"] for b in blist]
+        color = model_color_map.get(model, f"C{mi}")
+
+        bars = ax.bar(
+            offsets, durations, width, label=model[:25],
+            color=color, alpha=0.85,
+        )
+
+        # Annotate email count on each bar.
+        for off, dur, sz in zip(offsets, durations, sizes):
+            if dur > 0:
+                ax.text(
+                    off, dur + max(dur * 0.02, 5),
+                    f"n={sz}", ha="center", va="bottom",
+                    fontsize=7, fontweight="bold",
+                )
+
+    ax.set_xlabel("Batch Number")
+    ax.set_ylabel("Duration (ms)")
+    ax.set_title(
+        "Batch Processing Timeline -- Duration per Batch with Email Count",
+        fontweight="bold", fontsize=12,
+    )
+    ax.legend(fontsize=8, loc="upper right")
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(
+        fig, output_dir, "27_batched_llm_activity", run_id_suffix=run_id_suffix
+    )
+
+
 def plot_model_performance_radar(
     runs: list[dict[str, Any]], output_dir: Path
 ) -> Path | None:
@@ -2676,7 +2756,11 @@ def plot_model_performance_radar(
         model = r.get("model", "unknown")
         duration = r.get("total_duration_ms", 0)
         tokens = r.get("total_tokens", 0)
-        steps = len(r.get("step_results", []))
+        steps = (
+            r.get("estimated_steps", 0)
+            if r.get("mode") == "batched"
+            else len(r.get("step_results", []))
+        )
         confident, total_emails = _count_confident(r)
         heuristic_pct = (confident / total_emails * 100) if total_emails > 0 else 0
         escalation_pct = 100 - heuristic_pct
@@ -3181,6 +3265,18 @@ def generate_charts(
                     "Model Performance Radar -- 6-axis spider chart with normalized 0-100 scores",
                 )
             )
+
+        # Chart 27 (batched): Batch processing timeline
+        if any(r.get("mode") == "batched" for r in multi_model_runs):
+            p = plot_batched_llm_activity(multi_model_runs, output_dir)
+            if p:
+                paths.append(p)
+                charts_index.append(
+                    (
+                        p.name,
+                        "Batch Processing Timeline -- Duration per batch with email count overlay",
+                    )
+                )
 
     # --- Heuristic vs LLM escalation (always, when runs exist) ---
     all_runs_for_escalation = []
