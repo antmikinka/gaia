@@ -357,7 +357,7 @@ def _run_batched_agent(
         total_input_tokens=total_input_tokens, total_output_tokens=0,
         total_tokens=total_input_tokens,
         category_counts=category_counts,
-        estimated_steps=len(email_results),
+        estimated_steps=total_batches + 1,  # one LLM call per batch + final summary
         status="completed" if email_results else "error",
     )
 
