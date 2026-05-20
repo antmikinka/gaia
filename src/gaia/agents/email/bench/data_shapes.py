@@ -119,7 +119,7 @@ class RunResult:
     mbox_path: str = ""
     jsonl_path: str = ""
     data_source: str = "mbox"  # "mbox" | "jsonl"
-    mode: str = ""  # "heuristic" | "full"
+    mode: str = ""  # "heuristic" | "full" | "batched" | "smart"
     batch_results: list[BatchResult] = field(default_factory=list)
     step_results: list[StepResult] = field(default_factory=list)
     total_emails: int = 0
@@ -137,3 +137,5 @@ class RunResult:
     is_cold_start: bool = False
     source_framework: str = "gaia"
     estimated_steps: int = 0
+    heuristic_only_count: int = 0
+    llm_processed_count: int = 0

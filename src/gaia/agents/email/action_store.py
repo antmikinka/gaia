@@ -282,9 +282,7 @@ def record_triage_result(
     )
 
 
-def fetch_triage_results(
-    db, *, run_id: str
-) -> List[Dict[str, Any]]:
+def fetch_triage_results(db, *, run_id: str) -> List[Dict[str, Any]]:
     """Return all triage results for a given run_id."""
     rows = db.query(
         "SELECT * FROM email_triage_results WHERE run_id = :run_id "

@@ -266,11 +266,11 @@ def _run_batched_agent(
     import uuid as _uuid
     from datetime import datetime, timezone
 
-    from gaia.agents.email.agent import EmailTriageAgent
-    from gaia.agents.email.config import EmailAgentConfig
     from gaia.agents.email.action_store import fetch_triage_results
-    from gaia.agents.email.fake_gmail import FakeCalendarBackend, FakeGmailBackend
+    from gaia.agents.email.agent import EmailTriageAgent
     from gaia.agents.email.bench.data_shapes import BatchResult, EmailResult
+    from gaia.agents.email.config import EmailAgentConfig
+    from gaia.agents.email.fake_gmail import FakeCalendarBackend, FakeGmailBackend
 
     run_id = f"run-batched-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{model_id.replace('/', '-')}-{_uuid.uuid4().hex[:6]}"
     timestamp = datetime.now(timezone.utc).isoformat()
@@ -302,10 +302,16 @@ def _run_batched_agent(
         result_str = agent.process_batched_triage(max_messages=limit)
     except Exception as exc:
         return RunResult(
-            run_id=run_id, timestamp=timestamp, model=model_id,
-            provider="lemonade", mbox_path=mbox_path, jsonl_path=jsonl_path,
-            data_source="jsonl" if jsonl_path else "mbox", mode="batched",
-            status="error", error=str(exc),
+            run_id=run_id,
+            timestamp=timestamp,
+            model=model_id,
+            provider="lemonade",
+            mbox_path=mbox_path,
+            jsonl_path=jsonl_path,
+            data_source="jsonl" if jsonl_path else "mbox",
+            mode="batched",
+            status="error",
+            error=str(exc),
             total_duration_ms=int((time.monotonic() - start) * 1000),
         )
 
@@ -317,14 +323,20 @@ def _run_batched_agent(
     for row in results:
         cat = row.get("category", "informational")
         category_counts[cat] = category_counts.get(cat, 0) + 1
-        email_results.append(EmailResult(
-            email_id=row["email_id"], subject="", sender="",
-            category=cat, confident=row.get("confident", False),
-            reason="", llm_summary=row.get("llm_summary", ""),
-            status="ok",
-            duration_ms=int((row.get("duration_secs", 0) or 0) * 1000),
-            total_tokens=row.get("token_count", 0) or 0,
-        ))
+        email_results.append(
+            EmailResult(
+                email_id=row["email_id"],
+                subject="",
+                sender="",
+                category=cat,
+                confident=row.get("confident", False),
+                reason="",
+                llm_summary=row.get("llm_summary", ""),
+                status="ok",
+                duration_ms=int((row.get("duration_secs", 0) or 0) * 1000),
+                total_tokens=row.get("token_count", 0) or 0,
+            )
+        )
 
     batch_groups: dict[int, list[EmailResult]] = {}
     for idx, row in enumerate(results):
@@ -335,26 +347,38 @@ def _run_batched_agent(
     batch_results_list: list[BatchResult] = []
     for bn in sorted(batch_groups.keys()):
         group = batch_groups[bn]
-        batch_results_list.append(BatchResult(
-            batch_number=bn, batch_size=len(group), total_batches=total_batches,
-            email_results=group,
-            duration_ms=int(sum(e.duration_ms for e in group)),
-            total_input_tokens=sum(e.total_tokens for e in group),
-            total_output_tokens=0,
-            total_tokens=sum(e.total_tokens for e in group),
-            categories=list(set(e.category for e in group)),
-            status="ok",
-        ))
+        batch_results_list.append(
+            BatchResult(
+                batch_number=bn,
+                batch_size=len(group),
+                total_batches=total_batches,
+                email_results=group,
+                duration_ms=int(sum(e.duration_ms for e in group)),
+                total_input_tokens=sum(e.total_tokens for e in group),
+                total_output_tokens=0,
+                total_tokens=sum(e.total_tokens for e in group),
+                categories=list(set(e.category for e in group)),
+                status="ok",
+            )
+        )
 
     total_input_tokens = sum(e.total_tokens for e in email_results)
 
     return RunResult(
-        run_id=run_id, timestamp=timestamp, model=model_id, provider="lemonade",
-        mbox_path=mbox_path, jsonl_path=jsonl_path,
-        data_source="jsonl" if jsonl_path else "mbox", mode="batched",
-        batch_results=batch_results_list, step_results=[],
-        total_emails=len(email_results), total_duration_ms=total_duration_ms,
-        total_input_tokens=total_input_tokens, total_output_tokens=0,
+        run_id=run_id,
+        timestamp=timestamp,
+        model=model_id,
+        provider="lemonade",
+        mbox_path=mbox_path,
+        jsonl_path=jsonl_path,
+        data_source="jsonl" if jsonl_path else "mbox",
+        mode="batched",
+        batch_results=batch_results_list,
+        step_results=[],
+        total_emails=len(email_results),
+        total_duration_ms=total_duration_ms,
+        total_input_tokens=total_input_tokens,
+        total_output_tokens=0,
         total_tokens=total_input_tokens,
         category_counts=category_counts,
         estimated_steps=total_batches + 1,  # one LLM call per batch + final summary
@@ -363,7 +387,164 @@ def _run_batched_agent(
 
 
 # ---------------------------------------------------------------------------
-# Interactive benchmark — multi-turn session tracking
+# Smart agent mode (heuristic fast-path + selective LLM batching)
+# ---------------------------------------------------------------------------
+
+
+def _run_smart_agent(
+    mbox_path: str = "",
+    jsonl_path: str = "",
+    *,
+    model_id: str,
+    base_url: str,
+    max_steps: int = 12,
+    limit: int = 100,
+    batch_size: int = 5,
+    force_llm: bool = False,
+) -> RunResult:
+    """Run the smart EmailTriageAgent end-to-end.
+
+    Heuristic-only for confident emails, LLM batches for the rest.
+    """
+    import uuid as _uuid
+    from datetime import datetime, timezone
+
+    from gaia.agents.email.action_store import fetch_triage_results
+    from gaia.agents.email.agent import EmailTriageAgent
+    from gaia.agents.email.bench.data_shapes import BatchResult, EmailResult
+    from gaia.agents.email.config import EmailAgentConfig
+    from gaia.agents.email.fake_gmail import FakeCalendarBackend, FakeGmailBackend
+
+    run_id = f"run-smart-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{model_id.replace('/', '-')}-{_uuid.uuid4().hex[:6]}"
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    if mbox_path and jsonl_path:
+        raise ValueError("Specify either mbox_path or jsonl_path, not both")
+    if mbox_path:
+        fake = FakeGmailBackend(mbox_path=Path(mbox_path))
+    elif jsonl_path:
+        fake = FakeGmailBackend(jsonl_path=Path(jsonl_path))
+    else:
+        raise ValueError("Either mbox_path or jsonl_path must be provided")
+    fake_cal = FakeCalendarBackend()
+    config = EmailAgentConfig(
+        model_id=model_id,
+        base_url=base_url,
+        max_steps=max_steps,
+        debug=True,
+        show_stats=True,
+        enable_smart_mode=True,
+        batch_size=batch_size,
+        force_llm=force_llm,
+        gmail_backend=fake,
+        calendar_backend=fake_cal,
+    )
+    agent = EmailTriageAgent(config=config)
+
+    start = time.monotonic()
+    try:
+        result_str = agent.process_smart_triage(max_messages=limit)
+    except Exception as exc:
+        return RunResult(
+            run_id=run_id,
+            timestamp=timestamp,
+            model=model_id,
+            provider="lemonade",
+            mbox_path=mbox_path,
+            jsonl_path=jsonl_path,
+            data_source="jsonl" if jsonl_path else "mbox",
+            mode="smart",
+            status="error",
+            error=str(exc),
+            total_duration_ms=int((time.monotonic() - start) * 1000),
+        )
+
+    total_duration_ms = int((time.monotonic() - start) * 1000)
+    results = fetch_triage_results(agent, run_id=run_id)
+
+    email_results: list[EmailResult] = []
+    category_counts: dict[str, int] = {}
+    heuristic_only_count = 0
+    llm_processed_count = 0
+    for row in results:
+        cat = row.get("category", "informational")
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+        confident = row.get("confident", False)
+        token_count = row.get("token_count", 0) or 0
+        if confident and token_count == 0:
+            heuristic_only_count += 1
+        else:
+            llm_processed_count += 1
+        email_results.append(
+            EmailResult(
+                email_id=row["email_id"],
+                subject="",
+                sender="",
+                category=cat,
+                confident=confident,
+                reason="",
+                llm_summary=row.get("llm_summary", ""),
+                status="ok",
+                duration_ms=int((row.get("duration_secs", 0) or 0) * 1000),
+                total_tokens=token_count,
+            )
+        )
+
+    # Group by batch_number for BatchResult construction.
+    # batch_number=0 = heuristic-only, batch_number>=1 = LLM batches.
+    batch_groups: dict[int, list[EmailResult]] = {}
+    for idx, row in enumerate(results):
+        bn = row.get("batch_number", 1)
+        batch_groups.setdefault(bn, []).append(email_results[idx])
+
+    total_batches = max(batch_groups.keys(), default=1)
+    batch_results_list: list[BatchResult] = []
+    for bn in sorted(batch_groups.keys()):
+        group = batch_groups[bn]
+        batch_results_list.append(
+            BatchResult(
+                batch_number=bn,
+                batch_size=len(group),
+                total_batches=total_batches,
+                email_results=group,
+                duration_ms=int(sum(e.duration_ms for e in group)),
+                total_input_tokens=sum(e.total_tokens for e in group),
+                total_output_tokens=0,
+                total_tokens=sum(e.total_tokens for e in group),
+                categories=list(set(e.category for e in group)),
+                status="ok",
+            )
+        )
+
+    total_input_tokens = sum(e.total_tokens for e in email_results)
+    llm_batch_count = max((bn for bn in batch_groups if bn > 0), default=0)
+
+    return RunResult(
+        run_id=run_id,
+        timestamp=timestamp,
+        model=model_id,
+        provider="lemonade",
+        mbox_path=mbox_path,
+        jsonl_path=jsonl_path,
+        data_source="jsonl" if jsonl_path else "mbox",
+        mode="smart",
+        batch_results=batch_results_list,
+        step_results=[],
+        total_emails=len(email_results),
+        total_duration_ms=total_duration_ms,
+        total_input_tokens=total_input_tokens,
+        total_output_tokens=0,
+        total_tokens=total_input_tokens,
+        category_counts=category_counts,
+        heuristic_only_count=heuristic_only_count,
+        llm_processed_count=llm_processed_count,
+        estimated_steps=1 + (llm_batch_count if llm_batch_count > 0 else 0),
+        status="completed" if email_results else "error",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Interactive benchmark -- multi-turn session tracking
 # ---------------------------------------------------------------------------
 
 # Default interactive scenario: a realistic email triage session.
@@ -726,7 +907,9 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
                     state.triaged_emails[item["id"]] = item.get("category", "unknown")
 
         # archive_message / archive_message_batch — track archived IDs.
-        if tool_name in ("archive_message", "archive_message_batch") and isinstance(data, dict):
+        if tool_name in ("archive_message", "archive_message_batch") and isinstance(
+            data, dict
+        ):
             msg_id = data.get("message_id", "") or data.get("id", "")
             if msg_id:
                 state.archived.add(msg_id)
@@ -752,7 +935,9 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
                 state.starred.discard(msg_id)
 
         # Mark read/unread.
-        if tool_name in ("mark_read", "mark_read_batch", "mark_as_read") and isinstance(data, dict):
+        if tool_name in ("mark_read", "mark_read_batch", "mark_as_read") and isinstance(
+            data, dict
+        ):
             msg_id = data.get("id", "") or data.get("message_id", "")
             if msg_id:
                 state.marked_read.add(msg_id)

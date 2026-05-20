@@ -2881,12 +2881,14 @@ def plot_batched_llm_activity(
         model = r.get("model", "unknown")
         run_label = r.get("run_id", "")[:30]
         for b in r.get("batch_results", []):
-            model_batches.setdefault(model, []).append({
-                "batch_number": b.get("batch_number", 0),
-                "duration_ms": b.get("duration_ms", 0),
-                "batch_size": b.get("batch_size", 0),
-                "run_label": run_label,
-            })
+            model_batches.setdefault(model, []).append(
+                {
+                    "batch_number": b.get("batch_number", 0),
+                    "duration_ms": b.get("duration_ms", 0),
+                    "batch_size": b.get("batch_size", 0),
+                    "run_label": run_label,
+                }
+            )
 
     if not model_batches:
         return None
@@ -2904,30 +2906,41 @@ def plot_batched_llm_activity(
 
     for mi, model in enumerate(models):
         blist = model_batches[model]
-        offsets = [b["batch_number"] + (mi - len(models) / 2 + 0.5) * width for b in blist]
+        offsets = [
+            b["batch_number"] + (mi - len(models) / 2 + 0.5) * width for b in blist
+        ]
         durations = [b["duration_ms"] for b in blist]
         sizes = [b["batch_size"] for b in blist]
         color = model_color_map.get(model, f"C{mi}")
 
         bars = ax.bar(
-            offsets, durations, width, label=model[:25],
-            color=color, alpha=0.85,
+            offsets,
+            durations,
+            width,
+            label=model[:25],
+            color=color,
+            alpha=0.85,
         )
 
         # Annotate email count on each bar.
         for off, dur, sz in zip(offsets, durations, sizes):
             if dur > 0:
                 ax.text(
-                    off, dur + max(dur * 0.02, 5),
-                    f"n={sz}", ha="center", va="bottom",
-                    fontsize=7, fontweight="bold",
+                    off,
+                    dur + max(dur * 0.02, 5),
+                    f"n={sz}",
+                    ha="center",
+                    va="bottom",
+                    fontsize=7,
+                    fontweight="bold",
                 )
 
     ax.set_xlabel("Batch Number")
     ax.set_ylabel("Duration (ms)")
     ax.set_title(
         "Batch Processing Timeline -- Duration per Batch with Email Count",
-        fontweight="bold", fontsize=12,
+        fontweight="bold",
+        fontsize=12,
     )
     ax.legend(fontsize=8, loc="upper right")
     ax.grid(axis="y", linestyle="--", alpha=0.3)
@@ -3643,8 +3656,14 @@ def main(argv: list[str] | None = None) -> int:
             if candidate.exists():
                 args.jsonl_path = str(candidate)
                 break
-        for pattern_dir in [Path(args.output_dir), Path("benchmark_results"), Path(".")]:
-            candidates = sorted(pattern_dir.glob("interactive_*.json"), key=lambda p: p.stat().st_mtime)
+        for pattern_dir in [
+            Path(args.output_dir),
+            Path("benchmark_results"),
+            Path("."),
+        ]:
+            candidates = sorted(
+                pattern_dir.glob("interactive_*.json"), key=lambda p: p.stat().st_mtime
+            )
             if candidates:
                 args.interactive_path = str(candidates[-1])
                 break

@@ -286,14 +286,19 @@ class EmailTriageAgent(
         )
         all_emails = triage_data.get("results", [])
         if not all_emails:
-            return json.dumps({
-                "ok": True,
-                "data": {"message": "No emails found.", "total": 0},
-            })
+            return json.dumps(
+                {
+                    "ok": True,
+                    "data": {"message": "No emails found.", "total": 0},
+                }
+            )
 
         run_id = f"batched-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
         batch_size = self.config.batch_size
-        batches = [all_emails[i:i + batch_size] for i in range(0, len(all_emails), batch_size)]
+        batches = [
+            all_emails[i : i + batch_size]
+            for i in range(0, len(all_emails), batch_size)
+        ]
         total_batches = len(batches)
 
         for batch_idx, batch in enumerate(batches, start=1):
@@ -303,6 +308,77 @@ class EmailTriageAgent(
                 batch_number=batch_idx,
                 run_id=run_id,
             )
+
+        summary = self._produce_final_summary(run_id=run_id)
+        return json.dumps({"ok": True, "data": summary}, default=str)
+
+    # -- Smart triage mode (heuristic fast-path + selective LLM batching) ----
+
+    def process_smart_triage(
+        self,
+        *,
+        max_messages: int = 25,
+    ) -> str:
+        """Run the smart triage flow: heuristic-only for confident emails,
+        LLM batches for the rest.
+
+        Returns JSON string with final summary.
+        """
+        from gaia.agents.email.action_store import record_triage_result
+        from gaia.agents.email.tools.read_tools import triage_inbox_impl
+
+        triage_data = triage_inbox_impl(
+            self._gmail,
+            max_messages=max_messages,
+            debug=self.config.debug,
+            force_llm=self.config.force_llm,
+        )
+        all_emails = triage_data.get("results", [])
+        if not all_emails:
+            return json.dumps(
+                {
+                    "ok": True,
+                    "data": {"message": "No emails found.", "total": 0},
+                }
+            )
+
+        run_id = f"smart-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        batch_size = self.config.batch_size
+
+        # Split: confident emails go straight through, rest need LLM.
+        confident_emails = [e for e in all_emails if e.get("confident")]
+        needs_llm = [e for e in all_emails if not e.get("confident")]
+
+        # Record heuristic-only results (zero LLM cost).
+        for email_info in confident_emails:
+            record_triage_result(
+                self,
+                triage_id=f"{run_id}-0-{email_info['id']}",
+                run_id=run_id,
+                batch_number=0,
+                email_id=email_info["id"],
+                thread_id=email_info.get("thread_id"),
+                category=email_info.get("category", "informational"),
+                confident=True,
+                llm_summary=f"Heuristic: {email_info.get('rationale', '')}",
+                body_preview="",
+                token_count=0,
+                duration_secs=0.0,
+            )
+
+        # Process uncertain emails through LLM batches.
+        if needs_llm:
+            batches = [
+                needs_llm[i : i + batch_size]
+                for i in range(0, len(needs_llm), batch_size)
+            ]
+            for batch_idx, batch in enumerate(batches, start=1):
+                print(f"\n  Processing LLM batch {batch_idx} of {len(batches)}...")
+                self._process_single_batch(
+                    batch=batch,
+                    batch_number=batch_idx,
+                    run_id=run_id,
+                )
 
         summary = self._produce_final_summary(run_id=run_id)
         return json.dumps({"ok": True, "data": summary}, default=str)
@@ -338,10 +414,14 @@ class EmailTriageAgent(
             subject = email_info.get("subject", "")
             sender = email_info.get("from", "")
             try:
-                full_msg = get_message_impl(self._gmail, message_id=email_id, debug=self.config.debug)
-                body = (full_msg.get("body") or "").replace(
-                    "<<<UNTRUSTED_EMAIL_BODY_START>>>\n", ""
-                ).replace("\n<<<UNTRUSTED_EMAIL_BODY_END>>>", "")
+                full_msg = get_message_impl(
+                    self._gmail, message_id=email_id, debug=self.config.debug
+                )
+                body = (
+                    (full_msg.get("body") or "")
+                    .replace("<<<UNTRUSTED_EMAIL_BODY_START>>>\n", "")
+                    .replace("\n<<<UNTRUSTED_EMAIL_BODY_END>>>", "")
+                )
             except Exception as exc:
                 record_triage_result(
                     self,
@@ -359,13 +439,15 @@ class EmailTriageAgent(
                 )
                 continue
 
-            email_payloads.append({
-                "id": email_id,
-                "thread_id": thread_id,
-                "subject": subject,
-                "sender": sender,
-                "body": body,
-            })
+            email_payloads.append(
+                {
+                    "id": email_id,
+                    "thread_id": thread_id,
+                    "subject": subject,
+                    "sender": sender,
+                    "body": body,
+                }
+            )
 
         if not email_payloads:
             return
@@ -404,9 +486,12 @@ class EmailTriageAgent(
                 temperature=0.0,
                 max_tokens=256 * len(email_blocks),
             )
-            response_text = response.text if hasattr(response, "text") else str(response)
+            response_text = (
+                response.text if hasattr(response, "text") else str(response)
+            )
 
             import re
+
             json_match = re.search(r"\[.*\]", response_text, re.DOTALL)
             if json_match:
                 parsed_list = json.loads(json_match.group())
@@ -469,13 +554,15 @@ class EmailTriageAgent(
             category_counts[cat] = category_counts.get(cat, 0) + 1
             total_duration += row.get("duration_secs", 0) or 0
             total_tokens += row.get("token_count", 0) or 0
-            email_summaries.append({
-                "email_id": row["email_id"],
-                "thread_id": row.get("thread_id"),
-                "category": cat,
-                "confident": row.get("confident", False),
-                "summary": row.get("llm_summary", ""),
-            })
+            email_summaries.append(
+                {
+                    "email_id": row["email_id"],
+                    "thread_id": row.get("thread_id"),
+                    "category": cat,
+                    "confident": row.get("confident", False),
+                    "summary": row.get("llm_summary", ""),
+                }
+            )
 
         batch_count = max(
             (row.get("batch_number", 1) or 1 for row in results), default=1

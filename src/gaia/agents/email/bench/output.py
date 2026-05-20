@@ -408,6 +408,18 @@ def print_summary(run: RunResult) -> None:
         print(f"  Avg/email:    {run.total_duration_ms // max(run.total_emails, 1)}ms")
     if run.mode == "heuristic":
         print("  Tokens:     N/A (heuristic)")
+    elif run.mode == "smart":
+        heuristic = getattr(run, "heuristic_only_count", 0)
+        llm = getattr(run, "llm_processed_count", 0)
+        print(f"  Heuristic:  {heuristic} emails (zero LLM cost)")
+        print(f"  LLM:        {llm} emails")
+        if run.total_tokens > 0:
+            print(f"  Total tokens: {run.total_tokens:,}")
+            print(f"    Input:      {run.total_input_tokens:,}")
+            print(f"    Output:     {run.total_output_tokens:,}")
+            print(f"    Reasoning:  {run.total_reasoning_tokens:,}")
+        else:
+            print("  Tokens:     0 (all heuristic)")
     else:
         print(f"  Total tokens: {run.total_tokens:,}")
         print(f"    Input:      {run.total_input_tokens:,}")

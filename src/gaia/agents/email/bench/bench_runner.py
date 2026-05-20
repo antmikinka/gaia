@@ -18,7 +18,6 @@ import re
 from pathlib import Path
 from typing import Any, Optional
 
-
 from gaia.agents.email.bench.visualize import _extract_run_suffix
 
 
@@ -50,6 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--steps", action="store_true")
     parser.add_argument("--force-llm", action="store_true")
     parser.add_argument("--batched", action="store_true")
+    parser.add_argument("--smart", action="store_true")
     parser.add_argument("--batch-size", type=int, default=5)
     return parser
 
@@ -103,7 +103,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         print(f"{'='*70}")
         print(f"  Data:     {args.mbox_path or args.jsonl_path}")
         print(f"  Limit:    {args.limit} emails")
-        print(f"  Batch:    {args.limit // args.batch_size + 1} batches of ~{args.batch_size} emails")
+        print(
+            f"  Batch:    {args.limit // args.batch_size + 1} batches of ~{args.batch_size} emails"
+        )
         print(f"{'='*70}")
 
         try:
@@ -122,7 +124,53 @@ def main(argv: Optional[list[str]] = None) -> int:
                 return 1
 
             from gaia.agents.email.bench.output import save_jsonl
+
             save_jsonl(result, jsonl_path)
+            print(f"\n  Results saved to: {jsonl_path}")
+            return 0
+        except Exception as exc:
+            print(f"\n  Error: {exc}")
+            return 1
+
+    # Smart mode: heuristic fast-path + selective LLM batching.
+    if args.smart:
+        from gaia.agents.email.bench.runner import _run_smart_agent
+
+        model = args.model or (args.models[0] if args.models else None)
+        if not model:
+            print("Error: --model or --models is required for smart mode.")
+            return 1
+
+        jsonl_path = output_dir / f"results_{_slug(model)}_smart.jsonl"
+
+        print(f"\n{'='*70}")
+        print(f"  Smart Email Triage -- {model}")
+        print(f"{'='*70}")
+        print(f"  Data:     {args.mbox_path or args.jsonl_path}")
+        print(f"  Limit:    {args.limit} emails")
+        print(f"  Batch:    up to {args.batch_size} emails per LLM batch")
+        print(f"{'='*70}")
+
+        try:
+            result = _run_smart_agent(
+                args.mbox_path or "",
+                args.jsonl_path or "",
+                model_id=model,
+                base_url=args.base_url,
+                max_steps=12,
+                limit=args.limit,
+                batch_size=args.batch_size,
+                force_llm=args.force_llm,
+            )
+
+            if result.status == "error":
+                print(f"\n  Error: {result.error}")
+                return 1
+
+            from gaia.agents.email.bench.output import print_summary, save_jsonl
+
+            save_jsonl(result, jsonl_path)
+            print_summary(result)
             print(f"\n  Results saved to: {jsonl_path}")
             return 0
         except Exception as exc:
@@ -148,8 +196,14 @@ def main(argv: Optional[list[str]] = None) -> int:
         )
 
         model_slug = _slug(model or "unknown")
-        run_id_suffix = _extract_run_suffix(summary["run_id"]) if summary.get("run_id") else None
-        filename = f"interactive_{model_slug}_{run_id_suffix}.json" if run_id_suffix else f"interactive_{model_slug}.json"
+        run_id_suffix = (
+            _extract_run_suffix(summary["run_id"]) if summary.get("run_id") else None
+        )
+        filename = (
+            f"interactive_{model_slug}_{run_id_suffix}.json"
+            if run_id_suffix
+            else f"interactive_{model_slug}.json"
+        )
         interactive_path = output_dir / filename
         interactive_path.parent.mkdir(parents=True, exist_ok=True)
 
