@@ -1403,7 +1403,8 @@ def main():
     # Forward all bench args to the internal dispatcher.
     _email_bench_parser.add_argument(
         "--mbox-path",
-        required=True,
+        type=str,
+        default=None,
         help="Path to the MBOX file to benchmark against.",
     )
     _email_bench_parser.add_argument(
@@ -4089,12 +4090,13 @@ def handle_email_command(args):
             "fail_fast",
             "force_llm",
             "batched",
+            "smart",
         ]:
             if getattr(args, flag, False):
                 bench_args.append(f"--{flag.replace('_', '-')}")
 
-        # Batch-size param (value, only meaningful with --batched).
-        if args.batched and getattr(args, "batch_size", None):
+        # Batch-size param (always pass if set, used by --batched and --smart).
+        if getattr(args, "batch_size", None):
             bench_args.extend(["--batch-size", str(args.batch_size)])
 
         # Compare param (list).
