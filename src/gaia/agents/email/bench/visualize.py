@@ -2353,7 +2353,7 @@ def plot_planning_steps_heatmap(
                 ax.text(
                     j,
                     i,
-                    f"{steps}",
+                    f"{val:.0f}",
                     ha="center",
                     va="center",
                     fontsize=9,
@@ -2607,7 +2607,7 @@ def plot_interactive_llm_activity(
         tool = 0
         for step in turn.get("step_results", []):
             tool_name = step.get("tool_name", "")
-            if tool_name and tool_name not in ("", "planning", "think"):
+            if tool_name and tool_name not in ("planning", "think"):
                 tool += 1
             else:
                 planning += 1
