@@ -406,7 +406,6 @@ def _run_smart_agent(
 
     Heuristic-only for confident emails, LLM batches for the rest.
     """
-    import uuid as _uuid
     from datetime import datetime, timezone
 
     from gaia.agents.email.action_store import fetch_triage_results
@@ -415,7 +414,6 @@ def _run_smart_agent(
     from gaia.agents.email.config import EmailAgentConfig
     from gaia.agents.email.fake_gmail import FakeCalendarBackend, FakeGmailBackend
 
-    run_id = f"run-smart-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{model_id.replace('/', '-')}-{_uuid.uuid4().hex[:6]}"
     timestamp = datetime.now(timezone.utc).isoformat()
 
     if mbox_path and jsonl_path:
@@ -446,7 +444,7 @@ def _run_smart_agent(
         result_str = agent.process_smart_triage(max_messages=limit)
     except Exception as exc:
         return RunResult(
-            run_id=run_id,
+            run_id="smart-error",
             timestamp=timestamp,
             model=model_id,
             provider="lemonade",
@@ -460,7 +458,29 @@ def _run_smart_agent(
         )
 
     total_duration_ms = int((time.monotonic() - start) * 1000)
-    results = fetch_triage_results(agent, run_id=run_id)
+
+    # Extract the run_id that the agent generated internally.
+    try:
+        response = json.loads(result_str)
+        agent_run_id = response.get("data", {}).get("run_id", "")
+    except Exception:
+        agent_run_id = ""
+    if not agent_run_id:
+        return RunResult(
+            run_id="smart-unknown",
+            timestamp=timestamp,
+            model=model_id,
+            provider="lemonade",
+            mbox_path=mbox_path,
+            jsonl_path=jsonl_path,
+            data_source="jsonl" if jsonl_path else "mbox",
+            mode="smart",
+            status="error",
+            error="Could not extract run_id from agent response",
+            total_duration_ms=total_duration_ms,
+        )
+
+    results = fetch_triage_results(agent, run_id=agent_run_id)
 
     email_results: list[EmailResult] = []
     category_counts: dict[str, int] = {}
@@ -520,7 +540,7 @@ def _run_smart_agent(
     llm_batch_count = max((bn for bn in batch_groups if bn > 0), default=0)
 
     return RunResult(
-        run_id=run_id,
+        run_id=agent_run_id,
         timestamp=timestamp,
         model=model_id,
         provider="lemonade",
