@@ -2666,6 +2666,201 @@ def plot_interactive_llm_activity(
     )
 
 
+# ---------------------------------------------------------------------------
+# Chart I2: Interactive Context Growth (Cumulative Tokens)
+# ---------------------------------------------------------------------------
+
+
+def plot_interactive_context_growth(
+    interactive: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
+) -> Path | None:
+    """Line + area chart: cumulative token consumption across interactive turns."""
+    plt_mod = _require_matplotlib()
+    turns = interactive.get("turns", [])
+    if not turns:
+        return None
+
+    # Running totals.
+    cumulative_total: list[int] = []
+    cumulative_reasoning: list[int] = []
+    running_total = 0
+    running_reasoning = 0
+    for t in turns:
+        running_total += t.get("total_tokens", 0)
+        running_reasoning += t.get("reasoning_tokens", 0)
+        cumulative_total.append(running_total)
+        cumulative_reasoning.append(running_reasoning)
+
+    turn_labels = [f"Turn {i + 1}" for i in range(len(turns))]
+    x = list(range(len(turns)))
+
+    fig, ax = plt_mod.subplots(figsize=(max(6, min(len(turns), 12) * 1.5), 4))
+
+    # Area: reasoning tokens (filled beneath total line).
+    ax.fill_between(
+        x,
+        cumulative_reasoning,
+        color=COLORS["reasoning"],
+        alpha=0.2,
+        label="Cumulative reasoning tokens",
+    )
+
+    # Line: total tokens.
+    ax.plot(
+        x,
+        cumulative_total,
+        marker="o",
+        linewidth=2,
+        color=COLORS["tokens"],
+        label="Cumulative total tokens",
+    )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(turn_labels, rotation=45, ha="right", fontsize=8)
+    ax.set_ylabel("Cumulative tokens")
+    ax.set_xlabel("Conversation Turn")
+    ax.set_title(
+        "Interactive Context Growth (Cumulative Tokens)",
+        fontweight="bold",
+        fontsize=12,
+    )
+    ax.legend(fontsize=8, loc="upper left")
+    ax.grid(axis="both", linestyle="--", alpha=0.3)
+
+    # Annotate final point.
+    ax.annotate(
+        f"{cumulative_total[-1]:,} total",
+        xy=(x[-1], cumulative_total[-1]),
+        xytext=(-10, 10),
+        textcoords="offset points",
+        fontsize=8,
+        fontweight="bold",
+        color=COLORS["tokens"],
+        ha="right",
+    )
+
+    fig.tight_layout()
+    return _save_chart(
+        fig, output_dir, "I2_interactive_context_growth", run_id_suffix=run_id_suffix
+    )
+
+
+# ---------------------------------------------------------------------------
+# Chart I3: Interactive Tool Calls by Turn
+# ---------------------------------------------------------------------------
+
+# Canonical tool categories shown in the chart. Any tool not matching a
+# known category is bucketed under "other".
+_TOOL_CATEGORIES = [
+    "archive",
+    "delete",
+    "reply",
+    "calendar",
+    "label",
+    "star",
+    "draft",
+    "send",
+    "mark_read",
+]
+
+_TOOL_COLORS = [
+    "#3182CE",  # archive - blue
+    "#E53E3E",  # delete - red
+    "#38A169",  # reply - green
+    "#9B59B6",  # calendar - purple
+    "#DD6B20",  # label - orange
+    "#ECC94B",  # star - yellow
+    "#4299E1",  # draft - light blue
+    "#48BB78",  # send - light green
+    "#A0AEC0",  # mark_read - gray
+    "#718096",  # other - dark gray
+]
+
+
+def _categorize_tool(tool_name: str) -> str:
+    """Map a raw tool name to a display category."""
+    name = tool_name.lower()
+    # Exact match first
+    if name in _TOOL_CATEGORIES:
+        return name
+    # Substring fallback
+    for cat in _TOOL_CATEGORIES:
+        if cat in name:
+            return cat
+    return "other"
+
+
+def plot_interactive_tool_calls(
+    interactive: dict[str, Any], output_dir: Path, *, run_id_suffix: str | None = None
+) -> Path | None:
+    """Stacked bar: tool call counts by type per interactive turn."""
+    plt_mod = _require_matplotlib()
+    turns = interactive.get("turns", [])
+    if not turns:
+        return None
+
+    # Build per-turn counts per tool category.
+    all_categories_seen: list[str] = []
+    turn_counts: list[dict[str, int]] = []
+    for t in turns:
+        counts: dict[str, int] = {}
+        for tool in t.get("tools_called", []):
+            cat = _categorize_tool(tool)
+            counts[cat] = counts.get(cat, 0) + 1
+        turn_counts.append(counts)
+        for cat in counts:
+            if cat not in all_categories_seen:
+                all_categories_seen.append(cat)
+
+    # Preserve a stable order: canonical categories first, then any extras.
+    ordered_categories = [c for c in _TOOL_CATEGORIES if c in all_categories_seen]
+    for c in all_categories_seen:
+        if c not in ordered_categories:
+            ordered_categories.append(c)
+
+    if not ordered_categories:
+        return None  # No tool calls recorded.
+
+    n_turns = len(turns)
+    turn_labels = [f"Turn {i + 1}" for i in range(n_turns)]
+    x = list(range(n_turns))
+    width = 0.5
+
+    fig, ax = plt_mod.subplots(figsize=(max(6, min(n_turns, 12) * 2.0), 4))
+
+    bottom = [0] * n_turns
+    color_map = dict(zip(_TOOL_CATEGORIES + ["other"], _TOOL_COLORS))
+
+    for cat in ordered_categories:
+        values = [turn_counts[i].get(cat, 0) for i in range(n_turns)]
+        ax.bar(
+            x,
+            values,
+            width,
+            bottom=bottom,
+            label=cat.replace("_", " ").title(),
+            color=color_map.get(cat, "#718096"),
+            alpha=0.85,
+        )
+        bottom = [b + v for b, v in zip(bottom, values)]
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(turn_labels, rotation=45, ha="right", fontsize=8)
+    ax.set_ylabel("Tool Calls")
+    ax.set_xlabel("Conversation Turn")
+    ax.set_title(
+        "Interactive Tool Calls by Turn",
+        fontweight="bold",
+        fontsize=12,
+    )
+    ax.legend(fontsize=7, loc="upper right", ncol=2)
+    ax.grid(axis="y", linestyle="--", alpha=0.3)
+    fig.tight_layout()
+    return _save_chart(
+        fig, output_dir, "I3_interactive_tool_calls", run_id_suffix=run_id_suffix
+    )
+
+
 def plot_batched_llm_activity(
     runs: list[dict[str, Any]], output_dir: Path, *, run_id_suffix: str | None = None
 ) -> Path | None:
@@ -3129,6 +3324,32 @@ def generate_charts(
                 (
                     p.name,
                     "Interactive LLM Activity -- Stacked bar of planning vs tool calls per conversation turn",
+                )
+            )
+
+        # Chart I2: Interactive context growth
+        p = plot_interactive_context_growth(
+            interactive, output_dir, run_id_suffix=interactive_suffix
+        )
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Interactive Context Growth -- Line + area chart of cumulative token consumption across turns",
+                )
+            )
+
+        # Chart I3: Interactive tool calls by turn
+        p = plot_interactive_tool_calls(
+            interactive, output_dir, run_id_suffix=interactive_suffix
+        )
+        if p:
+            paths.append(p)
+            charts_index.append(
+                (
+                    p.name,
+                    "Interactive Tool Calls by Turn -- Stacked bar of tool call counts by type per conversation turn",
                 )
             )
 
