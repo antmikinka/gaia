@@ -138,6 +138,22 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Bypass heuristic fast-path; force LLM classification of every email.",
     )
+    bench_parser.add_argument(
+        "--batched",
+        action="store_true",
+        help="Run batched triage mode (full bodies, no truncation, batches of 5).",
+    )
+    bench_parser.add_argument(
+        "--smart",
+        action="store_true",
+        help="Run smart triage mode: heuristic fast-path + selective LLM on uncertain emails.",
+    )
+    bench_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=5,
+        help="Number of emails per batch (default 5). Used by --batched and --smart.",
+    )
 
     # ------------------------------------------------------------------
     # Subcommand: clawflow (ClawFlow runner)
@@ -361,6 +377,12 @@ def _build_bench_args(args) -> list[str]:
         bench_args.append("--steps")
     if args.force_llm:
         bench_args.append("--force-llm")
+    if args.batched:
+        bench_args.append("--batched")
+    if args.smart:
+        bench_args.append("--smart")
+    if getattr(args, "batch_size", None) and args.batch_size != 5:
+        bench_args.extend(["--batch-size", str(args.batch_size)])
 
     return bench_args
 

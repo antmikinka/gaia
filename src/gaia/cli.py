@@ -1531,6 +1531,11 @@ def main():
         help="Run batched triage mode (full bodies, no truncation, batches of 5).",
     )
     _email_bench_parser.add_argument(
+        "--smart",
+        action="store_true",
+        help="Run smart triage mode: heuristic fast-path + selective LLM on uncertain emails.",
+    )
+    _email_bench_parser.add_argument(
         "--batch-size",
         type=int,
         default=5,
