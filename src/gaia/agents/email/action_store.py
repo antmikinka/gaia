@@ -32,7 +32,7 @@ from __future__ import annotations
 import json
 import time
 import uuid
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # ---------------------------------------------------------------------------
 # Schema
@@ -67,6 +67,27 @@ CREATE TABLE IF NOT EXISTS email_drafts (
 );
 """
 
+EMAIL_TRIAGE_RESULTS_DDL = """
+CREATE TABLE IF NOT EXISTS email_triage_results (
+    triage_id      TEXT PRIMARY KEY,
+    run_id         TEXT NOT NULL,
+    batch_number   INTEGER NOT NULL,
+    email_id       TEXT NOT NULL,
+    thread_id      TEXT,
+    category       TEXT NOT NULL,
+    confident      BOOLEAN NOT NULL,
+    llm_summary    TEXT NOT NULL DEFAULT '',
+    body_preview   TEXT NOT NULL DEFAULT '',
+    token_count    INTEGER,
+    duration_secs  REAL,
+    created_at     REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_triage_results_run
+    ON email_triage_results(run_id);
+CREATE INDEX IF NOT EXISTS idx_triage_results_email
+    ON email_triage_results(email_id);
+"""
+
 
 # 100 chars max — see plan A4 + adversarial S15. Email bodies routinely
 # carry MFA codes, password reset URLs, banking transaction summaries; a
@@ -75,9 +96,15 @@ BODY_PREVIEW_MAX_CHARS = 100
 
 
 def init_schema(db) -> None:
-    """Create both tables if they don't exist. Idempotent."""
+    """Create all tables if they don't exist. Idempotent."""
     db.execute(EMAIL_ACTIONS_DDL)
     db.execute(EMAIL_DRAFTS_DDL)
+    init_triage_schema(db)
+
+
+def init_triage_schema(db) -> None:
+    """Create the email_triage_results table if it doesn't exist. Idempotent."""
+    db.execute(EMAIL_TRIAGE_RESULTS_DDL)
 
 
 # ---------------------------------------------------------------------------
@@ -215,15 +242,69 @@ def fetch_draft(db, *, draft_id: str) -> Optional[Dict[str, Any]]:
     )
 
 
+# ---------------------------------------------------------------------------
+# email_triage_results API
+# ---------------------------------------------------------------------------
+
+
+def record_triage_result(
+    db,
+    *,
+    triage_id: str,
+    run_id: str,
+    batch_number: int,
+    email_id: str,
+    thread_id: Optional[str] = None,
+    category: str = "informational",
+    confident: bool = False,
+    llm_summary: str = "",
+    body_preview: str = "",
+    token_count: Optional[int] = None,
+    duration_secs: float = 0.0,
+) -> None:
+    """Persist a single email's triage result."""
+    db.insert(
+        "email_triage_results",
+        {
+            "triage_id": triage_id,
+            "run_id": run_id,
+            "batch_number": batch_number,
+            "email_id": email_id,
+            "thread_id": thread_id,
+            "category": category,
+            "confident": confident,
+            "llm_summary": llm_summary,
+            "body_preview": body_preview,
+            "token_count": token_count,
+            "duration_secs": duration_secs,
+            "created_at": time.time(),
+        },
+    )
+
+
+def fetch_triage_results(db, *, run_id: str) -> List[Dict[str, Any]]:
+    """Return all triage results for a given run_id."""
+    rows = db.query(
+        "SELECT * FROM email_triage_results WHERE run_id = :run_id "
+        "ORDER BY batch_number, email_id",
+        {"run_id": run_id},
+    )
+    return list(rows) if rows else []
+
+
 __all__ = [
     "BODY_PREVIEW_MAX_CHARS",
     "EMAIL_ACTIONS_DDL",
     "EMAIL_DRAFTS_DDL",
+    "EMAIL_TRIAGE_RESULTS_DDL",
     "fetch_draft",
+    "fetch_triage_results",
     "fetch_undoable",
     "init_schema",
+    "init_triage_schema",
     "mark_draft_sent",
     "mark_undone",
     "record_action",
     "record_draft",
+    "record_triage_result",
 ]

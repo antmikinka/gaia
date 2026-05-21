@@ -16,7 +16,7 @@ API entirely.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Optional
 from urllib.parse import urlparse
 
@@ -92,11 +92,16 @@ class EmailAgentConfig:
     debug: bool = False
     silent_mode: bool = False
     show_stats: bool = False
+    force_llm: bool = False
     output_dir: Optional[str] = None
     undo_window_seconds: int = 30
     db_path: Optional[str] = None
     gmail_backend: Optional[Any] = None
     calendar_backend: Optional[Any] = None
+    batch_size: int = 5
+    enable_batched_mode: bool = False
+    enable_smart_mode: bool = False
+    force_llm_ids: dict[str, str] = field(default_factory=dict)
 
     def validate(self) -> None:
         """Run startup-time invariants. Called from the agent's __init__.
