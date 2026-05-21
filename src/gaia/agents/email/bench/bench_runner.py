@@ -133,7 +133,9 @@ def main(argv: Optional[list[str]] = None) -> int:
             return 1
 
     # Smart mode: heuristic fast-path + selective LLM batching.
-    if args.smart:
+    # When --mode interactive is also set, fall through to the interactive
+    # handler below (which already wires enable_smart_mode=True).
+    if args.smart and getattr(args, "mode", None) != "interactive":
         from gaia.agents.email.bench.runner import _run_smart_agent
 
         model = args.model or (args.models[0] if args.models else None)
