@@ -122,8 +122,6 @@ def initialize_lemonade_for_agent(
     """
     from gaia.llm.lemonade_manager import LemonadeManager
 
-    log = get_logger(__name__)
-
     # Use provided base_url, or host/port, or get from env var, or use defaults
     env_host, env_port, env_base_url = _get_lemonade_config()
 
@@ -137,21 +135,17 @@ def initialize_lemonade_for_agent(
     if skip_if_external and (use_claude or use_chatgpt):
         return True, base_url or env_base_url
 
-    # Map agent names to context size requirements.
-    # `chat` and `rag` need 64K so doc-Q&A flows (system prompt + RAG
-    # retrieval + tool result + history) don't crush the window —
-    # `summarize_document` was hitting context overflow on 1-2 MB PDFs
-    # at the previous 32K default (#1030 follow-up). Users on tight RAM
-    # can override with the ``GAIA_CTX_SIZE`` env var.
+    # Map agent names to context size requirements
+    # Complex agents need 32768+, simple ones can use default 4096
     agent_context_sizes = {
         "code": 32768,
-        "chat": 65536,
+        "chat": 32768,
         "code_index": 32768,
         "jira": 32768,
         "blender": 32768,
         "docker": 32768,
         "talk": 32768,
-        "rag": 65536,
+        "rag": 32768,
         "email": 32768,  # email agent (#962) — needs room for body + thread context
         "sd": 8192,  # SD agent needs 8K for image + story workflow
         "mcp": 4096,
@@ -160,47 +154,21 @@ def initialize_lemonade_for_agent(
     }
     required_ctx = agent_context_sizes.get(agent.lower(), 32768)
 
-    # Env-var override: lets users on lower-memory hardware dial back
-    # (or, in advanced cases, push higher up to the model's 128K max).
-    # Honors any positive integer; values lower than the requested ctx
-    # still load — the user is explicitly taking the trade-off.
-    _ctx_override = os.environ.get("GAIA_CTX_SIZE", "").strip()
-    if _ctx_override:
-        try:
-            _ctx_int = int(_ctx_override)
-            if _ctx_int > 0:
-                log.info(
-                    "GAIA_CTX_SIZE=%d overriding agent '%s' default of %d",
-                    _ctx_int,
-                    agent,
-                    required_ctx,
-                )
-                required_ctx = _ctx_int
-        except ValueError:
-            log.warning(
-                "GAIA_CTX_SIZE=%r is not a positive integer; ignoring",
-                _ctx_override,
-            )
-
     # LemonadeManager handles all validation and error printing
     # Pass base_url directly when provided to preserve full URL (https, ngrok, etc.)
-    try:
-        if base_url:
-            success = LemonadeManager.ensure_ready(
-                min_context_size=required_ctx,
-                quiet=quiet,
-                base_url=base_url,
-            )
-        else:
-            success = LemonadeManager.ensure_ready(
-                min_context_size=required_ctx,
-                quiet=quiet,
-                host=host,
-                port=port,
-            )
-    except LemonadeClientError as e:
-        print(f"❌ Error: {e}", file=sys.stderr)
-        return False, None
+    if base_url:
+        success = LemonadeManager.ensure_ready(
+            min_context_size=required_ctx,
+            quiet=quiet,
+            base_url=base_url,
+        )
+    else:
+        success = LemonadeManager.ensure_ready(
+            min_context_size=required_ctx,
+            quiet=quiet,
+            host=host,
+            port=port,
+        )
 
     if not success:
         return False, None
@@ -512,15 +480,13 @@ async def async_main(action, **kwargs):
     action_to_agent = {
         "prompt": "minimal",  # Basic prompts use minimal profile
         "chat": "chat",
-        "browse": "chat",
-        "analyze": "chat",
         "talk": "talk",
         "stats": "minimal",
     }
 
     # Initialize Lemonade with agent-specific profile
     lemonade_base_url = kwargs.get("base_url")  # May be None if not specified
-    if action in action_to_agent and not kwargs.get("no_lemonade_check", False):
+    if action in action_to_agent:
         agent_profile = action_to_agent[action]
         use_claude = kwargs.get("use_claude", False)
         use_chatgpt = kwargs.get("use_chatgpt", False)
@@ -648,30 +614,6 @@ async def async_main(action, **kwargs):
 
                 return 0 if result["status"] == "success" else 1
 
-            # First-boot: if no profile entries exist, offer onboarding intro
-            from gaia.agents.base.memory_store import MemoryStore as _BootMS
-
-            _boot_store = _BootMS()
-            try:
-                _has_profile = bool(
-                    _boot_store.get_by_category("profile", context="global", limit=1)
-                )
-            finally:
-                _boot_store.close()
-            if not _has_profile:
-                print("\n" + "=" * 60)
-                print("  First time with GAIA? Let's set up your profile.")
-                print("=" * 60)
-                try:
-                    run_first_boot = (
-                        input("  Quick intro? Takes ~1 minute. [Y/n]: ").strip().lower()
-                    )
-                except (EOFError, KeyboardInterrupt):
-                    run_first_boot = "n"
-                if run_first_boot != "n":
-                    _bootstrap_chat()
-                    print()
-
             # Interactive mode
             interactive_mode(agent)
             return
@@ -690,73 +632,6 @@ async def async_main(action, **kwargs):
                     agent.stop_watching()
             except Exception:  # pylint: disable=broad-except
                 pass
-    elif action in ("browse", "analyze"):
-        if action == "browse":
-            from gaia.agents.browser.agent import BrowserAgent, BrowserAgentConfig
-
-            agent = BrowserAgent(
-                BrowserAgentConfig(
-                    use_claude=kwargs.get("use_claude", False),
-                    use_chatgpt=kwargs.get("use_chatgpt", False),
-                    claude_model=kwargs.get("claude_model", "claude-sonnet-4-20250514"),
-                    base_url=kwargs.get("base_url"),
-                    model_id=kwargs.get("model", None),
-                    max_steps=kwargs.get("max_steps", 100),
-                    streaming=kwargs.get("stream", False),
-                    show_prompts=kwargs.get("show_prompts", False),
-                    show_stats=kwargs.get("show_stats", False),
-                    silent_mode=not (
-                        kwargs.get("debug", False) or kwargs.get("list_tools", False)
-                    ),
-                    debug=kwargs.get("debug", False),
-                    allowed_paths=kwargs.get("allowed_paths", None),
-                )
-            )
-        else:
-            from gaia.agents.analyst.agent import AnalystAgent, AnalystAgentConfig
-
-            agent = AnalystAgent(
-                AnalystAgentConfig(
-                    use_claude=kwargs.get("use_claude", False),
-                    use_chatgpt=kwargs.get("use_chatgpt", False),
-                    claude_model=kwargs.get("claude_model", "claude-sonnet-4-20250514"),
-                    base_url=kwargs.get("base_url"),
-                    model_id=kwargs.get("model", None),
-                    max_steps=kwargs.get("max_steps", 100),
-                    streaming=kwargs.get("stream", False),
-                    show_prompts=kwargs.get("show_prompts", False),
-                    show_stats=kwargs.get("show_stats", False),
-                    silent_mode=not (
-                        kwargs.get("debug", False) or kwargs.get("list_tools", False)
-                    ),
-                    debug=kwargs.get("debug", False),
-                    allowed_paths=kwargs.get("allowed_paths", None),
-                )
-            )
-
-        try:
-            if kwargs.get("list_tools", False):
-                agent.list_tools(verbose=True)
-                return 0
-
-            query = kwargs.get("query")
-            if query:
-                result = agent.process_query(query, trace=kwargs.get("trace", False))
-                if kwargs.get("show_stats", False) and result.get("duration"):
-                    agent.console.display_stats(result)
-                return 0 if result["status"] == "success" else 1
-
-            print(f"Starting {agent.__class__.__name__}. Type /quit to exit.")
-            while True:
-                user_input = input("\nYou: ").strip()
-                if not user_input:
-                    continue
-                if user_input.lower() in {"/quit", "/exit"}:
-                    return 0
-                agent.process_query(user_input, trace=kwargs.get("trace", False))
-        finally:
-            if hasattr(agent, "close"):
-                agent.close()
     elif action == "talk":
         # Use TalkSDK for voice functionality
         from gaia.talk.sdk import TalkConfig, TalkSDK
@@ -1197,32 +1072,6 @@ def main():
         default=None,
         help="Path to pre-built Agent UI frontend dist directory (used with --ui)",
     )
-    for agent_command, agent_help in (
-        ("browse", "Web research with search, page fetch, and download tools"),
-        ("analyze", "Structured data analysis with scratchpad tables"),
-    ):
-        agent_parser = subparsers.add_parser(
-            agent_command,
-            help=agent_help,
-            parents=[parent_parser],
-        )
-        agent_parser.add_argument(
-            "--query",
-            "-q",
-            type=str,
-            help="Single query to execute (defaults to interactive mode if not provided)",
-        )
-        agent_parser.add_argument(
-            "--show-prompts", action="store_true", help="Display prompts sent to LLM"
-        )
-        agent_parser.add_argument(
-            "--debug", action="store_true", help="Enable debug output"
-        )
-        agent_parser.add_argument(
-            "--allowed-paths",
-            nargs="+",
-            help="Allowed directory paths for file operations",
-        )
     talk_parser = subparsers.add_parser(
         "talk", help="Start voice conversation with Gaia", parents=[parent_parser]
     )
@@ -1509,12 +1358,15 @@ def main():
         ),
         parents=[parent_parser],
     )
+    email_subparsers = email_parser.add_subparsers(dest="email_action")
+
+    # Default: one-shot/interactive triage (no subcommand).
     email_parser.add_argument(
         "-q",
         "--query",
         type=str,
         default=None,
-        help="One-shot query to send to the agent (non-interactive).",
+        help="One-shot query to send to agent (non-interactive).",
     )
     email_parser.add_argument(
         "-i",
@@ -1539,6 +1391,279 @@ def main():
             "Debug mode — adds full prompt + LLM response logging to "
             "verbose output. Sensitive payloads in logs."
         ),
+    )
+
+    # Email benchmark subcommands (#962 benchmark harness, split into 3).
+    # The bench/* directory now has its own dispatcher with 3 subcommands:
+    #   bench, clawflow, report -- each independent.
+    _email_bench_parser = email_subparsers.add_parser(
+        "bench",
+        help="Benchmark the Email Triage Agent against an MBOX file.",
+    )
+    # Forward all bench args to the internal dispatcher.
+    _email_bench_parser.add_argument(
+        "--mbox-path",
+        type=str,
+        default=None,
+        help="Path to the MBOX file to benchmark against.",
+    )
+    _email_bench_parser.add_argument(
+        "--mode",
+        choices=["heuristic", "full", "interactive"],
+        default="heuristic",
+        help="Benchmark mode.",
+    )
+    _email_bench_parser.add_argument(
+        "--model",
+        type=str,
+        default="heuristic-only",
+        help="Model ID for full agent mode.",
+    )
+    _email_bench_parser.add_argument(
+        "--models",
+        action="append",
+        default=None,
+        help="Model IDs to benchmark sequentially.",
+    )
+    _email_bench_parser.add_argument(
+        "--experiments",
+        "--iterations",
+        dest="experiments",
+        type=int,
+        default=1,
+        help="Number of benchmark experiments (deprecated; use --experiments-per-model).",
+    )
+    _email_bench_parser.add_argument(
+        "--experiments-per-model",
+        "--iterations-per-model",
+        dest="experiments_per_model",
+        type=int,
+        default=1,
+        help="Experiments per model in multi-model benchmark.",
+    )
+    _email_bench_parser.add_argument(
+        "--limit",
+        type=int,
+        default=100,
+        help="Max total emails from MBOX (0=no limit).",
+    )
+    _email_bench_parser.add_argument(
+        "--base-url",
+        type=str,
+        default=None,
+        help="Base URL for the LLM server (full mode only).",
+    )
+    _email_bench_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="benchmark_results",
+        help="Directory to write output files.",
+    )
+    _email_bench_parser.add_argument(
+        "--variance-only",
+        action="store_true",
+        help="DEPRECATED: use 'gaia email report --input-dir <dir>'.",
+    )
+    _email_bench_parser.add_argument(
+        "--jsonl-path",
+        type=str,
+        default=None,
+        help="Path to a JSONL file of emails (alternative to --mbox-path).",
+    )
+    _email_bench_parser.add_argument(
+        "--ground-truth",
+        type=str,
+        default=None,
+        help="Path to ground truth JSON for quality scoring.",
+    )
+    _email_bench_parser.add_argument(
+        "--cost-per-1m-input",
+        type=float,
+        default=0.0,
+        help="Cost per 1M input tokens.",
+    )
+    _email_bench_parser.add_argument(
+        "--cost-per-1m-output",
+        type=float,
+        default=0.0,
+        help="Cost per 1M output tokens.",
+    )
+    _email_bench_parser.add_argument(
+        "--compare",
+        nargs=2,
+        metavar=("HEURISTIC_JSON", "FULL_JSON"),
+        help="DEPRECATED: use 'gaia email report --compare <path1> <path2>'.",
+    )
+    _email_bench_parser.add_argument(
+        "--steps",
+        action="store_true",
+        help="Print per-step token breakdown for full mode.",
+    )
+    _email_bench_parser.add_argument(
+        "--visualize",
+        action="store_true",
+        help="DEPRECATED: use 'gaia email report --charts --input-dir <dir>'.",
+    )
+    _email_bench_parser.add_argument(
+        "--chart-dir",
+        type=str,
+        default="benchmark_charts",
+        help="Directory for chart PNGs (used with legacy --visualize).",
+    )
+    _email_bench_parser.add_argument(
+        "--skip-cold-start",
+        action="store_true",
+        help="Skip cold-start iteration in reports.",
+    )
+    _email_bench_parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Abort on first model iteration failure.",
+    )
+    _email_bench_parser.add_argument(
+        "--force-llm",
+        action="store_true",
+        help="Bypass heuristic fast-path; force LLM classification of every email.",
+    )
+    _email_bench_parser.add_argument(
+        "--batched",
+        action="store_true",
+        help="Run batched triage mode (full bodies, no truncation, batches of 5).",
+    )
+    _email_bench_parser.add_argument(
+        "--smart",
+        action="store_true",
+        help="Run smart triage mode: heuristic fast-path + selective LLM on uncertain emails.",
+    )
+    _email_bench_parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=5,
+        help="Number of emails per batch in batched mode (default 5).",
+    )
+    # ClawFlow (deprecated from bench; use 'gaia email clawflow').
+    _email_bench_parser.add_argument(
+        "--clawflow",
+        action="store_true",
+        help="DEPRECATED: use 'gaia email clawflow' instead.",
+    )
+    _email_bench_parser.add_argument(
+        "--clawflow-timeout",
+        type=int,
+        default=3600,
+        help="Timeout for ClawFlow execution.",
+    )
+    _email_bench_parser.add_argument(
+        "--clawflow-workflow",
+        type=str,
+        default="inbox-zero-helper",
+        help="ClawFlow workflow name.",
+    )
+    _email_bench_parser.add_argument(
+        "--clawflow-path",
+        type=str,
+        default=None,
+        help="Explicit path to clawflow binary or script.",
+    )
+
+    # ClawFlow subcommand (first-class).
+    _email_clawflow_parser = email_subparsers.add_parser(
+        "clawflow",
+        help="Run ClawFlow email triage benchmark.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--workflow",
+        type=str,
+        default="inbox-zero-helper",
+        help="ClawFlow workflow name.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Model ID for ClawFlow.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=3600,
+        help="Timeout in seconds.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--cli-path",
+        type=str,
+        default=None,
+        help="Explicit path to clawflow binary or script.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="benchmark_results",
+        help="Directory to write output.",
+    )
+    _email_clawflow_parser.add_argument(
+        "--mbox-path",
+        type=str,
+        default=None,
+        help="MBOX path (for report correlation).",
+    )
+
+    # Report subcommand.
+    _email_report_parser = email_subparsers.add_parser(
+        "report",
+        help="Generate reports from existing benchmark data.",
+    )
+    _email_report_parser.add_argument(
+        "--input-dir",
+        type=str,
+        default="benchmark_results",
+        help="Directory containing results.jsonl and optional clawflow_results.json.",
+    )
+    _email_report_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default=None,
+        help="Directory to write reports. Defaults to --input-dir.",
+    )
+    _email_report_parser.add_argument(
+        "--charts",
+        action="store_true",
+        help="Generate chart PNGs.",
+    )
+    _email_report_parser.add_argument(
+        "--chart-dir",
+        type=str,
+        default=None,
+        help="Directory for charts. Defaults to <input-dir>/charts.",
+    )
+    _email_report_parser.add_argument(
+        "--skip-cold-start",
+        action="store_true",
+        help="Exclude cold-start runs from variance.",
+    )
+    _email_report_parser.add_argument(
+        "--compare",
+        nargs=2,
+        metavar=("HEURISTIC_JSON", "FULL_JSON"),
+        help="Compare heuristic and full mode results.",
+    )
+    _email_report_parser.add_argument(
+        "--ground-truth",
+        type=str,
+        default=None,
+        help="Path to ground truth JSON for quality scoring.",
+    )
+    _email_report_parser.add_argument(
+        "--cost-per-1m-input",
+        type=float,
+        default=0.0,
+        help="Cost per 1M input tokens.",
+    )
+    _email_report_parser.add_argument(
+        "--cost-per-1m-output",
+        type=float,
+        default=0.0,
+        help="Cost per 1M output tokens.",
     )
 
     # Add Docker app command
@@ -1999,35 +2124,11 @@ Examples:
         help="Convert an Agent UI session from the database into a YAML scenario file",
     )
     agent_eval_parser.add_argument(
-        "--keep-sessions",
-        action="store_true",
-        help="Do not delete Agent UI sessions after eval — leave them for manual inspection",
-    )
-    agent_eval_parser.add_argument(
         "--scenario-dir",
         action="append",
         metavar="PATH",
         help="Additional directory to scan for scenario YAML files (can be repeated). "
         "User scenarios override built-in scenarios with the same ID.",
-    )
-
-    # Add new subparser for generating summary reports from evaluation directories
-    subparsers.add_parser(
-        "report",
-        help="Generate summary report from evaluation results directory",
-        parents=[parent_parser],
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Examples:
-  # Generate report from evaluation directory
-  gaia report -d ./output/eval
-
-  # Generate report with custom output filename
-  gaia report -d ./output/eval -o Model_Comparison_Report.md
-
-  # Generate report and display summary only
-  gaia report -d ./output/eval --summary-only
-        """,
     )
     agent_eval_parser.add_argument(
         "--corpus-dir",
@@ -2183,36 +2284,28 @@ Examples:
         "--verbose", action="store_true", help="Enable verbose logging"
     )
 
-    # MCP serve command (Agent UI MCP server)
-    mcp_serve_parser = mcp_subparsers.add_parser(
-        "serve", help="Start Agent UI MCP server (wraps the Agent UI backend)"
+    # MCP Client commands (connect to external MCP servers)
+    mcp_add_parser = mcp_subparsers.add_parser(
+        "add", help="Add an MCP server connection"
     )
-    mcp_serve_parser.add_argument(
-        "--host", default="localhost", help="Host to bind to (default: localhost)"
+    mcp_add_parser.add_argument("name", help="Friendly name for the server")
+    mcp_add_parser.add_argument("command", help="Command to start the MCP server")
+    mcp_add_parser.add_argument(
+        "--config",
+        help="Path to MCP servers config file (default: ~/.gaia/mcp_servers.json)",
     )
-    mcp_serve_parser.add_argument(
-        "--port", type=int, default=8766, help="Port to listen on (default: 8766)"
-    )
-    mcp_serve_parser.add_argument(
-        "--backend",
-        default="http://localhost:4200",
-        help="GAIA Agent UI backend URL (default: http://localhost:4200)",
-    )
-    mcp_serve_parser.add_argument(
-        "--stdio",
-        action="store_true",
-        help="Use stdio transport instead of HTTP (for Claude Code / eval runner integration)",
-    )
-
-    # MCP Client commands (connect to external MCP servers).
-    # `add` and `remove` moved to `gaia connectors mcp add/remove` (#977) so
-    # configuration goes through the connectors framework with keyring-backed
-    # secrets and per-agent grants.
 
     mcp_list_parser = mcp_subparsers.add_parser(
         "list", help="List configured MCP servers"
     )
     mcp_list_parser.add_argument(
+        "--config",
+        help="Path to MCP servers config file (default: ~/.gaia/mcp_servers.json)",
+    )
+
+    mcp_remove_parser = mcp_subparsers.add_parser("remove", help="Remove an MCP server")
+    mcp_remove_parser.add_argument("name", help="Name of the server to remove")
+    mcp_remove_parser.add_argument(
         "--config",
         help="Path to MCP servers config file (default: ~/.gaia/mcp_servers.json)",
     )
@@ -2249,54 +2342,6 @@ Examples:
     )
     cache_clear_parser.add_argument(
         "--all", action="store_true", help="Clear all caches"
-    )
-
-    # Memory command (agent memory management)
-    memory_parser = subparsers.add_parser(
-        "memory",
-        help="Manage agent memory (bootstrap onboarding, view status)",
-    )
-    memory_subparsers = memory_parser.add_subparsers(
-        dest="memory_action", help="Memory action to perform"
-    )
-
-    # Memory status command
-    _ = memory_subparsers.add_parser("status", help="Show memory statistics")
-
-    # Memory bootstrap command
-    memory_bootstrap_parser = memory_subparsers.add_parser(
-        "bootstrap",
-        help="Run day-zero onboarding (conversational + system discovery)",
-    )
-    memory_bootstrap_parser.add_argument(
-        "--chat-only",
-        action="store_true",
-        help="Conversational onboarding only",
-    )
-    memory_bootstrap_parser.add_argument(
-        "--discover",
-        action="store_true",
-        help="System discovery only (re-scannable)",
-    )
-    memory_bootstrap_parser.add_argument(
-        "--reset",
-        action="store_true",
-        help="Clear source='discovery' items (with confirmation)",
-    )
-    memory_bootstrap_parser.add_argument(
-        "--system",
-        action="store_true",
-        help="Re-scan and refresh system context (OS, hardware, apps, versions)",
-    )
-    memory_bootstrap_parser.add_argument(
-        "--reset-system",
-        action="store_true",
-        help="Clear system context entries and optionally disable auto-collection",
-    )
-    memory_bootstrap_parser.add_argument(
-        "--infer",
-        action="store_true",
-        help="LLM-assisted profile inference from browser history and installed apps",
     )
 
     # Diagnostics command (bundle logs + system info for bug reports)
@@ -2598,7 +2643,7 @@ Examples:
         return
 
     # Handle core Gaia CLI commands
-    if args.action in ["prompt", "chat", "browse", "analyze", "talk", "stats"]:
+    if args.action in ["prompt", "chat", "talk", "stats"]:
         kwargs = {
             k: v for k, v in vars(args).items() if v is not None and k != "action"
         }
@@ -3511,34 +3556,15 @@ Let me know your answer!
                             print(
                                 "  Run `gaia eval agent --save-baseline` first to save a baseline."
                             )
-                            sys.exit(1)
-                        result = compare_scorecards(
-                            str(baseline_path), compare_paths[0]
-                        )
+                            return
+                        compare_scorecards(str(baseline_path), compare_paths[0])
                     elif len(compare_paths) == 2:
-                        result = compare_scorecards(compare_paths[0], compare_paths[1])
+                        compare_scorecards(compare_paths[0], compare_paths[1])
                     else:
                         print("[ERROR] --compare accepts 1 or 2 paths")
-                        sys.exit(1)
-
-                    # If compare detected regressions or significant score drops, fail non-zero
-                    regressed = result.get("regressed", [])
-                    score_regressed = result.get("score_regressed", [])
-                    time_regressed = result.get("time_regressed", [])
-                    total_issues = (
-                        len(regressed) + len(score_regressed) + len(time_regressed)
-                    )
-                    if total_issues > 0:
-                        print(
-                            f"[ERROR] Detected {total_issues} issue(s) (status regressions, score regressions, or time regressions); failing."
-                        )
-                        sys.exit(2)
-                    # Otherwise success
-                    sys.exit(0)
                 except FileNotFoundError as e:
                     print(f"[ERROR] {e}")
-                    sys.exit(1)
-                # compare handled; no further action
+                return
 
             from gaia.eval.runner import AgentEvalRunner
 
@@ -3560,7 +3586,6 @@ Let me know your answer!
                 fix_mode=getattr(args, "fix", False),
                 max_fix_iterations=getattr(args, "max_fix_iterations", 3),
                 target_pass_rate=getattr(args, "target_pass_rate", 0.90),
-                keep_sessions=getattr(args, "keep_sessions", False),
             )
             # --save-baseline: copy scorecard to eval/results/baseline.json
             if getattr(args, "save_baseline", False) and scorecard:
@@ -3590,11 +3615,6 @@ Let me know your answer!
     # Handle Cache command
     if args.action == "cache":
         handle_cache_command(args)
-        return
-
-    # Handle Memory command
-    if args.action == "memory":
-        handle_memory_command(args)
         return
 
     # Handle Connectors command (issue #927, parent of #915)
@@ -4015,10 +4035,140 @@ def handle_email_command(args):
     the agent (the agent's config has no such field). The local-LLM-only
     path is the only path.
 
+    Supports ``gaia email bench`` for benchmarking via the bench harness.
+
     Args:
         args: Parsed command line arguments for the email command
     """
     log = get_logger(__name__)
+
+    # Dispatch to benchmark harness subcommands (bench, clawflow, report).
+    email_action = getattr(args, "email_action", None)
+
+    if email_action == "bench":
+        from gaia.agents.email.bench.cli import main as bench_dispatch_main
+
+        bench_args = ["bench"]
+        for key in [
+            "mbox_path",
+            "mode",
+            "limit",
+            "model",
+            "base_url",
+            "output_dir",
+            "jsonl_path",
+            "ground_truth",
+            # Multi-model.
+            "models",
+            "experiments_per_model",
+        ]:
+            val = getattr(args, key, None)
+            if val is not None:
+                # Skip deprecated/deprecated-default values that the internal
+                # parser no longer accepts.
+                if key == "mode" and val == "heuristic":
+                    continue
+                if key == "model" and val == "heuristic-only":
+                    continue
+                if isinstance(val, list):
+                    for item in val:
+                        bench_args.append(f"--{key.replace('_', '-')}")
+                        bench_args.append(str(item))
+                else:
+                    bench_args.append(f"--{key.replace('_', '-')}")
+                    bench_args.append(str(val))
+
+        # Cost params.
+        cost_input = getattr(args, "cost_per_1m_input", 0.0)
+        cost_output = getattr(args, "cost_per_1m_output", 0.0)
+        if cost_input:
+            bench_args.extend(["--cost-per-1m-input", str(cost_input)])
+        if cost_output:
+            bench_args.extend(["--cost-per-1m-output", str(cost_output)])
+
+        # Boolean flags.
+        for flag in [
+            "variance_only",
+            "visualize",
+            "steps",
+            "skip_cold_start",
+            "fail_fast",
+            "force_llm",
+            "batched",
+            "smart",
+        ]:
+            if getattr(args, flag, False):
+                bench_args.append(f"--{flag.replace('_', '-')}")
+
+        # Batch-size param (always pass if set, used by --batched and --smart).
+        if getattr(args, "batch_size", None):
+            bench_args.extend(["--batch-size", str(args.batch_size)])
+
+        # Compare param (list).
+        compare_paths = getattr(args, "compare", None)
+        if compare_paths:
+            bench_args.append("--compare")
+            bench_args.extend(compare_paths)
+
+        rc = bench_dispatch_main(bench_args)
+        sys.exit(rc)
+
+    elif email_action == "clawflow":
+        from gaia.agents.email.bench.cli import main as bench_dispatch_main
+
+        cf_args = ["clawflow"]
+        for key in [
+            "workflow",
+            "model",
+            "timeout",
+            "cli_path",
+            "output_dir",
+            "mbox_path",
+        ]:
+            val = getattr(args, key, None)
+            if val is not None:
+                cf_args.append(f"--{key.replace('_', '-')}")
+                cf_args.append(str(val))
+
+        rc = bench_dispatch_main(cf_args)
+        sys.exit(rc)
+
+    elif email_action == "report":
+        from gaia.agents.email.bench.cli import main as bench_dispatch_main
+
+        rpt_args = ["report"]
+        for key in [
+            "input_dir",
+            "output_dir",
+            "chart_dir",
+            "ground_truth",
+        ]:
+            val = getattr(args, key, None)
+            if val is not None:
+                rpt_args.append(f"--{key.replace('_', '-')}")
+                rpt_args.append(str(val))
+
+        # Cost params.
+        cost_input = getattr(args, "cost_per_1m_input", 0.0)
+        cost_output = getattr(args, "cost_per_1m_output", 0.0)
+        if cost_input:
+            rpt_args.extend(["--cost-per-1m-input", str(cost_input)])
+        if cost_output:
+            rpt_args.extend(["--cost-per-1m-output", str(cost_output)])
+
+        # Boolean flags.
+        for flag in ["charts", "skip_cold_start"]:
+            if getattr(args, flag, False):
+                rpt_args.append(f"--{flag.replace('_', '-')}")
+
+        # Compare param (list).
+        compare_paths = getattr(args, "compare", None)
+        if compare_paths:
+            rpt_args.append("--compare")
+            rpt_args.extend(compare_paths)
+
+        rc = bench_dispatch_main(rpt_args)
+        sys.exit(rc)
 
     # Initialize Lemonade — local LLM only. The email agent's config will
     # also reject any non-local base_url at construction time, but the
@@ -4047,6 +4197,10 @@ def handle_email_command(args):
             args.query = None
         if not hasattr(args, "interactive"):
             args.interactive = False
+        if not hasattr(args, "trace"):
+            args.trace = False
+        if not hasattr(args, "show_stats"):
+            args.show_stats = False
 
         result = asyncio.run(email_main(args))
         sys.exit(result)
@@ -4575,865 +4729,6 @@ def handle_cache_command(args):
         sys.exit(1)
 
 
-def handle_memory_command(args):
-    """Handle the memory management command.
-
-    Subcommands:
-        status    — Show memory stats (entries by source/category/context, DB size)
-        bootstrap — Run day-zero onboarding (conversation + discovery)
-    """
-    if not hasattr(args, "memory_action") or args.memory_action is None:
-        print("❌ Error: No memory action specified")
-        print("Available actions: status, bootstrap")
-        print("Run 'gaia memory --help' for more information")
-        return
-
-    if args.memory_action == "status":
-        _handle_memory_status()
-    elif args.memory_action == "bootstrap":
-        _handle_memory_bootstrap(args)
-
-
-def _handle_memory_status():
-    """Show memory statistics: entries by source/category/context, DB size, session count."""
-    from gaia.agents.base.memory_store import MemoryStore
-
-    try:
-        store = MemoryStore()
-    except Exception as e:
-        print(f"❌ Error opening memory database: {e}")
-        sys.exit(1)
-
-    try:
-        stats = store.get_stats()
-
-        # Also query by_source (not in get_stats, do a direct query)
-        by_source = {}
-        try:
-            by_source = store.get_source_counts()
-        except Exception:
-            pass
-
-        # --- Format output ---
-        print("\n=== GAIA Agent Memory ===\n")
-
-        # Knowledge section
-        k = stats["knowledge"]
-        print(f"  Knowledge entries: {k['total']}")
-        if k["by_category"]:
-            cats = ", ".join(
-                f"{cat}: {count}" for cat, count in sorted(k["by_category"].items())
-            )
-            print(f"    By category:  {cats}")
-        if k["by_context"]:
-            ctxs = ", ".join(
-                f"{ctx}: {count}" for ctx, count in sorted(k["by_context"].items())
-            )
-            print(f"    By context:   {ctxs}")
-        if by_source:
-            srcs = ", ".join(
-                f"{src}: {count}" for src, count in sorted(by_source.items())
-            )
-            print(f"    By source:    {srcs}")
-        if k["sensitive_count"] > 0:
-            print(f"    Sensitive:    {k['sensitive_count']}")
-        if k["entity_count"] > 0:
-            print(f"    Entities:     {k['entity_count']}")
-        if k["total"] > 0:
-            print(f"    Avg confidence: {k['avg_confidence']:.2f}")
-
-        # Conversations section
-        c = stats["conversations"]
-        print(
-            f"\n  Conversations:     {c['total_turns']} turns across {c['total_sessions']} sessions"
-        )
-        if c["first_session"]:
-            print(f"    First session: {c['first_session'][:10]}")
-        if c["last_session"]:
-            print(f"    Last session:  {c['last_session'][:10]}")
-
-        # Tools section
-        t = stats["tools"]
-        print(
-            f"\n  Tool calls:        {t['total_calls']} ({t['unique_tools']} unique tools)"
-        )
-        if t["total_calls"] > 0:
-            print(f"    Success rate:  {t['overall_success_rate']:.0%}")
-            print(f"    Total errors:  {t['total_errors']}")
-
-        # Temporal section
-        tp = stats["temporal"]
-        if tp["upcoming_count"] > 0 or tp["overdue_count"] > 0:
-            print("\n  Temporal:")
-            if tp["upcoming_count"] > 0:
-                print(f"    Upcoming (7d): {tp['upcoming_count']}")
-            if tp["overdue_count"] > 0:
-                print(f"    Overdue:       {tp['overdue_count']}")
-
-        # DB size
-        db_mb = stats["db_size_bytes"] / (1024 * 1024)
-        if db_mb >= 1.0:
-            print(f"\n  Database size:     {db_mb:.1f} MB")
-        else:
-            db_kb = stats["db_size_bytes"] / 1024
-            print(f"\n  Database size:     {db_kb:.1f} KB")
-
-        print()
-
-    except Exception as e:
-        print(f"❌ Error reading memory stats: {e}")
-        sys.exit(1)
-    finally:
-        store.close()
-
-
-def _handle_memory_bootstrap(args):
-    """Handle the memory bootstrap subcommand.
-
-    Flags:
-        --chat-only     Conversational onboarding only
-        --discover      System discovery only (interactive, with approval)
-        --system        Re-scan and refresh silent system context
-        --reset         Clear source='discovery' items
-        --reset-system  Clear system context entries (optionally disable)
-        (default)       Run chat-only then discover
-    """
-    try:
-        if getattr(args, "reset_system", False):
-            _bootstrap_reset_system()
-        elif getattr(args, "system", False):
-            _bootstrap_system(force=True)
-        elif args.reset:
-            _bootstrap_reset()
-        elif args.chat_only:
-            _bootstrap_chat()
-        elif args.discover:
-            _bootstrap_discover()
-        elif getattr(args, "infer", False):
-            _bootstrap_infer()
-        else:
-            # Default: run both phases
-            _bootstrap_chat()
-            print()
-            _bootstrap_discover()
-    except RuntimeError as e:
-        print(f"❌ {e}")
-        sys.exit(1)
-
-
-# ---- Bootstrap: conversational onboarding ----
-
-_BOOTSTRAP_QUESTIONS = [
-    {
-        "prompt": "What's your name?",
-        "category": "profile",
-        "template": "User's name is {answer}",
-    },
-    {
-        "prompt": "What do you do? (role, profession, or student)",
-        "category": "profile",
-        "template": "User's role/profession: {answer}",
-    },
-    {
-        "prompt": "What will you mainly use GAIA for?",
-        "category": "profile",
-        "template": "User's primary use cases for GAIA: {answer}",
-    },
-    {
-        "prompt": "What programming languages or tools do you use most?",
-        "category": "profile",
-        "template": "User's primary tools and languages: {answer}",
-    },
-    {
-        "prompt": "What are your interests or hobbies outside of work?",
-        "category": "profile",
-        "template": "User's interests and hobbies: {answer}",
-    },
-    {
-        "prompt": "How should I communicate with you? (concise/detailed, casual/formal)",
-        "category": "preference",
-        "template": "Preferred communication style: {answer}",
-    },
-    {
-        "prompt": "Anything else you'd like me to know about you?",
-        "category": "profile",
-        "template": "Additional user context: {answer}",
-    },
-]
-
-
-def _bootstrap_chat():
-    """Phase 1: Conversational onboarding — ask questions, store answers."""
-    from gaia.agents.base.memory_store import MemoryStore
-
-    print("\n=== Welcome to GAIA — Your Personal AI Assistant ===")
-    print("I run locally on your AMD hardware, so everything stays private.")
-    print("Let me get to know you so I can be more helpful from the start.")
-    print("(Press Enter to skip any question)\n")
-
-    try:
-        store = MemoryStore()
-    except Exception as e:
-        raise RuntimeError(f"Error opening memory database: {e}") from e
-
-    stored_count = 0
-    try:
-        for q in _BOOTSTRAP_QUESTIONS:
-            try:
-                answer = input(f"  {q['prompt']} ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print("\n\nBootstrap cancelled.")
-                return
-
-            if not answer:
-                continue
-
-            content = q["template"].format(answer=answer)
-            try:
-                store.store(
-                    category=q["category"],
-                    content=content,
-                    source="user",
-                    context="global",
-                    confidence=0.8,
-                )
-                stored_count += 1
-            except Exception as e:
-                print(f"  ⚠ Failed to store: {e}")
-
-        print(f"\n✅ Stored {stored_count} memory entries from onboarding.")
-    finally:
-        store.close()
-
-
-# ---- Bootstrap: LLM-assisted profile inference ----
-
-_INFER_PROMPT = """\
-You are analyzing a user's computing environment to generate personalized profile insights.
-
-Based on the data below, generate 5-10 concise profile facts about this user. Focus on:
-- Professional role or domain (e.g. software developer, data scientist, designer)
-- Key technologies, languages, and tools they regularly use
-- Technical interests and areas of focus
-- Non-technical interests or hobbies (if clearly evident)
-
-Raw data:
-{sections}
-
-Respond with a JSON array of insight objects. Each object must have:
-  "content"    - A clear, specific fact about the user (1 sentence, ≤120 chars)
-  "confidence" - Float 0.0–1.0 (how confident you are, given the evidence)
-  "domain"     - One of: "work", "technical", "personal", "general"
-
-Rules:
-- Only state what the data clearly supports — do not guess.
-- Skip generic facts that apply to almost everyone.
-- Return ONLY the JSON array, no other text, no markdown fences.
-
-Example output:
-[
-  {{"content": "Primarily a Python developer with strong AI/ML focus", "confidence": 0.9, "domain": "work"}},
-  {{"content": "Regularly contributes to open-source projects on GitHub", "confidence": 0.8, "domain": "technical"}}
-]"""
-
-_INFER_REFRESH_DAYS = 30  # Re-run LLM inference after this many days
-
-
-def _bootstrap_infer():
-    """Phase 3 (optional): LLM-assisted profile inference from browser history + system data.
-
-    Collects raw signals (browser domains, installed apps, git identity), sends
-    them to the local LLM, and stores the generated profile insights after user
-    review.  All browser data is sensitive — explicit consent is requested before
-    reading it.
-    """
-    import json as _json
-
-    from gaia.agents.base.discovery import SystemDiscovery
-    from gaia.agents.base.memory_store import MemoryStore
-
-    print("\n=== GAIA Memory — AI Profile Inference ===")
-    print(
-        "GAIA will read your browser history and installed apps, then use the local\n"
-        "LLM to generate personalised profile facts.  Raw data is NEVER stored or\n"
-        "sent anywhere — only the LLM-generated insights are proposed for storage.\n"
-    )
-
-    # Check for stale inferred facts — offer refresh
-    try:
-        store_check = MemoryStore()
-        try:
-            inferred = store_check.get_by_category("profile", context="global", limit=1)
-            # Filter to source="inferred"
-            inferred = [r for r in inferred if r.get("source") == "inferred"]
-            if inferred:
-                newest_updated = inferred[0].get("updated_at", "")
-                if newest_updated:
-                    from datetime import datetime as _dt
-
-                    age_days = (
-                        _dt.now()
-                        - _dt.fromisoformat(newest_updated).replace(tzinfo=None)
-                    ).days
-                    if age_days < _INFER_REFRESH_DAYS:
-                        print(
-                            f"  LLM-inferred profile facts are {age_days} day(s) old "
-                            f"(refresh threshold: {_INFER_REFRESH_DAYS} days)."
-                        )
-                        try:
-                            resp = (
-                                input("  Re-run inference anyway? [y/N]: ")
-                                .strip()
-                                .lower()
-                            )
-                        except (EOFError, KeyboardInterrupt):
-                            print("\nInference cancelled.")
-                            return
-                        if resp != "y":
-                            print("  Skipping — your profile is up to date.")
-                            return
-        finally:
-            store_check.close()
-    except Exception:
-        pass  # Non-critical — proceed anyway
-
-    # Explicit consent for browser history access
-    try:
-        consent = input("  Read browser history for inference? [Y/n]: ").strip().lower()
-    except (EOFError, KeyboardInterrupt):
-        print("\nInference cancelled.")
-        return
-    use_browser = consent != "n"
-
-    print("\n  Collecting data...", end="", flush=True)
-    try:
-        discovery = SystemDiscovery()
-    except Exception as e:
-        raise RuntimeError(f"Error initializing system discovery: {e}") from e
-
-    # --- Collect raw signals ---
-    sections: list[str] = []
-
-    # 1. Browser history (top domains, visit counts)
-    if use_browser:
-        try:
-            browser_results = discovery.scan_browser_history(days=30)
-            if browser_results:
-                lines = []
-                for item in browser_results[:40]:
-                    # content is "Frequently visited: domain.com (N visits)"
-                    lines.append(f"  {item['content']}")
-                sections.append(
-                    "BROWSER HISTORY (top domains, last 30 days):\n" + "\n".join(lines)
-                )
-        except Exception:
-            pass
-
-    # 2. Installed applications
-    try:
-        app_results = discovery.scan_installed_apps()
-        if app_results:
-            # Extract just the app names from content strings like "Installed app: VS Code"
-            apps = []
-            for item in app_results:
-                content = item.get("content", "")
-                if content.startswith("Installed app: "):
-                    apps.append(content[len("Installed app: ") :].strip())
-            if apps:
-                sections.append("INSTALLED APPS:\n  " + ", ".join(apps))
-    except Exception:
-        pass
-
-    # 3. Git identity (name / employer domain — not raw email)
-    try:
-        git_results = discovery.scan_git_identity()
-        if git_results:
-            git_lines = []
-            for item in git_results:
-                # Skip sensitive (raw email) items
-                if not item.get("sensitive") and item.get("content"):
-                    git_lines.append(f"  {item['content']}")
-            if git_lines:
-                sections.append("GIT IDENTITY:\n" + "\n".join(git_lines))
-    except Exception:
-        pass
-
-    # 4. Project languages / manifests (non-sensitive)
-    try:
-        manifest_results = discovery.scan_project_manifests()
-        if manifest_results:
-            manifest_lines = []
-            for item in manifest_results[:10]:
-                if not item.get("sensitive") and item.get("content"):
-                    manifest_lines.append(f"  {item['content']}")
-            if manifest_lines:
-                sections.append(
-                    "PROJECT MANIFESTS (sample):\n" + "\n".join(manifest_lines)
-                )
-    except Exception:
-        pass
-
-    # 5. App launch frequency (UserAssist — covers consumer apps like Spotify, Outlook)
-    try:
-        userassist_results = discovery.scan_windows_userassist()
-        if userassist_results:
-            lines = [f"  {item['content']}" for item in userassist_results[:20]]
-            sections.append(
-                "FREQUENTLY LAUNCHED APPS (actual usage frequency):\n"
-                + "\n".join(lines)
-            )
-    except Exception:
-        pass
-
-    # 6. Recent file type patterns
-    try:
-        filetype_results = discovery.scan_recent_file_types()
-        if filetype_results:
-            lines = [f"  {item['content']}" for item in filetype_results]
-            sections.append("RECENT FILE TYPES (work patterns):\n" + "\n".join(lines))
-    except Exception:
-        pass
-
-    # 7. Gaming and media
-    try:
-        gaming_results = discovery.scan_gaming_and_media()
-        if gaming_results:
-            lines = [f"  {item['content']}" for item in gaming_results]
-            sections.append("GAMING AND MEDIA:\n" + "\n".join(lines))
-    except Exception:
-        pass
-
-    print(" done.")
-
-    if not sections:
-        print("\n  No data collected for inference.  Nothing to process.")
-        return
-
-    # --- Build and send LLM prompt ---
-    prompt_sections = "\n\n".join(sections)
-    prompt = _INFER_PROMPT.format(sections=prompt_sections)
-
-    print(
-        "  Calling local LLM for insights (this may take ~30s)...", end="", flush=True
-    )
-    try:
-        llm = create_client()
-        raw_response = llm.chat(
-            [{"role": "user", "content": prompt}],
-            temperature=0.2,
-            max_new_tokens=1024,
-        )
-        # Collect streamed response if needed
-        if hasattr(raw_response, "__iter__") and not isinstance(raw_response, str):
-            raw_response = "".join(raw_response)
-    except Exception as e:
-        print(f"\n\n  ❌ LLM call failed: {e}")
-        print("  Make sure Lemonade Server is running: lemonade-server serve")
-        return
-
-    print(" done.")
-
-    # --- Parse JSON array from response ---
-    insights: list[dict] = []
-    try:
-        # Strip markdown fences if LLM wrapped output
-        cleaned = raw_response.strip()
-        if cleaned.startswith("```"):
-            cleaned = "\n".join(cleaned.split("\n")[1:])
-            if cleaned.endswith("```"):
-                cleaned = cleaned[: cleaned.rfind("```")]
-
-        insights = _json.loads(cleaned.strip())
-        if not isinstance(insights, list):
-            raise ValueError("Expected a JSON array")
-        # Validate each item
-        insights = [
-            i
-            for i in insights
-            if isinstance(i, dict)
-            and isinstance(i.get("content"), str)
-            and i["content"].strip()
-        ]
-    except Exception as e:
-        print(f"\n  ❌ Failed to parse LLM response: {e}")
-        print(f"  Raw response:\n{raw_response[:500]}")
-        return
-
-    if not insights:
-        print("\n  No insights generated.")
-        return
-
-    print(f"\n  Generated {len(insights)} insights. Review each one:\n")
-    print("  [Y] = approve (default)   [n] = skip   [q] = quit\n")
-
-    # --- Review and store ---
-    try:
-        store = MemoryStore()
-    except Exception as e:
-        raise RuntimeError(f"Error opening memory database: {e}") from e
-
-    # Silence noisy store INFO logs
-    _store_logger = logging.getLogger("gaia.agents.base.memory_store")
-    _orig_level = _store_logger.level
-    _store_logger.setLevel(logging.WARNING)
-
-    approved = 0
-    skipped = 0
-
-    # Delete stale inferred facts before storing new ones (only if user approves at least one)
-    inferred_deleted = False
-
-    try:
-        for i, insight in enumerate(insights, 1):
-            content = insight["content"].strip()[:200]
-            confidence = float(insight.get("confidence", 0.7))
-            domain = insight.get("domain", "general")
-            confidence = max(0.0, min(1.0, confidence))
-
-            print(f"  ({i}/{len(insights)}) [{confidence:.0%}] {content}")
-            try:
-                choice = input("    Approve? [Y/n/q]: ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                print("\n\nReview cancelled.")
-                break
-
-            if choice == "q":
-                print("  Review stopped.")
-                break
-            elif choice == "n":
-                skipped += 1
-                continue
-            else:
-                # Clear old inferred facts on first approval
-                if not inferred_deleted:
-                    try:
-                        store.delete_by_source("inferred")
-                    except Exception:
-                        pass
-                    inferred_deleted = True
-
-                try:
-                    store.store(
-                        category="profile",
-                        content=content,
-                        source="inferred",
-                        context="global",
-                        sensitive=False,
-                        confidence=confidence,
-                        domain=domain,
-                    )
-                    approved += 1
-                except Exception as e:
-                    print(f"    ⚠ Failed to store: {e}")
-
-        print(f"\n✅ Inference complete: {approved} approved, {skipped} skipped.")
-    finally:
-        _store_logger.setLevel(_orig_level)
-        store.close()
-
-
-# ---- Bootstrap: system discovery ----
-
-
-def _bootstrap_discover():
-    """Phase 2: System discovery — scan local system, present findings for review."""
-    from gaia.agents.base.discovery import SystemDiscovery
-    from gaia.agents.base.memory_store import MemoryStore
-
-    print("\n=== GAIA Memory Bootstrap — System Discovery ===")
-    print("Scanning your system for projects, apps, and more...")
-    print("Nothing is stored without your approval.\n")
-
-    try:
-        discovery = SystemDiscovery()
-    except Exception as e:
-        raise RuntimeError(f"Error initializing system discovery: {e}") from e
-
-    try:
-        all_results = discovery.scan_all()
-    except Exception as e:
-        raise RuntimeError(f"Error during system scan: {e}") from e
-
-    # Flatten and count
-    findings = []
-    for source_name, items in all_results.items():
-        for item in items:
-            item["_source_name"] = source_name
-            findings.append(item)
-
-    if not findings:
-        print("No discoveries found on this system.")
-        return
-
-    print(f"Found {len(findings)} items. Review each one:\n")
-    print("  [Y] = approve (default)   [n] = skip   [q] = quit review\n")
-
-    try:
-        store = MemoryStore()
-    except Exception as e:
-        raise RuntimeError(f"Error opening memory database: {e}") from e
-
-    approved_count = 0
-    skipped_count = 0
-    try:
-        for i, item in enumerate(findings, 1):
-            sensitive_tag = " [SENSITIVE]" if item.get("sensitive") else ""
-            ctx_tag = f" [{item.get('context', 'unclassified')}]"
-            print(f"  ({i}/{len(findings)}) {item['content']}{ctx_tag}{sensitive_tag}")
-
-            try:
-                choice = input("    Approve? [Y/n/q]: ").strip().lower()
-            except (EOFError, KeyboardInterrupt):
-                print("\n\nReview cancelled.")
-                break
-
-            if choice == "q":
-                print("  Review stopped.")
-                break
-            elif choice == "n":
-                skipped_count += 1
-                continue
-            else:
-                # Default = approve (empty string or 'y')
-                try:
-                    store.store(
-                        category=item.get("category", "fact"),
-                        content=item["content"],
-                        source="discovery",
-                        context=item.get("context", "global"),
-                        sensitive=item.get("sensitive", False),
-                        entity=item.get("entity") or None,
-                        confidence=item.get("confidence", 0.4),
-                    )
-                    approved_count += 1
-                except Exception as e:
-                    print(f"    ⚠ Failed to store: {e}")
-
-        print(
-            f"\n✅ Discovery complete: {approved_count} approved, {skipped_count} skipped."
-        )
-    finally:
-        store.close()
-
-
-# ---- Bootstrap: reset discovery items ----
-
-
-def _bootstrap_reset():
-    """Clear all source='discovery' knowledge items after user confirmation."""
-    from gaia.agents.base.memory_store import MemoryStore
-
-    try:
-        store = MemoryStore()
-    except Exception as e:
-        raise RuntimeError(f"Error opening memory database: {e}") from e
-
-    try:
-        # Count discovery items
-        by_source = store.get_source_counts()
-        count = by_source.get("discovery", 0)
-
-        if count == 0:
-            print("No discovery items found in memory. Nothing to reset.")
-            return
-
-        # Prompt for confirmation
-        try:
-            response = (
-                input(
-                    f"Delete {count} discovered item(s)? "
-                    "User-edited items (source='user') are preserved. [y/N]: "
-                )
-                .strip()
-                .lower()
-            )
-        except (EOFError, KeyboardInterrupt):
-            print("\nReset cancelled.")
-            return
-
-        if response != "y":
-            print("Reset cancelled.")
-            return
-
-        # Delete discovery items atomically (FTS + knowledge in one transaction)
-        deleted = store.delete_by_source("discovery")
-        print(f"✅ Deleted {deleted} discovery item(s).")
-
-    except Exception as e:
-        raise RuntimeError(f"Error during reset: {e}") from e
-    finally:
-        store.close()
-
-
-# ---- Bootstrap: system context (silent, non-interactive) ----
-
-
-def _bootstrap_system(force: bool = True):
-    """Re-scan system context and store facts in memory (no LLM required)."""
-    from gaia.agents.base.memory import (
-        _save_memory_settings,
-        _system_context_is_enabled,
-    )
-    from gaia.agents.base.memory_store import MemoryStore
-    from gaia.agents.base.system_context import collect_system_info
-
-    print("\n=== GAIA Memory — System Context Refresh ===")
-
-    if not _system_context_is_enabled():
-        print("⚠  System context collection is disabled.")
-        try:
-            choice = input("Re-enable and collect now? [y/N]: ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print("\nCancelled.")
-            return
-        if choice != "y":
-            print(
-                "Skipped. Run 'gaia memory bootstrap --reset-system' to manage this setting."
-            )
-            return
-        _save_memory_settings({"system_context_enabled": True})
-        print("✅ System context collection re-enabled.\n")
-
-    print("Collecting system information...\n")
-    try:
-        facts = collect_system_info()
-    except Exception as e:
-        print(f"❌ Error collecting system info: {e}")
-        return
-
-    for f in facts:
-        print(f"  [{f['domain']}] {f['content']}")
-
-    if not facts:
-        print("No facts collected.")
-        return
-
-    try:
-        store = MemoryStore()
-    except Exception as e:
-        print(f"❌ Error opening memory database: {e}")
-        return
-
-    _store_logger = logging.getLogger("gaia.agents.base.memory_store")
-    _orig_level = _store_logger.level
-
-    try:
-        # Silence INFO-level store logs — end users don't need per-row output
-        _store_logger.setLevel(logging.WARNING)
-
-        if force:
-            # Clear existing system entries before re-storing
-            cleared = store.delete_by_category("system")
-            if cleared:
-                print(f"\n  (replaced {cleared} existing system entries)")
-
-        stored = 0
-        for fact in facts:
-            try:
-                store.store(
-                    category="system",
-                    content=fact["content"],
-                    domain=fact.get("domain"),
-                    context="global",
-                    confidence=1.0,
-                    source="system",
-                )
-                stored += 1
-            except Exception as e:
-                print(f"  ⚠ Failed to store: {e}")
-
-        print(f"\n✅ Stored {stored} system context item(s).")
-    finally:
-        _store_logger.setLevel(_orig_level)
-        store.close()
-
-
-# ---- Bootstrap: reset system context ----
-
-
-def _bootstrap_reset_system():
-    """Clear all system context entries and optionally disable auto-collection."""
-    from gaia.agents.base.memory import (
-        _save_memory_settings,
-        _system_context_is_enabled,
-    )
-    from gaia.agents.base.memory_store import MemoryStore
-
-    print("\n=== GAIA Memory — Reset System Context ===")
-
-    try:
-        store = MemoryStore()
-    except Exception as e:
-        print(f"❌ Error opening memory database: {e}")
-        return
-
-    try:
-        items = store.get_by_category("system", context="global", limit=200)
-        count = len(items)
-
-        if count == 0:
-            print("No system context entries found in memory.")
-        else:
-            print(f"Found {count} system context entries:\n")
-            for item in items[:10]:
-                print(f"  - {item['content']}")
-            if count > 10:
-                print(f"  ... and {count - 10} more.")
-
-            try:
-                choice = (
-                    input(f"\nDelete all {count} system context entries? [y/N]: ")
-                    .strip()
-                    .lower()
-                )
-            except (EOFError, KeyboardInterrupt):
-                print("\nCancelled.")
-                return
-
-            if choice == "y":
-                deleted = store.delete_by_category("system")
-                print(f"✅ Deleted {deleted} system context entry(ies).")
-            else:
-                print("Deletion cancelled.")
-                return
-    finally:
-        store.close()
-
-    # Ask whether to disable auto-collection going forward
-    currently_enabled = _system_context_is_enabled()
-    if currently_enabled:
-        try:
-            choice = (
-                input(
-                    "\nDisable automatic system context collection on startup? [y/N]: "
-                )
-                .strip()
-                .lower()
-            )
-        except (EOFError, KeyboardInterrupt):
-            print()
-            return
-
-        if choice == "y":
-            _save_memory_settings({"system_context_enabled": False})
-            print("✅ System context collection disabled.")
-            print("   Run 'gaia memory bootstrap --system' to re-enable and refresh.")
-        else:
-            print(
-                "Auto-collection remains enabled — system context will be re-collected on next startup."
-            )
-    else:
-        print("\nAuto-collection is already disabled.")
-        try:
-            choice = input("Re-enable it? [y/N]: ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
-            print()
-            return
-        if choice == "y":
-            _save_memory_settings({"system_context_enabled": True})
-            print("✅ System context collection re-enabled.")
-
-
 def handle_diagnostics_command(args):
     """Handle the 'gaia diagnostics' command.
 
@@ -5761,10 +5056,12 @@ def handle_mcp_command(args):
         handle_mcp_agent(args)
     elif args.mcp_action == "docker":
         handle_mcp_docker(args)
-    elif args.mcp_action == "serve":
-        handle_mcp_serve(args)
+    elif args.mcp_action == "add":
+        handle_mcp_add(args)
     elif args.mcp_action == "list":
         handle_mcp_list(args)
+    elif args.mcp_action == "remove":
+        handle_mcp_remove(args)
     elif args.mcp_action == "tools":
         handle_mcp_tools(args)
     elif args.mcp_action == "test-client":
@@ -6348,51 +5645,38 @@ def handle_mcp_docker(args):
         print(f"❌ Error starting Docker MCP server: {e}")
 
 
-def handle_mcp_serve(args):
-    """Start the Agent UI MCP server (wraps the GAIA Agent UI REST API)."""
-    log = get_logger(__name__)
+def handle_mcp_add(args):
+    """Add an MCP server connection."""
+    import shlex
+
+    from gaia.mcp import MCPClientManager
+    from gaia.mcp.client.config import MCPConfig
+
+    config = MCPConfig(args.config) if args.config else MCPConfig()
+    manager = MCPClientManager(config=config)
 
     try:
-        from gaia.mcp.servers.agent_ui_mcp import create_agent_ui_mcp
+        print(f"📡 Connecting to MCP server '{args.name}'...")
 
-        mcp = create_agent_ui_mcp(backend_url=args.backend)
+        # Parse command string into config dict (Anthropic format)
+        parts = shlex.split(args.command)
+        server_config = {"command": parts[0]}
+        if len(parts) > 1:
+            server_config["args"] = parts[1:]
 
-        if args.stdio:
-            print(
-                "Starting GAIA Agent UI MCP Server (stdio mode)...",
-                file=__import__("sys").stderr,
-            )
-            mcp.run(transport="stdio")
-        else:
-            mcp.settings.host = args.host
-            mcp.settings.port = args.port
+        client = manager.add_server(args.name, server_config)
 
-            print("=" * 60)
-            print("🤖 GAIA Agent UI MCP Server")
-            print("=" * 60)
-            print(f"   Backend : {args.backend}")
-            print(f"   MCP     : http://{args.host}:{args.port}/mcp")
-            try:
-                tool_count = len(
-                    mcp._tool_manager._tools
-                )  # pylint: disable=protected-access
-                print(f"   Tools   : {tool_count} registered")
-            except Exception:
-                pass
-            print("\nPress Ctrl+C to stop")
-            print("=" * 60)
-            mcp.run(transport="streamable-http")
+        tools = client.list_tools()
+        print(f"✅ Successfully connected to '{args.name}'")
+        print(f"   Server: {client.server_info.get('name', 'Unknown')}")
+        print(f"   Version: {client.server_info.get('version', 'Unknown')}")
+        print(f"   Tools: {len(tools)} available")
 
-    except KeyboardInterrupt:
-        print("\n✅ Agent UI MCP server stopped")
-    except ImportError as e:
-        log.error(f"Failed to import Agent UI MCP server: {e}")
-        print("❌ Error: Could not load Agent UI MCP server")
-        print(f"   {e}")
-        print("   Make sure the Agent UI backend is running: gaia chat --ui")
+        config_path = args.config if args.config else "~/.gaia/mcp_servers.json"
+        print(f"   Saved to: {config_path}")
+
     except Exception as e:
-        log.error(f"Error starting Agent UI MCP server: {e}")
-        print(f"❌ Error starting Agent UI MCP server: {e}")
+        print(f"❌ Error connecting to MCP server: {e}")
 
 
 def handle_mcp_list(args):
@@ -6422,6 +5706,20 @@ def handle_mcp_list(args):
         command = server_config.get("command", "Unknown")
         print(f"\n🔹 {name}")
         print(f"   Command: {command}")
+
+
+def handle_mcp_remove(args):
+    """Remove an MCP server."""
+    from gaia.mcp import MCPConfig
+
+    config = MCPConfig(args.config) if args.config else MCPConfig()
+
+    if not config.server_exists(args.name):
+        print(f"❌ MCP server '{args.name}' not found")
+        return
+
+    config.remove_server(args.name)
+    print(f"✅ Removed MCP server '{args.name}'")
 
 
 def handle_mcp_tools(args):
