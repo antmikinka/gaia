@@ -424,6 +424,32 @@ class EmailTriageAgent(
             return True  # unknown email — use LLM
         return not entry.get("confident", False)
 
+    def sync_smart_triage_cache(
+        self, *, heuristic_ids: dict[str, str], llm_ids: dict[str, str]
+    ) -> None:
+        """Populate _smart_triaged_cache from runner's SessionState.
+
+        Called by the interactive benchmark runner after each turn to bridge
+        heuristic triage results back into the agent's in-memory cache so
+        ``_should_use_llm`` can gate LLM calls on subsequent turns.
+
+        Args:
+            heuristic_ids: {email_id: category} from state.heuristic_triaged.
+            llm_ids: {email_id: category} from state.llm_triaged.
+        """
+        for eid, cat in heuristic_ids.items():
+            self._smart_triaged_cache[eid] = {
+                "category": cat,
+                "confident": True,
+                "source": "heuristic",
+            }
+        for eid, cat in llm_ids.items():
+            self._smart_triaged_cache[eid] = {
+                "category": cat,
+                "confident": False,
+                "source": "llm",
+            }
+
     def _process_single_batch(
         self,
         *,

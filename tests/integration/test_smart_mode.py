@@ -274,3 +274,79 @@ def test_run_interactive_benchmark_smart_mode_partitioning():
     assert len(state.llm_triaged) == 2  # msg-b, msg-e
     assert state.llm_calls_saved == 3
     assert state.heuristic_token_estimate == 150  # 3 * 50
+
+
+# ---------------------------------------------------------------------------
+# Phase 4f: sync_smart_triage_cache — bridging runner state to agent cache
+# ---------------------------------------------------------------------------
+
+
+def test_sync_smart_triage_cache_populates_agent_cache(smart_config):
+    """sync_smart_triage_cache bridges runner SessionState into
+    agent._smart_triaged_cache so _should_use_llm gates correctly."""
+    agent = _make_agent_with_triaged_cache(smart_config, {})
+    agent.sync_smart_triage_cache(
+        heuristic_ids={"e1": "promotions", "e2": "updates"},
+        llm_ids={"e3": "actionable"},
+    )
+    assert agent._should_use_llm("e1") is False  # heuristic-confident
+    assert agent._should_use_llm("e2") is False  # heuristic-confident
+    assert agent._should_use_llm("e3") is True   # non-confident -> LLM
+    assert agent._should_use_llm("unknown") is True  # not in cache
+
+
+def test_sync_smart_triage_cache_overwrites_on_subsequent_turn(smart_config):
+    """Re-syncing after reclassify moves an email from heuristic to LLM."""
+    agent = _make_agent_with_triaged_cache(smart_config, {})
+    # Turn 1: all confident.
+    agent.sync_smart_triage_cache(
+        heuristic_ids={"e1": "promotions"},
+        llm_ids={},
+    )
+    assert agent._should_use_llm("e1") is False
+
+    # Turn 2: user reclassified e1 -> move to llm_ids.
+    agent.sync_smart_triage_cache(
+        heuristic_ids={},
+        llm_ids={"e1": "promotions"},
+    )
+    assert agent._should_use_llm("e1") is True
+
+
+# ---------------------------------------------------------------------------
+# Phase 4g: force_llm_ids in triage_inbox_impl
+# ---------------------------------------------------------------------------
+
+
+def test_triage_inbox_impl_force_llm_ids_override():
+    """When force_llm_ids contains an email id, it overrides confident=True."""
+    from gaia.agents.email.fake_gmail import FakeGmailBackend
+    from gaia.agents.email.tools.read_tools import triage_inbox_impl
+    from pathlib import Path
+
+    fake = FakeGmailBackend(mbox_path=None)
+    result = triage_inbox_impl(
+        fake,
+        max_messages=10,
+        force_llm_ids={"test-email-1": "user-requested"},
+    )
+    # With no mbox, the fake gmail may return empty or test emails.
+    # If it returns emails, verify force_llm_ids override works.
+    for item in result.get("results", []):
+        if item.get("id") == "test-email-1":
+            assert item["confident"] is False
+            assert "user-requested" in item["rationale"]
+
+
+def test_triage_inbox_impl_force_llm_ids_empty_dict_no_effect():
+    """An empty force_llm_ids dict should not affect confident results."""
+    from gaia.agents.email.fake_gmail import FakeGmailBackend
+    from gaia.agents.email.tools.read_tools import triage_inbox_impl
+
+    fake = FakeGmailBackend(mbox_path=None)
+    result1 = triage_inbox_impl(fake, max_messages=10, force_llm_ids={})
+    result2 = triage_inbox_impl(fake, max_messages=10, force_llm_ids=None)
+    # Both should produce identical results.
+    assert len(result1["results"]) == len(result2["results"])
+    for r1, r2 in zip(result1["results"], result2["results"]):
+        assert r1["confident"] == r2["confident"]

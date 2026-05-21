@@ -776,6 +776,11 @@ def run_interactive_benchmark(
 
         if enable_smart_mode:
             _extract_actions(agent_result, state)
+            # Bridge heuristic results into agent's cache for _should_use_llm.
+            agent.sync_smart_triage_cache(
+                heuristic_ids=dict(state.heuristic_triaged),
+                llm_ids=dict(state.llm_triaged),
+            )
 
         # Persist conversation state for next turn.
         conversation = agent_result.get("conversation", [])
@@ -949,7 +954,10 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
         tool_name = msg.get("name", "")
         try:
             envelope = json.loads(text)
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError) as exc:
+            print(
+                f"  [WARN] _extract_actions: malformed JSON from tool '{tool_name}': {exc}"
+            )
             continue
 
         if not envelope.get("ok") or "data" not in envelope:
@@ -1195,11 +1203,14 @@ def run_interactive_session(
                 cat = state.heuristic_triaged.pop(email_id)
                 state.llm_triaged[email_id] = cat
                 state.force_llm_ids[email_id] = "user-requested"
+                # Wire into agent config so next triage_inbox call respects it.
+                agent.config.force_llm_ids[email_id] = "user-requested"
                 print(
-                    f"  Marked [{email_id}] for LLM reclassification (next triage run will use LLM)."
+                    f"  Marked [{email_id}] for LLM reclassification (next triage will use LLM)."
                 )
             elif email_id in state.triaged_emails:
                 state.force_llm_ids[email_id] = "user-requested"
+                agent.config.force_llm_ids[email_id] = "user-requested"
                 print(f"  Marked [{email_id}] for user-requested LLM review.")
             else:
                 print(f"  Email [{email_id}] not found in triaged results.")
@@ -1244,6 +1255,11 @@ def run_interactive_session(
 
         if enable_smart_mode:
             _extract_actions(agent_result, state)
+            # Bridge heuristic results into agent's cache for _should_use_llm.
+            agent.sync_smart_triage_cache(
+                heuristic_ids=dict(state.heuristic_triaged),
+                llm_ids=dict(state.llm_triaged),
+            )
 
         conversation = agent_result.get("conversation", [])
         if conversation:
@@ -1311,8 +1327,13 @@ def run_interactive_session(
     h_count = len(state.heuristic_triaged)
     l_count = len(state.llm_triaged)
     if h_count or l_count:
-        print(f"  Heuristic: {h_count} emails (confident)")
-        print(f"  LLM:       {l_count} emails (non-confident)")
+        total_processed = h_count + l_count
+        h_pct = h_count / total_processed * 100 if total_processed else 0
+        l_pct = l_count / total_processed * 100 if total_processed else 0
+        print(f"  Heuristic: {h_count} emails ({h_pct:.0f}%) -- zero LLM cost")
+        print(
+            f"  LLM:       {l_count} emails ({l_pct:.0f}%) -- {total_output:,} output tokens"
+        )
     if enable_smart_mode and state.llm_calls_saved > 0:
         saved_pct = (
             state.heuristic_token_estimate
@@ -1321,10 +1342,16 @@ def run_interactive_session(
             if (state.heuristic_token_estimate + total_tokens) > 0
             else 0
         )
+        est_avoided = h_count * 2048 if h_count else 0
         print(
-            f"  Heuristic fast-path saved ~{state.llm_calls_saved} LLM classifications "
-            f"(est. ~{state.heuristic_token_estimate} tokens, {saved_pct:.0f}% of estimated context)"
+            f"  Heuristic fast-path: ~{state.llm_calls_saved} LLM calls avoided "
+            f"(est. ~{state.heuristic_token_estimate} input tokens, {saved_pct:.0f}% of estimated context)"
         )
+        if est_avoided > 0:
+            print(
+                f"  Estimated tokens avoided: ~{est_avoided:,} output tokens "
+                f"({h_count} emails x ~2048 avg)"
+            )
     _print_session_state(state)
     if enable_smart_mode:
         _print_smart_breakdown(state)

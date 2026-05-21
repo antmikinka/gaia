@@ -154,6 +154,7 @@ def triage_inbox_impl(
     max_messages: int = 25,
     debug: bool = False,
     force_llm: bool = False,
+    force_llm_ids: dict[str, str] | None = None,
 ) -> Dict[str, Any]:
     """Triage the inbox using heuristic fast path + LLM fallback.
 
@@ -189,6 +190,12 @@ def triage_inbox_impl(
             if force_llm and heuristic.confident:
                 heuristic.confident = False
                 heuristic.reason = f"forced LLM bypass (was: {heuristic.reason})"
+            if force_llm_ids and msg["id"] in force_llm_ids and heuristic.confident:
+                heuristic.confident = False
+                heuristic.reason = (
+                    f"forced LLM bypass (user-requested: "
+                    f"{force_llm_ids[msg['id']]})"
+                )
             log_triage_dispatch(
                 message_id=msg["id"],
                 decision="heuristic" if heuristic.confident else "needs_llm",
@@ -339,12 +346,14 @@ class ReadToolsMixin:
             try:
                 max_messages = max(1, min(int(max_messages or 25), 100))
                 force_llm_flag = bool(getattr(self.config, "force_llm", False))
+                force_llm_ids = getattr(self.config, "force_llm_ids", None) or None
                 return _envelope_ok(
                     triage_inbox_impl(
                         gmail,
                         max_messages=max_messages,
                         debug=debug_flag,
                         force_llm=force_llm_flag,
+                        force_llm_ids=force_llm_ids,
                     )
                 )
             except ConnectorsError as exc:

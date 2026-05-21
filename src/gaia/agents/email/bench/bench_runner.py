@@ -264,8 +264,22 @@ def main(argv: Optional[list[str]] = None) -> int:
             "llm_triaged": summary.get("llm_triaged", {}),
             "heuristic_only_count": summary.get("heuristic_only_count", 0),
             "llm_escalated_count": summary.get("llm_escalated_count", 0),
+            "per_email_classification": [
+                {
+                    "email_id": eid,
+                    "category": cat,
+                    "confident": True,
+                    "source": "heuristic",
+                }
+                for eid, cat in summary.get("heuristic_triaged", {}).items()
+            ]
+            + [
+                {"email_id": eid, "category": cat, "confident": False, "source": "llm"}
+                for eid, cat in summary.get("llm_triaged", {}).items()
+            ],
             "turns": [_turn_to_dict(t) for t in summary["turns"]],
             "session_state": summary.get("session_state", {}),
+            "heuristic_savings": summary.get("heuristic_savings", {}),
         }
         with open(interactive_path, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
