@@ -86,6 +86,15 @@ class SessionState:
     marked_read: set = field(default_factory=set)
     deleted: set = field(default_factory=set)
     triaged_emails: dict = field(default_factory=dict)  # id -> category
+    # Smart-mode partitions (id -> category).
+    heuristic_triaged: dict = field(default_factory=dict)
+    llm_triaged: dict = field(default_factory=dict)
+    # Force-LLM bypass set (id -> reason). Populated by "reclassify" command
+    # in interactive sessions. Reserved for future wiring into triage_inbox_impl.
+    force_llm_ids: dict = field(default_factory=dict)
+    # Cost-tracking counters for smart mode.
+    llm_calls_saved: int = 0
+    heuristic_token_estimate: int = 0
 
 
 @dataclass

@@ -193,6 +193,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             base_url=args.base_url,
             limit=args.limit,
             force_llm=getattr(args, "force_llm", False),
+            enable_smart_mode=getattr(args, "smart", False),
+            batch_size=getattr(args, "batch_size", 5),
         )
 
         model_slug = _slug(model or "unknown")
@@ -258,6 +260,10 @@ def main(argv: Optional[list[str]] = None) -> int:
             "avg_duration_per_turn_ms": summary["avg_duration_per_turn_ms"],
             "avg_time_to_first_token_ms": summary.get("avg_time_to_first_token_ms", 0),
             "avg_tokens_per_second": summary.get("avg_tokens_per_second", 0),
+            "heuristic_triaged": summary.get("heuristic_triaged", {}),
+            "llm_triaged": summary.get("llm_triaged", {}),
+            "heuristic_only_count": summary.get("heuristic_only_count", 0),
+            "llm_escalated_count": summary.get("llm_escalated_count", 0),
             "turns": [_turn_to_dict(t) for t in summary["turns"]],
             "session_state": summary.get("session_state", {}),
         }

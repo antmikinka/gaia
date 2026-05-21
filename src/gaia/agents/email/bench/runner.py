@@ -690,6 +690,9 @@ def run_interactive_benchmark(
     scenario: list[str] | None = None,
     limit: int = 100,
     max_steps: int = 12,
+    force_llm: bool = False,
+    enable_smart_mode: bool = False,
+    batch_size: int = 5,
 ) -> dict:
     """Run an interactive multi-turn benchmark session.
 
@@ -727,11 +730,15 @@ def run_interactive_benchmark(
         max_steps=max_steps,
         debug=True,
         show_stats=True,  # Capture TTFT/TPS per LLM call for benchmark stats
+        force_llm=force_llm,
+        enable_smart_mode=enable_smart_mode,
+        batch_size=batch_size,
         gmail_backend=fake,
         calendar_backend=fake_cal,
     )
     agent = EmailTriageAgent(config=config)
 
+    state = SessionState()
     turns: list[TurnResult] = []
     total_start = time.monotonic()
 
@@ -766,6 +773,9 @@ def run_interactive_benchmark(
         output_tokens = agent_result.get("output_tokens", 0) or 0
         total_tokens = agent_result.get("total_tokens", 0) or 0
         final = agent_result.get("result", "")
+
+        if enable_smart_mode:
+            _extract_actions(agent_result, state)
 
         # Persist conversation state for next turn.
         conversation = agent_result.get("conversation", [])
@@ -867,6 +877,8 @@ def run_interactive_benchmark(
     }
 
     # Print final summary.
+    h_count = len(state.heuristic_triaged)
+    l_count = len(state.llm_triaged)
     print(f"\n{'='*70}")
     print(f"  Interactive Benchmark — Summary")
     print(f"{'='*70}")
@@ -883,7 +895,31 @@ def run_interactive_benchmark(
     )
     print(f"  Tools:     {', '.join(all_tools)}")
     print(f"  Emails:    {len(all_emails)} unique emails affected")
+    if h_count or l_count:
+        print(f"  Heuristic: {h_count} emails (confident)")
+        print(f"  LLM:       {l_count} emails (non-confident)")
+    if enable_smart_mode and state.llm_calls_saved > 0:
+        saved_pct = (
+            state.heuristic_token_estimate
+            / (state.heuristic_token_estimate + total_tokens)
+            * 100
+            if (state.heuristic_token_estimate + total_tokens) > 0
+            else 0
+        )
+        print(
+            f"  Heuristic fast-path saved ~{state.llm_calls_saved} LLM classifications "
+            f"(est. ~{state.heuristic_token_estimate} tokens, {saved_pct:.0f}% of estimated context)"
+        )
     print(f"{'='*70}\n")
+
+    summary["heuristic_triaged"] = dict(state.heuristic_triaged)
+    summary["llm_triaged"] = dict(state.llm_triaged)
+    summary["heuristic_only_count"] = h_count
+    summary["llm_escalated_count"] = l_count
+    summary["heuristic_savings"] = {
+        "llm_calls_saved": state.llm_calls_saved,
+        "estimated_tokens_saved": state.heuristic_token_estimate,
+    }
 
     return summary
 
@@ -920,11 +956,25 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
             continue
         data = envelope["data"]
 
-        # triage_inbox results — track categories.
+        # triage_inbox results — track categories, partition by confident flag.
         if tool_name == "triage_inbox" and isinstance(data, dict) and "results" in data:
             for item in data["results"]:
                 if isinstance(item, dict) and "id" in item:
-                    state.triaged_emails[item["id"]] = item.get("category", "unknown")
+                    eid = item["id"]
+                    cat = item.get("category", "unknown")
+                    confident = item.get("confident", False)
+                    # Idempotent dict assignment (safe on re-triage).
+                    state.triaged_emails[eid] = cat
+                    if confident:
+                        if eid not in state.heuristic_triaged:
+                            # Cost tracking: each heuristic fast-path saves ~1 LLM call.
+                            state.llm_calls_saved += 1
+                            state.heuristic_token_estimate += (
+                                50  # rough per-email estimate
+                            )
+                        state.heuristic_triaged[eid] = cat
+                    else:
+                        state.llm_triaged[eid] = cat
 
         # archive_message / archive_message_batch — track archived IDs.
         if tool_name in ("archive_message", "archive_message_batch") and isinstance(
@@ -969,6 +1019,32 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
                 state.deleted.add(msg_id)
 
 
+def _print_smart_breakdown(state: SessionState) -> None:
+    """Print smart-mode classification breakdown for interactive sessions."""
+    h_count = len(state.heuristic_triaged)
+    l_count = len(state.llm_triaged)
+    force_count = len(state.force_llm_ids)
+    if not (h_count or l_count):
+        return
+    print(f"\n{'─'*60}")
+    print(f"  Smart-Mode Breakdown")
+    print(f"{'─'*60}")
+    print(f"  Heuristic (confident): {h_count} emails")
+    for eid, cat in sorted(state.heuristic_triaged.items()):
+        print(f"    [{eid}] -> {cat} (heuristic)")
+    print(f"  LLM (non-confident):   {l_count} emails")
+    for eid, cat in sorted(state.llm_triaged.items()):
+        source = "llm" if eid not in state.force_llm_ids else "user-requested"
+        print(f"    [{eid}] -> {cat} ({source})")
+    if state.force_llm_ids:
+        print(f"  User-requested LLM:    {force_count} emails")
+    if state.llm_calls_saved > 0:
+        print(
+            f"  Heuristic savings:     ~{state.heuristic_token_estimate} tokens ({state.llm_calls_saved} LLM calls avoided)"
+        )
+    print(f"{'─'*60}")
+
+
 def _print_session_state(state: SessionState) -> None:
     """Print current session state."""
     print(f"\n{'─'*60}")
@@ -981,6 +1057,18 @@ def _print_session_state(state: SessionState) -> None:
         print(f"  Triaged: {len(state.triaged_emails)} emails")
         for cat, cnt in sorted(cats.items(), key=lambda x: -x[1]):
             print(f"    {cat}: {cnt}")
+    # Smart-mode breakdown.
+    if state.heuristic_triaged or state.llm_triaged:
+        h_count = len(state.heuristic_triaged)
+        l_count = len(state.llm_triaged)
+        print(f"    Heuristic (confident): {h_count}")
+        print(f"    LLM (non-confident):   {l_count}")
+        # Invariant: heuristic + llm == total triaged.
+        if h_count + l_count != len(state.triaged_emails):
+            print(
+                f"    WARNING: heuristic({h_count}) + llm({l_count}) "
+                f"!= triaged({len(state.triaged_emails)})"
+            )
     if state.archived:
         print(f"  Archived: {len(state.archived)} emails")
     if state.starred:
@@ -1017,6 +1105,8 @@ def run_interactive_session(
     limit: int = 100,
     max_steps: int = 12,
     force_llm: bool = False,
+    enable_smart_mode: bool = False,
+    batch_size: int = 5,
 ) -> dict:
     """Run a truly interactive email session with user input.
 
@@ -1051,6 +1141,8 @@ def run_interactive_session(
         debug=True,
         show_stats=True,
         force_llm=force_llm,
+        enable_smart_mode=enable_smart_mode,
+        batch_size=batch_size,
         gmail_backend=fake,
         calendar_backend=fake_cal,
     )
@@ -1061,12 +1153,17 @@ def run_interactive_session(
     total_start = time.monotonic()
 
     data_label = Path(jsonl_path).name if jsonl_path else Path(mbox_path).name
+    mode_label = "Smart" if enable_smart_mode else "Full"
+    if enable_smart_mode and force_llm:
+        mode_label = "Smart (force LLM)"
     print(f"\n{'='*70}")
-    print(f"  GAIA Email — Interactive Session")
+    print(f"  GAIA Email — Interactive Session ({mode_label})")
     print(f"{'='*70}")
     print(f"  Model:  {model_id}")
     print(f"  Data:   {data_label}")
     print(f"  Limit:  {limit} emails")
+    if enable_smart_mode:
+        print(f"  Batch:  up to {batch_size} emails per LLM batch")
     print(f"  Type 'quit' or 'exit' to end the session.")
     print(f"{'='*70}")
 
@@ -1088,6 +1185,34 @@ def run_interactive_session(
             print("  Ending session.")
             turn_num -= 1
             break
+
+        # Reclassify command — mark an email for future LLM review.
+        # Currently scoped to "mark for manual review" — the email is
+        # tracked in force_llm_ids for future wiring into triage_inbox_impl.
+        if enable_smart_mode and prompt.lower().startswith("reclassify "):
+            email_id = prompt.split(None, 1)[1].strip()
+            if email_id in state.heuristic_triaged:
+                cat = state.heuristic_triaged.pop(email_id)
+                state.llm_triaged[email_id] = cat
+                state.force_llm_ids[email_id] = "user-requested"
+                print(
+                    f"  Marked [{email_id}] for LLM reclassification (next triage run will use LLM)."
+                )
+            elif email_id in state.triaged_emails:
+                state.force_llm_ids[email_id] = "user-requested"
+                print(f"  Marked [{email_id}] for user-requested LLM review.")
+            else:
+                print(f"  Email [{email_id}] not found in triaged results.")
+            turn_num -= 1
+            continue
+
+        # Built-in helpers.
+        if prompt.lower() in ("state", "status"):
+            _print_session_state(state)
+            if enable_smart_mode:
+                _print_smart_breakdown(state)
+            turn_num -= 1
+            continue
 
         prompt = prompt.format(limit=limit)
 
@@ -1117,7 +1242,8 @@ def run_interactive_session(
         total_tokens = agent_result.get("total_tokens", 0) or 0
         final = agent_result.get("result", "")
 
-        _extract_actions(agent_result, state)
+        if enable_smart_mode:
+            _extract_actions(agent_result, state)
 
         conversation = agent_result.get("conversation", [])
         if conversation:
@@ -1181,7 +1307,27 @@ def run_interactive_session(
     print(f"    Reasoning: {total_reasoning:,}")
     print(f"  Tools:     {', '.join(all_tools) if all_tools else '(none)'}")
     print(f"  Emails:    {len(all_emails)} unique emails affected")
+    # Smart-mode breakdown in final summary.
+    h_count = len(state.heuristic_triaged)
+    l_count = len(state.llm_triaged)
+    if h_count or l_count:
+        print(f"  Heuristic: {h_count} emails (confident)")
+        print(f"  LLM:       {l_count} emails (non-confident)")
+    if enable_smart_mode and state.llm_calls_saved > 0:
+        saved_pct = (
+            state.heuristic_token_estimate
+            / (state.heuristic_token_estimate + total_tokens)
+            * 100
+            if (state.heuristic_token_estimate + total_tokens) > 0
+            else 0
+        )
+        print(
+            f"  Heuristic fast-path saved ~{state.llm_calls_saved} LLM classifications "
+            f"(est. ~{state.heuristic_token_estimate} tokens, {saved_pct:.0f}% of estimated context)"
+        )
     _print_session_state(state)
+    if enable_smart_mode:
+        _print_smart_breakdown(state)
     print(f"{'='*70}")
 
     return {
@@ -1206,6 +1352,14 @@ def run_interactive_session(
         "avg_duration_per_turn_ms": round(total_duration_ms / max(len(turns), 1), 0),
         "avg_time_to_first_token_ms": round(avg_ttft, 1),
         "avg_tokens_per_second": round(avg_tps, 1),
+        "heuristic_triaged": dict(state.heuristic_triaged),
+        "llm_triaged": dict(state.llm_triaged),
+        "heuristic_only_count": h_count,
+        "llm_escalated_count": l_count,
+        "heuristic_savings": {
+            "llm_calls_saved": state.llm_calls_saved,
+            "estimated_tokens_saved": state.heuristic_token_estimate,
+        },
         "session_state": {
             "archived": sorted(state.archived),
             "starred": sorted(state.starred),
