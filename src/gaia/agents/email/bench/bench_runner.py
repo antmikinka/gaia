@@ -54,6 +54,25 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _write_generation_manifest(output_dir: Path, entry: dict) -> None:
+    """Append a generation-tracking entry to _manifest.json.
+
+    Each entry links run_id -> output files -> timestamp -> mode -> model,
+    enabling cross-generation report lineage tracking.
+    """
+    manifest_path = output_dir / "_manifest.json"
+    entries = []
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                entries = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            entries = []
+    entries.append(entry)
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(entries, f, indent=2, ensure_ascii=False)
+
+
 def _run_single_iteration(
     mbox_path: str = "",
     jsonl_path: str = "",
@@ -96,8 +115,6 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("Error: --model or --models is required for batched mode.")
             return 1
 
-        jsonl_path = output_dir / f"results_{_slug(model)}_batched.jsonl"
-
         print(f"\n{'='*70}")
         print(f"  Batched Email Triage — {model}")
         print(f"{'='*70}")
@@ -125,7 +142,21 @@ def main(argv: Optional[list[str]] = None) -> int:
 
             from gaia.agents.email.bench.output import save_jsonl
 
+            run_suffix = _extract_run_suffix(result.run_id) if result.run_id else _slug(model)
+            jsonl_path = output_dir / f"results_{run_suffix}_batched.jsonl"
             save_jsonl(result, jsonl_path)
+
+            _write_generation_manifest(output_dir, {
+                "run_id": result.run_id,
+                "timestamp": result.timestamp,
+                "model": model,
+                "mode": "batched",
+                "output_files": [str(jsonl_path.relative_to(output_dir))],
+                "total_emails": result.total_emails,
+                "total_tokens": result.total_tokens,
+                "status": result.status,
+            })
+
             print(f"\n  Results saved to: {jsonl_path}")
             return 0
         except Exception as exc:
@@ -143,17 +174,15 @@ def main(argv: Optional[list[str]] = None) -> int:
             print("Error: --model or --models is required for smart mode.")
             return 1
 
-        jsonl_path = output_dir / f"results_{_slug(model)}_smart.jsonl"
-
-        print(f"\n{'='*70}")
-        print(f"  Smart Email Triage -- {model}")
-        print(f"{'='*70}")
-        print(f"  Data:     {args.mbox_path or args.jsonl_path}")
-        print(f"  Limit:    {args.limit} emails")
-        print(f"  Batch:    up to {args.batch_size} emails per LLM batch")
-        print(f"{'='*70}")
-
         try:
+            print(f"\n{'='*70}")
+            print(f"  Smart Email Triage -- {model}")
+            print(f"{'='*70}")
+            print(f"  Data:     {args.mbox_path or args.jsonl_path}")
+            print(f"  Limit:    {args.limit} emails")
+            print(f"  Batch:    up to {args.batch_size} emails per LLM batch")
+            print(f"{'='*70}")
+
             result = _run_smart_agent(
                 args.mbox_path or "",
                 args.jsonl_path or "",
@@ -171,8 +200,24 @@ def main(argv: Optional[list[str]] = None) -> int:
 
             from gaia.agents.email.bench.output import print_summary, save_jsonl
 
+            run_suffix = _extract_run_suffix(result.run_id) if result.run_id else _slug(model)
+            jsonl_path = output_dir / f"results_{run_suffix}_smart.jsonl"
             save_jsonl(result, jsonl_path)
             print_summary(result)
+
+            _write_generation_manifest(output_dir, {
+                "run_id": result.run_id,
+                "timestamp": result.timestamp,
+                "model": model,
+                "mode": "smart",
+                "output_files": [str(jsonl_path.relative_to(output_dir))],
+                "total_emails": result.total_emails,
+                "total_tokens": result.total_tokens,
+                "heuristic_only": getattr(result, "heuristic_only_count", 0),
+                "llm_escalated": getattr(result, "llm_processed_count", 0),
+                "status": result.status,
+            })
+
             print(f"\n  Results saved to: {jsonl_path}")
             return 0
         except Exception as exc:
@@ -212,7 +257,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         interactive_path.parent.mkdir(parents=True, exist_ok=True)
 
         def _turn_to_dict(t):
-            return {
+            d = {
                 "turn_number": t.turn_number,
                 "prompt": t.prompt,
                 "step_results": [
@@ -243,6 +288,15 @@ def main(argv: Optional[list[str]] = None) -> int:
                 "status": t.status,
                 "error": t.error,
             }
+            # Include per-turn smart-mode fields when present.
+            if getattr(t, "heuristic_email_count", 0) or getattr(t, "llm_email_count", 0):
+                d["heuristic_email_count"] = t.heuristic_email_count
+                d["llm_email_count"] = t.llm_email_count
+            if getattr(t, "context_compacted", False):
+                d["context_compacted"] = True
+            if getattr(t, "gate_decisions"):
+                d["gate_decisions"] = t.gate_decisions
+            return d
 
         output_data = {
             "run_id": summary["run_id"],
@@ -285,6 +339,20 @@ def main(argv: Optional[list[str]] = None) -> int:
         }
         with open(interactive_path, "w", encoding="utf-8") as f:
             json.dump(output_data, f, indent=2, ensure_ascii=False)
+
+        _write_generation_manifest(output_dir, {
+            "run_id": summary["run_id"],
+            "timestamp": summary["timestamp"],
+            "model": model,
+            "mode": "interactive" + ("-smart" if getattr(args, "smart", False) else ""),
+            "output_files": [str(interactive_path.relative_to(output_dir))],
+            "total_turns": summary["total_turns"],
+            "total_emails_affected": summary["total_emails_affected"],
+            "total_tokens": summary["total_tokens"],
+            "heuristic_triaged": len(summary.get("heuristic_triaged", {})),
+            "llm_triaged": len(summary.get("llm_triaged", {})),
+        })
+
         print(f"\nResults saved to: {interactive_path}")
         return 0
 
@@ -341,6 +409,28 @@ def main(argv: Optional[list[str]] = None) -> int:
                 save_jsonl(result, jsonl_path)
                 print_summary(result)
 
+                # Per-run JSON file keyed by run_id for traceability.
+                run_suffix = _extract_run_suffix(result.run_id) if result.run_id else f"exp{i}"
+                per_run_path = output_dir / f"run_{run_suffix}.json"
+                from gaia.agents.email.bench.output import _run_result_to_dict
+                with open(per_run_path, "w", encoding="utf-8") as f:
+                    json.dump(_run_result_to_dict(result), f, indent=2, ensure_ascii=False)
+
+                _write_generation_manifest(output_dir, {
+                    "run_id": result.run_id,
+                    "timestamp": result.timestamp,
+                    "model": model_id,
+                    "experiment": i,
+                    "mode": "full",
+                    "output_files": [
+                        str(jsonl_path.relative_to(output_dir)),
+                        str(per_run_path.relative_to(output_dir)),
+                    ],
+                    "total_emails": result.total_emails,
+                    "total_tokens": result.total_tokens,
+                    "status": result.status,
+                })
+
                 if args.steps:
                     for s in result.step_results:
                         time_str = (
@@ -359,8 +449,9 @@ def main(argv: Optional[list[str]] = None) -> int:
 
             except Exception as exc:
                 print(f"  Iteration {i} failed: {exc}")
+                error_run_id = f"error-{model_id}-{i}"
                 error_record = {
-                    "run_id": f"error-{model_id}-{i}",
+                    "run_id": error_run_id,
                     "model": model_id,
                     "experiment": i,
                     "status": "error",
@@ -375,6 +466,17 @@ def main(argv: Optional[list[str]] = None) -> int:
                 }
                 with open(jsonl_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(error_record, ensure_ascii=False) + "\n")
+
+                _write_generation_manifest(output_dir, {
+                    "run_id": error_run_id,
+                    "timestamp": "",
+                    "model": model_id,
+                    "experiment": i,
+                    "mode": "full",
+                    "output_files": [str(jsonl_path.relative_to(output_dir))],
+                    "status": "error",
+                    "error": str(exc),
+                })
                 if args.fail_fast:
                     print("  --fail-fast: aborting.")
                     return 1

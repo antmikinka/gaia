@@ -23,8 +23,28 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _write_report_manifest(output_dir: Path, entry: dict) -> None:
+    """Append a report-generation entry to _manifest.json for lineage tracking."""
+    manifest_path = output_dir / "_manifest.json"
+    entries = []
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                entries = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            entries = []
+    entries.append(entry)
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(entries, f, indent=2, ensure_ascii=False)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -521,6 +541,26 @@ def generate_reports(
             jsonl_path=jsonl_paths[-1] if jsonl_paths else None,
             last_gaia_json=runs[-1] if runs else None,
         )
+
+    # Track report generation in manifest for cross-generation lineage.
+    report_files = []
+    for name in ("report.csv", "variance.json", "quality.json",
+                  "statistical_tests.json", "framework_comparison.json"):
+        p = output_dir / name
+        if p.exists():
+            report_files.append(str(p.relative_to(output_dir)))
+    if generate_charts and (output_dir / "charts").exists():
+        report_files.append("charts/")
+
+    _write_report_manifest(output_dir, {
+        "timestamp": _utc_now_iso(),
+        "source_run_ids": [r.get("run_id", "unknown") for r in runs],
+        "source_jsonl_files": [str(p.relative_to(input_dir)) for p in jsonl_paths],
+        "output_files": report_files,
+        "total_runs_processed": len(runs),
+        "charts_generated": generate_charts,
+        "ground_truth_used": str(ground_truth) if ground_truth else None,
+    })
 
 
 def main(argv: Optional[list[str]] = None) -> int:

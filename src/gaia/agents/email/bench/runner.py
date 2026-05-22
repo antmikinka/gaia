@@ -1152,7 +1152,7 @@ def run_interactive_benchmark(
     print(f"{'='*70}\n")
 
     if enable_smart_mode:
-        generate_interactive_smart_summary(summary, state, total_tokens)
+        summary = generate_interactive_smart_summary(summary, state, total_tokens)
     else:
         summary["heuristic_triaged"] = dict(state.heuristic_triaged)
         summary["llm_triaged"] = dict(state.llm_triaged)
@@ -1631,7 +1631,7 @@ def run_interactive_session(
     }
 
     if enable_smart_mode:
-        generate_interactive_smart_summary(summary, state, total_tokens)
+        summary = generate_interactive_smart_summary(summary, state, total_tokens)
     else:
         summary["heuristic_triaged"] = dict(state.heuristic_triaged)
         summary["llm_triaged"] = dict(state.llm_triaged)
