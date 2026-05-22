@@ -3186,12 +3186,28 @@ def generate_charts(
 
     Auto-detects which charts are relevant based on available data and mode.
     Returns list of generated PNG paths.
+
+    Default output directory includes a run ID suffix when extractable from
+    input data (e.g. ``benchmark_charts-abc123``), enabling cross-generation
+    chart lineage tracking.
     """
     plt_mod = _require_matplotlib()
     paths: list[Path] = []
 
+    # Default output directory: embed run ID suffix when available.
     if output_dir is None:
-        output_dir = Path("benchmark_charts")
+        run_id_suffix = None
+        if json_path and json_path.exists():
+            run = _load_json(json_path)
+            run_id_suffix = _extract_run_suffix(run.get("run_id", "")) if run.get("run_id") else None
+        if not run_id_suffix and interactive_path and interactive_path.exists():
+            interactive = _load_json(interactive_path)
+            run_id_suffix = _extract_run_suffix(interactive.get("run_id", "")) if interactive.get("run_id") else None
+        if not run_id_suffix and multi_model_runs:
+            last_run = multi_model_runs[-1]
+            run_id_suffix = _extract_run_suffix(last_run.get("run_id", "")) if last_run.get("run_id") else None
+        base_name = f"benchmark_charts-{run_id_suffix}" if run_id_suffix else "benchmark_charts"
+        output_dir = Path(base_name)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     charts_index = []

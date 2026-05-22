@@ -530,10 +530,18 @@ def generate_reports(
             runs, clawflow_run, output_dir / "framework_comparison.json"
         )
 
-    # 6. charts
+    # 6. charts — directory name includes run ID suffix for traceability.
+    from gaia.agents.email.bench.visualize import _extract_run_suffix
+
+    chart_dir_name = "charts"
     if generate_charts:
+        # Extract run ID suffix from the last run to embed in chart directory.
+        last_run_id = runs[-1].get("run_id", "") if runs else ""
+        run_suffix = _extract_run_suffix(last_run_id) if last_run_id else None
+        chart_dir_name = f"charts-{run_suffix}" if run_suffix else "charts"
+
         if chart_dir is None:
-            chart_dir = output_dir / "charts"
+            chart_dir = output_dir / chart_dir_name
         _generate_charts(
             runs,
             clawflow_run,
@@ -549,8 +557,8 @@ def generate_reports(
         p = output_dir / name
         if p.exists():
             report_files.append(str(p.relative_to(output_dir)))
-    if generate_charts and (output_dir / "charts").exists():
-        report_files.append("charts/")
+    if generate_charts and (output_dir / chart_dir_name).exists():
+        report_files.append(f"{chart_dir_name}/")
 
     _write_report_manifest(output_dir, {
         "timestamp": _utc_now_iso(),
