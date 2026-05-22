@@ -1,0 +1,1233 @@
+{
+  "generated_at": "2026-05-21T15:39:33.190434",
+  "total_logs_scanned": 70,
+  "results": [
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit100_batch10_20260520_112934.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 100,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit100_batch10_20260520_191818.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 100,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 418.0,
+      "heuristic_emails": 8,
+      "llm_emails": 92,
+      "total_tokens": 422520,
+      "categories": {
+        "informational": {
+          "count": 92,
+          "percent": 92.0
+        },
+        "low priority": {
+          "count": 8,
+          "percent": 8.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit100_batch20_20260520_113556.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 100,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit100_batch20_20260520_192518.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 100,
+      "batch_size": 20,
+      "status": "completed",
+      "duration_s": 359.4,
+      "heuristic_emails": 8,
+      "llm_emails": 92,
+      "total_tokens": 826040,
+      "categories": {
+        "informational": {
+          "count": 92,
+          "percent": 92.0
+        },
+        "low priority": {
+          "count": 8,
+          "percent": 8.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit100_batch50_20260520_114111.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 100,
+      "batch_size": 50,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit100_batch50_20260520_193120.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 100,
+      "batch_size": 50,
+      "status": "completed",
+      "duration_s": 107.5,
+      "heuristic_emails": 8,
+      "llm_emails": 92,
+      "total_tokens": 1973302,
+      "categories": {
+        "informational": {
+          "count": 92,
+          "percent": 92.0
+        },
+        "low priority": {
+          "count": 8,
+          "percent": 8.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit10_batch10_20260520_111942.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 10,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit10_batch10_20260520_190810.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 10,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 30.5,
+      "heuristic_emails": 2,
+      "llm_emails": 8,
+      "total_tokens": 6576,
+      "categories": {
+        "informational": {
+          "count": 8,
+          "percent": 80.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 20.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit20_batch10_20260520_112013.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 20,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit20_batch10_20260520_190842.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 20,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 69.6,
+      "heuristic_emails": 2,
+      "llm_emails": 18,
+      "total_tokens": 28638,
+      "categories": {
+        "informational": {
+          "count": 18,
+          "percent": 90.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 10.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit20_batch20_20260520_112125.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 20,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit20_batch20_20260520_190954.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 20,
+      "batch_size": 20,
+      "status": "completed",
+      "duration_s": 72.3,
+      "heuristic_emails": 2,
+      "llm_emails": 18,
+      "total_tokens": 57636,
+      "categories": {
+        "informational": {
+          "count": 18,
+          "percent": 90.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 10.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit50_batch10_20260520_112240.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 50,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit50_batch10_20260520_191108.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 50,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 204.6,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 248950,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit50_batch20_20260520_112550.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 50,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit50_batch20_20260520_191434.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 50,
+      "batch_size": 20,
+      "status": "completed",
+      "duration_s": 159.1,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 469420,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit50_batch50_20260520_112826.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 50,
+      "batch_size": 50,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-0.8B-GGUF_limit50_batch50_20260520_191715.log",
+      "model": "Qwen3.5-0.8B-GGUF",
+      "limit": 50,
+      "batch_size": 50,
+      "status": "completed",
+      "duration_s": 61.4,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 1204368,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit100_batch10_20260520_160849.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 100,
+      "batch_size": 10,
+      "status": "unknown",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit100_batch10_20260520_223750.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 100,
+      "batch_size": 10,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit100_batch20_20260520_223751.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 100,
+      "batch_size": 20,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit100_batch50_20260520_223753.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 100,
+      "batch_size": 50,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit10_batch10_20260520_152446.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 10,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit10_batch10_20260520_223742.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 10,
+      "batch_size": 10,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit20_batch10_20260520_152655.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 20,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit20_batch10_20260520_223743.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 20,
+      "batch_size": 10,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit20_batch20_20260520_153153.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 20,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit20_batch20_20260520_223744.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 20,
+      "batch_size": 20,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit50_batch10_20260520_153655.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 50,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit50_batch10_20260520_223746.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 50,
+      "batch_size": 10,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit50_batch20_20260520_155133.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 50,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit50_batch20_20260520_223747.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 50,
+      "batch_size": 20,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit50_batch50_20260520_160347.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 50,
+      "batch_size": 50,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-35B-A3B-GGUF_limit50_batch50_20260520_223749.log",
+      "model": "Qwen3.5-35B-A3B-GGUF",
+      "limit": 50,
+      "batch_size": 50,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit100_batch10_20260520_122253.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 100,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit100_batch10_20260520_201301.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 100,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 1344.5,
+      "heuristic_emails": 8,
+      "llm_emails": 92,
+      "total_tokens": 422520,
+      "categories": {
+        "informational": {
+          "count": 92,
+          "percent": 92.0
+        },
+        "low priority": {
+          "count": 8,
+          "percent": 8.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit100_batch20_20260520_124603.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 100,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit100_batch20_20260520_203528.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 100,
+      "batch_size": 20,
+      "status": "completed",
+      "duration_s": 1372.0,
+      "heuristic_emails": 8,
+      "llm_emails": 92,
+      "total_tokens": 826040,
+      "categories": {
+        "informational": {
+          "count": 92,
+          "percent": 92.0
+        },
+        "low priority": {
+          "count": 8,
+          "percent": 8.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit100_batch50_20260520_130912.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 100,
+      "batch_size": 50,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit100_batch50_20260520_205821.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 100,
+      "batch_size": 50,
+      "status": "completed",
+      "duration_s": 600.4,
+      "heuristic_emails": 8,
+      "llm_emails": 92,
+      "total_tokens": 1973302,
+      "categories": {
+        "informational": {
+          "count": 92,
+          "percent": 92.0
+        },
+        "low priority": {
+          "count": 8,
+          "percent": 8.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit10_batch10_20260520_114238.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 10,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit10_batch10_20260520_193313.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 10,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 111.9,
+      "heuristic_emails": 2,
+      "llm_emails": 8,
+      "total_tokens": 6576,
+      "categories": {
+        "informational": {
+          "count": 8,
+          "percent": 80.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 20.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit20_batch10_20260520_114429.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 20,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit20_batch10_20260520_193507.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 20,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 255.0,
+      "heuristic_emails": 2,
+      "llm_emails": 18,
+      "total_tokens": 28638,
+      "categories": {
+        "informational": {
+          "count": 18,
+          "percent": 90.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 10.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit20_batch20_20260520_114847.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 20,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit20_batch20_20260520_193924.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 20,
+      "batch_size": 20,
+      "status": "completed",
+      "duration_s": 262.2,
+      "heuristic_emails": 2,
+      "llm_emails": 18,
+      "total_tokens": 57636,
+      "categories": {
+        "informational": {
+          "count": 18,
+          "percent": 90.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 10.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit50_batch10_20260520_115313.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 50,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit50_batch10_20260520_194348.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 50,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 730.7,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 248950,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit50_batch20_20260520_120546.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 50,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit50_batch20_20260520_195600.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 50,
+      "batch_size": 20,
+      "status": "completed",
+      "duration_s": 717.3,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 469420,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit50_batch50_20260520_121751.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 50,
+      "batch_size": 50,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-4B-GGUF_limit50_batch50_20260520_200759.log",
+      "model": "Qwen3.5-4B-GGUF",
+      "limit": 50,
+      "batch_size": 50,
+      "status": "completed",
+      "duration_s": 300.2,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 1204368,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit100_batch10_20260520_141330.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 100,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit100_batch10_20260520_220048.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 100,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 2191.9,
+      "heuristic_emails": 8,
+      "llm_emails": 92,
+      "total_tokens": 422520,
+      "categories": {
+        "informational": {
+          "count": 92,
+          "percent": 92.0
+        },
+        "low priority": {
+          "count": 8,
+          "percent": 8.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit100_batch20_20260520_145103.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 100,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit100_batch20_20260520_223722.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 100,
+      "batch_size": 20,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit100_batch50_20260520_151604.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 100,
+      "batch_size": 50,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit100_batch50_20260520_223723.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 100,
+      "batch_size": 50,
+      "status": "argparse_error",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit10_batch10_20260520_131919.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 10,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit10_batch10_20260520_210832.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 10,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 171.3,
+      "heuristic_emails": 2,
+      "llm_emails": 8,
+      "total_tokens": 6576,
+      "categories": {
+        "informational": {
+          "count": 8,
+          "percent": 80.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 20.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit20_batch10_20260520_132220.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 20,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit20_batch10_20260520_211125.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 20,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 397.5,
+      "heuristic_emails": 2,
+      "llm_emails": 18,
+      "total_tokens": 28638,
+      "categories": {
+        "informational": {
+          "count": 18,
+          "percent": 90.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 10.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit20_batch20_20260520_132922.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 20,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit20_batch20_20260520_211804.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 20,
+      "batch_size": 20,
+      "status": "completed",
+      "duration_s": 300.2,
+      "heuristic_emails": 2,
+      "llm_emails": 18,
+      "total_tokens": 57636,
+      "categories": {
+        "informational": {
+          "count": 18,
+          "percent": 90.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 10.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit50_batch10_20260520_133424.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 50,
+      "batch_size": 10,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit50_batch10_20260520_212306.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 50,
+      "batch_size": 10,
+      "status": "completed",
+      "duration_s": 1155.1,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 248950,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit50_batch20_20260520_135457.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 50,
+      "batch_size": 20,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit50_batch20_20260520_214223.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 50,
+      "batch_size": 20,
+      "status": "completed",
+      "duration_s": 800.6,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 469420,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit50_batch50_20260520_140828.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 50,
+      "batch_size": 50,
+      "status": "failed",
+      "duration_s": null,
+      "heuristic_emails": 0,
+      "llm_emails": 0,
+      "total_tokens": 0,
+      "categories": {},
+      "turn_failures": 0,
+      "error_snippet": null
+    },
+    {
+      "log_file": "Qwen3.5-9B-GGUF_limit50_batch50_20260520_215545.log",
+      "model": "Qwen3.5-9B-GGUF",
+      "limit": 50,
+      "batch_size": 50,
+      "status": "completed",
+      "duration_s": 300.2,
+      "heuristic_emails": 2,
+      "llm_emails": 48,
+      "total_tokens": 1204368,
+      "categories": {
+        "informational": {
+          "count": 48,
+          "percent": 96.0
+        },
+        "low priority": {
+          "count": 2,
+          "percent": 4.0
+        }
+      },
+      "turn_failures": 0,
+      "error_snippet": null
+    }
+  ],
+  "summary_by_model": {
+    "Qwen3.5-0.8B-GGUF": {
+      "total": 18,
+      "completed": 9,
+      "failed": 9
+    },
+    "Qwen3.5-35B-A3B-GGUF": {
+      "total": 16,
+      "completed": 0,
+      "failed": 16
+    },
+    "Qwen3.5-4B-GGUF": {
+      "total": 18,
+      "completed": 9,
+      "failed": 9
+    },
+    "Qwen3.5-9B-GGUF": {
+      "total": 18,
+      "completed": 7,
+      "failed": 11
+    }
+  }
+}
