@@ -46,18 +46,27 @@ from gaia.agents.email.bench.trace_extractor import (
 # Risk 8: Batch boundary semantic split — related emails in the same thread may land in different
 #          LLM batches, losing cross-email context for accurate classification.
 
-_TRIAGE_KEYWORDS = ("triage", "inbox", "categorize", "classify")
+# Triage verbs (action words that indicate a classification request).
+_TRIAGE_VERBS = ("triage", "categorize", "classify")
+# Target nouns (objects that indicate email-related context).
+_TRIAGE_TARGETS = ("inbox", "email", "message")
 
 
 def _is_triage_prompt(prompt: str) -> bool:
     """Return True when the prompt looks like an initial triage request.
+
+    Requires BOTH a triage verb and a target keyword to avoid false
+    positives like "show me my inbox" (has "inbox" but no triage verb)
+    or "classify these documents" (has "classify" but no email target).
 
     Guards smart-mode dispatch so we only invoke process_interactive_smart_triage
     on turn 1 of a triage-style prompt, not on follow-up turns like
     'archive the low priority emails' or 'show me a summary'.
     """
     text = prompt.lower()
-    return any(kw in text for kw in _TRIAGE_KEYWORDS)
+    has_verb = any(kw in text for kw in _TRIAGE_VERBS)
+    has_target = any(kw in text for kw in _TRIAGE_TARGETS)
+    return has_verb and has_target
 
 
 def split_by_confidence(
@@ -100,7 +109,8 @@ def _normalize_agent_result(agent_result: object) -> dict:
     This helper ensures downstream extraction code always receives a dict.
     """
     if isinstance(agent_result, str):
-        # JSON string from process_smart_triage — unwrap the outer envelope.
+        if not agent_result.strip():
+            return {}
         parsed = json.loads(agent_result)
         if parsed.get("ok") and "data" in parsed:
             return parsed["data"]
@@ -840,6 +850,52 @@ def _extract_emails_affected(agent_result: dict) -> list[str]:
     return sorted(email_ids)
 
 
+def compact_context(
+    conversation: list[dict],
+    *,
+    max_chars: int = 5000,
+) -> list[dict]:
+    """Truncate body/snippet text in conversation messages while preserving structure.
+
+    System messages, role keys, tool names, and user prompts are never
+    truncated. Only long assistant content and tool result strings are
+    shortened to bound context growth across multi-turn interactive sessions.
+
+    Returns the conversation list (mutated in-place for efficiency).
+    """
+    if not conversation:
+        return conversation
+
+    # Compute current total char length.
+    total_chars = sum(len(str(m.get("content", ""))) for m in conversation)
+    if total_chars <= max_chars:
+        return conversation
+
+    # Truncate only assistant content and tool result strings.
+    for msg in conversation:
+        role = msg.get("role", "")
+        content = msg.get("content")
+        if role == "assistant" and isinstance(content, str) and len(content) > 200:
+            msg["content"] = content[:200] + "... [truncated]"
+        elif role == "tool" and isinstance(content, str) and len(content) > 500:
+            msg["content"] = content[:500] + "... [truncated]"
+        elif role == "tool" and isinstance(content, list):
+            # Tool content as list of blocks — truncate text in each block.
+            for block in content:
+                if isinstance(block, dict) and "text" in block:
+                    text = block["text"]
+                    if len(text) > 500:
+                        block["text"] = text[:500] + "... [truncated]"
+        elif role == "assistant" and isinstance(content, dict):
+            # Dict content (tool calls) — leave structural keys alone,
+            # but truncate any large "analysis" or "reasoning" fields.
+            for key in ("analysis", "reasoning", "explanation"):
+                if key in content and isinstance(content[key], str) and len(content[key]) > 200:
+                    content[key] = content[key][:200] + "... [truncated]"
+
+    return conversation
+
+
 def run_interactive_benchmark(
     mbox_path: str = "",
     jsonl_path: str = "",
@@ -959,6 +1015,7 @@ def run_interactive_benchmark(
         # See base/agent.py:1888 for the local initialization.
         conversation = agent_result.get("conversation", [])
         if conversation:
+            compact_context(conversation, max_chars=5000)
             agent.conversation_history.extend(conversation)
 
         turn = TurnResult(
@@ -980,6 +1037,9 @@ def run_interactive_benchmark(
             ),
             final_answer=str(final)[:500] if final else "",
             status="ok",
+            heuristic_email_count=len(state.heuristic_triaged),
+            llm_email_count=len(state.llm_triaged),
+            context_compacted=total_chars > 5000 if (total_chars := sum(len(str(m.get("content", ""))) for m in conversation)) else False,
         )
         turns.append(turn)
 
@@ -1440,6 +1500,7 @@ def run_interactive_session(
         # See base/agent.py:1888 for the local initialization.
         conversation = agent_result.get("conversation", [])
         if conversation:
+            compact_context(conversation, max_chars=5000)
             agent.conversation_history.extend(conversation)
 
         turns.append(
@@ -1462,6 +1523,8 @@ def run_interactive_session(
                 ),
                 final_answer=str(final)[:500] if final else "",
                 status="ok",
+                heuristic_email_count=len(state.heuristic_triaged),
+                llm_email_count=len(state.llm_triaged),
             )
         )
 

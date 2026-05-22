@@ -570,12 +570,26 @@ class EmailTriageAgent(
         if not getattr(self.config, "enable_smart_mode", False):
             return True
         if getattr(self.config, "force_llm", False):
+            logger.info("[smart-gate] force_llm=True, using LLM for %s", email_id)
             return True
         triaged = getattr(self, "_smart_triaged_cache", {})
         entry = triaged.get(email_id)
         if entry is None:
+            logger.info("[smart-gate] unknown email %s, using LLM", email_id)
             return True  # unknown email — use LLM
-        return not entry.get("confident", False)
+        if entry.get("confident", False):
+            logger.info(
+                "[smart-gate] heuristic-confident email %s (%s), skipping LLM",
+                email_id,
+                entry.get("category", "unknown"),
+            )
+            return False
+        logger.info(
+            "[smart-gate] non-confident email %s (%s), using LLM",
+            email_id,
+            entry.get("category", "unknown"),
+        )
+        return True
 
     def sync_smart_triage_cache(
         self, *, heuristic_ids: dict[str, str], llm_ids: dict[str, str]

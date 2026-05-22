@@ -48,6 +48,11 @@ class TurnResult:
     final_answer: str = ""
     status: str = "ok"
     error: str = ""
+    # PR2: Smart-mode per-turn fields.
+    heuristic_email_count: int = 0
+    llm_email_count: int = 0
+    context_compacted: bool = False
+    gate_decisions: list[dict] = field(default_factory=list)
 
 
 @dataclass
