@@ -2196,11 +2196,18 @@ def plot_heuristic_vs_llm_escalation(
     for r in runs:
         total = 0
         confident_count = 0
+        # Support batch_results format (full/batched/smart benchmark mode).
         for batch in r.get("batch_results", []):
             for email in batch.get("email_results", []):
                 total += 1
                 if email.get("confident", False):
                     confident_count += 1
+        # Support interactive format (heuristic_triaged / llm_triaged).
+        if total == 0 and ("heuristic_triaged" in r or "llm_triaged" in r):
+            h_count = len(r.get("heuristic_triaged", {}))
+            l_count = len(r.get("llm_triaged", {}))
+            total = h_count + l_count
+            confident_count = h_count
         if total == 0:
             continue
         model = r.get("model", "unknown")
@@ -3613,6 +3620,102 @@ def generate_charts(
             print(f"  - {p.name}")
 
     return paths
+
+
+# ---------------------------------------------------------------------------
+# Chart: Per-turn smart classification split (interactive mode)
+# ---------------------------------------------------------------------------
+
+
+def plot_smart_turn_split(
+    interactive: dict[str, Any], output_dir: Path
+) -> Path | None:
+    """Stacked bar showing heuristic vs LLM classification per turn.
+
+    Only renders for interactive smart runs that have per-turn
+    ``heuristic_email_count`` and ``llm_email_count`` fields.
+    """
+    plt_mod = _require_matplotlib()
+    turns = interactive.get("turns", [])
+    if not turns:
+        return None
+
+    model = interactive.get("model", "unknown")
+    labels = []
+    heuristic_counts = []
+    llm_counts = []
+
+    for t in turns:
+        turn_num = t.get("turn_number", "?")
+        prompt = t.get("prompt", "")[:40]
+        labels.append(f"Turn {turn_num}: {prompt}")
+        h = t.get("heuristic_email_count", 0) or 0
+        l = t.get("llm_email_count", 0) or 0
+        heuristic_counts.append(h)
+        llm_counts.append(l)
+
+    if all(h == 0 and l == 0 for h, l in zip(heuristic_counts, llm_counts)):
+        # No smart data at all -- still render with zeros
+        pass
+
+    fig, ax = plt_mod.subplots(figsize=(max(8, len(labels) * 2), 5))
+    y = range(len(labels))
+
+    bars_h = ax.barh(
+        y,
+        heuristic_counts,
+        height=0.5,
+        color="#38A169",
+        edgecolor="white",
+        label="Heuristic",
+    )
+    bars_l = ax.barh(
+        y,
+        llm_counts,
+        height=0.5,
+        left=heuristic_counts,
+        color="#ED6C02",
+        edgecolor="white",
+        label="LLM",
+    )
+
+    for bar, count in zip(bars_h, heuristic_counts):
+        if count > 0:
+            ax.text(
+                bar.get_x() + bar.get_width() / 2,
+                bar.get_y() + bar.get_height() / 2,
+                str(count),
+                ha="center",
+                va="center",
+                fontsize=8,
+                fontweight="bold",
+                color="white",
+            )
+    for bar_start, count in zip(bars_l, llm_counts):
+        if count > 0:
+            ax.text(
+                bar_start.get_x() + bar_start.get_width() / 2,
+                bar_start.get_y() + bar_start.get_height() / 2,
+                str(count),
+                ha="center",
+                va="center",
+                fontsize=8,
+                fontweight="bold",
+                color="white",
+            )
+
+    ax.set_yticks(list(y))
+    ax.set_yticklabels(labels, fontsize=7)
+    ax.set_xlabel("Emails classified")
+    ax.set_title(f"Smart Mode — Per-Turn Classification ({model})", fontsize=11)
+    ax.legend(loc="lower right", fontsize=8)
+    ax.invert_yaxis()
+
+    fig.tight_layout()
+    out_path = output_dir / "chart_smart_turn_split.png"
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt_mod.close(fig)
+    return out_path
 
 
 # ---------------------------------------------------------------------------
