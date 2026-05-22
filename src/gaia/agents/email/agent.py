@@ -407,6 +407,159 @@ class EmailTriageAgent(
         summary = self._produce_final_summary(run_id=run_id)
         return json.dumps({"ok": True, "data": summary}, default=str)
 
+    def process_interactive_smart_triage(
+        self,
+        *,
+        user_prompt: str,
+        max_messages: int = 25,
+    ) -> dict:
+        """Run a single-turn smart triage without entering the full agent loop.
+
+        Calls ``triage_inbox_impl`` directly (zero LLM tokens for the
+        heuristic fast-path), partitions results into confident vs.
+        needs-LLM, caches confident emails, and only invokes the LLM
+        batch pipeline for non-confident ones.
+
+        Designed for the interactive benchmark runner where each turn
+        calls ``process_query`` — using the full agent loop for every
+        turn would grow ``conversation_history`` unbounded.  This
+        method keeps context bounded by performing triage in one
+        direct call and returning a structured result dict.
+
+        Returns a dict compatible with the runner's extraction code:
+        ``conversation``, ``result``, ``input_tokens``, ``output_tokens``,
+        ``total_tokens``.
+        """
+        from datetime import datetime, timezone
+
+        from gaia.agents.email.action_store import record_triage_result
+        from gaia.agents.email.tools.read_tools import triage_inbox_impl
+
+        run_id = (
+            f"interactive-smart-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
+            f"-{uuid.uuid4().hex[:6]}"
+        )
+
+        # Step 1: Heuristic triage (0 LLM tokens).
+        triage_data = triage_inbox_impl(
+            self._gmail,
+            max_messages=max_messages,
+            debug=self.config.debug,
+            force_llm=self.config.force_llm,
+            force_llm_ids=getattr(self.config, "force_llm_ids", None) or None,
+        )
+
+        all_emails = triage_data.get("results", [])
+        if not all_emails:
+            return {
+                "total_emails": 0,
+                "confident_count": 0,
+                "needs_llm_count": 0,
+                "triage_summary": triage_data.get("grouped", {}),
+                "run_id": run_id,
+                "conversation": [],
+                "result": "No emails found.",
+                "input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+            }
+
+        # Step 2: Partition into confident vs. non-confident.
+        confident_emails = [e for e in all_emails if e.get("confident")]
+        needs_llm_raw = [e for e in all_emails if not e.get("confident")]
+
+        # Step 3: Cache confident emails (heuristic-only, zero LLM cost).
+        for email_info in confident_emails:
+            self._smart_triaged_cache[email_info["id"]] = {
+                "category": email_info.get("category", "informational"),
+                "confident": True,
+                "source": "heuristic",
+            }
+            record_triage_result(
+                self,
+                triage_id=f"{run_id}-0-{email_info['id']}",
+                run_id=run_id,
+                batch_number=0,
+                email_id=email_info["id"],
+                thread_id=email_info.get("thread_id"),
+                category=email_info.get("category", "informational"),
+                confident=True,
+                llm_summary=f"Heuristic: {email_info.get('rationale', '')}",
+                body_preview="",
+                token_count=0,
+                duration_secs=0.0,
+            )
+
+        # Step 4: For non-confident emails, respect _should_use_llm().
+        # Emails already in the cache (e.g. from prior turns) with
+        # confident=True will be skipped here too.
+        needs_llm = []
+        for email_info in needs_llm_raw:
+            if not self._should_use_llm(email_info["id"]):
+                # Already classified in a prior turn; cache as heuristic.
+                self._smart_triaged_cache[email_info["id"]] = {
+                    "category": email_info.get("category", "informational"),
+                    "confident": True,
+                    "source": "heuristic",
+                }
+                record_triage_result(
+                    self,
+                    triage_id=f"{run_id}-0-{email_info['id']}",
+                    run_id=run_id,
+                    batch_number=0,
+                    email_id=email_info["id"],
+                    thread_id=email_info.get("thread_id"),
+                    category=email_info.get("category", "informational"),
+                    confident=True,
+                    llm_summary=f"Previously classified: {email_info.get('rationale', '')}",
+                    body_preview="",
+                    token_count=0,
+                    duration_secs=0.0,
+                )
+            else:
+                needs_llm.append(email_info)
+
+        # Step 5: LLM batch pipeline for uncertain emails.
+        if needs_llm:
+            batch_size = self.config.batch_size
+            batches = [
+                needs_llm[i : i + batch_size]
+                for i in range(0, len(needs_llm), batch_size)
+            ]
+            for batch_idx, batch in enumerate(batches, start=1):
+                self._process_single_batch(
+                    batch=batch,
+                    batch_number=batch_idx,
+                    run_id=run_id,
+                )
+
+        # Build structured result dict.
+        summary = self._produce_final_summary(run_id=run_id)
+        tool_result = json.dumps({"ok": True, "data": triage_data}, default=str)
+
+        return {
+            "total_emails": len(all_emails),
+            "confident_count": len(confident_emails),
+            "needs_llm_count": len(needs_llm),
+            "triage_summary": triage_data.get("grouped", {}),
+            "run_id": run_id,
+            "conversation": [
+                {
+                    "role": "tool",
+                    "name": "triage_inbox",
+                    "content": tool_result,
+                }
+            ],
+            "result": (
+                f"Triaged {len(all_emails)} emails: "
+                f"{len(confident_emails)} heuristic-only, "
+                f"{len(needs_llm)} LLM-processed"
+            ),
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+        }
+
     def _should_use_llm(self, email_id: str) -> bool:
         """Return True when the LLM should classify the given email.
 

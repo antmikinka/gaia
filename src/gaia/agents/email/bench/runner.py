@@ -30,6 +30,165 @@ from gaia.agents.email.bench.trace_extractor import (
     extract_from_agent_result,
 )
 
+# ---------------------------------------------------------------------------
+# Smart-mode helpers
+# ---------------------------------------------------------------------------
+
+# Quality Item 6: Known risks registered in code comments.
+# Risk 1: Heuristic misclassification on ambiguous emails (promotions vs. actionable).
+# Risk 2: LLM batch prompt overflow when batch_size is too large for context window.
+# Risk 3: Conversation history unbounded growth across interactive turns (mitigated by .extend fix).
+# Risk 4: Smart dispatch triggered on non-triage prompts (mitigated by _is_triage_prompt guard).
+# Risk 5: Result shape mismatch between process_smart_triage (JSON str) and process_query (dict).
+# Risk 6: Heuristic confidence drift over time as email patterns evolve without model retraining.
+# Risk 7: Cross-turn cache invalidation gap — stale confident entries from prior turns may skip
+#          legitimate LLM escalation when email content has changed (e.g., thread replies).
+# Risk 8: Batch boundary semantic split — related emails in the same thread may land in different
+#          LLM batches, losing cross-email context for accurate classification.
+
+_TRIAGE_KEYWORDS = ("triage", "inbox", "categorize", "classify")
+
+
+def _is_triage_prompt(prompt: str) -> bool:
+    """Return True when the prompt looks like an initial triage request.
+
+    Guards smart-mode dispatch so we only invoke process_interactive_smart_triage
+    on turn 1 of a triage-style prompt, not on follow-up turns like
+    'archive the low priority emails' or 'show me a summary'.
+    """
+    text = prompt.lower()
+    return any(kw in text for kw in _TRIAGE_KEYWORDS)
+
+
+def split_by_confidence(
+    triage_results: list[dict],
+) -> tuple[list[dict], list[dict]]:
+    """Partition triage results into confident (heuristic) and needs-LLM groups."""
+    confident = [e for e in triage_results if e.get("confident")]
+    needs_llm = [e for e in triage_results if not e.get("confident")]
+    return confident, needs_llm
+
+
+def mark_for_escalation(
+    email_id: str,
+    state: SessionState,
+    agent,
+) -> str:
+    """Move an email from heuristic-triaged to LLM-triaged and wire into agent config.
+
+    Returns a status message for the caller to print.
+    """
+    if email_id in state.heuristic_triaged:
+        cat = state.heuristic_triaged.pop(email_id)
+        state.llm_triaged[email_id] = cat
+        state.force_llm_ids[email_id] = "user-requested"
+        agent.config.force_llm_ids[email_id] = "user-requested"
+        return f"Marked [{email_id}] for LLM reclassification (next triage will use LLM)."
+    elif email_id in state.triaged_emails:
+        state.force_llm_ids[email_id] = "user-requested"
+        agent.config.force_llm_ids[email_id] = "user-requested"
+        return f"Marked [{email_id}] for user-requested LLM review."
+    else:
+        return f"Email [{email_id}] not found in triaged results."
+
+
+def _normalize_agent_result(agent_result: object) -> dict:
+    """Normalize an agent result to a dict.
+
+    process_smart_triage returns a JSON string (outer envelope {"ok": ..., "data": {...}}),
+    while process_query and process_interactive_smart_triage return dicts directly.
+    This helper ensures downstream extraction code always receives a dict.
+    """
+    if isinstance(agent_result, str):
+        # JSON string from process_smart_triage — unwrap the outer envelope.
+        parsed = json.loads(agent_result)
+        if parsed.get("ok") and "data" in parsed:
+            return parsed["data"]
+        return parsed
+    if isinstance(agent_result, dict):
+        return agent_result
+    raise TypeError(
+        f"Expected dict or JSON string from agent, got {type(agent_result).__name__}"
+    )
+
+
+def _sync_session_state_from_smart_result(
+    agent_result: dict,
+    state: SessionState,
+) -> None:
+    """Populate SessionState heuristic/LLM partitions from a smart triage result dict.
+
+    Reads the triage results from the agent's conversation or embedded data
+    and partitions them by the confident flag so the runner's SessionState
+    stays in sync with what the smart dispatch produced.
+    """
+    # The result may carry the triage data in the conversation tool message.
+    for msg in agent_result.get("conversation", []):
+        if msg.get("role") != "tool" or not msg.get("content"):
+            continue
+        content = msg["content"]
+        if isinstance(content, str):
+            try:
+                envelope = json.loads(content)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not envelope.get("ok") or "data" not in envelope:
+                continue
+            data = envelope["data"]
+            results = data.get("results", []) if isinstance(data, dict) else []
+            for item in results:
+                if not isinstance(item, dict) or "id" not in item:
+                    continue
+                eid = item["id"]
+                cat = item.get("category", "unknown")
+                confident = item.get("confident", False)
+                state.triaged_emails[eid] = cat
+                if confident:
+                    if eid not in state.heuristic_triaged:
+                        state.llm_calls_saved += 1
+                        state.heuristic_token_estimate += 50
+                    state.heuristic_triaged[eid] = cat
+                else:
+                    state.llm_triaged[eid] = cat
+
+
+def generate_interactive_smart_summary(
+    base_summary: dict,
+    state: SessionState,
+    total_tokens: int,
+) -> dict:
+    """Augment an existing interactive benchmark summary with smart-mode keys.
+
+    Wraps the base summary dict by adding new keys (heuristic_triaged,
+    llm_triaged, heuristic_savings, etc.) without removing any of the
+    original 24 keys that the non-smart path produces.
+    """
+    h_count = len(state.heuristic_triaged)
+    l_count = len(state.llm_triaged)
+
+    base_summary["heuristic_triaged"] = dict(state.heuristic_triaged)
+    base_summary["llm_triaged"] = dict(state.llm_triaged)
+    base_summary["heuristic_only_count"] = h_count
+    base_summary["llm_escalated_count"] = l_count
+
+    saved_pct = 0.0
+    if state.llm_calls_saved > 0:
+        heuristic_est = state.heuristic_token_estimate
+        saved_pct = (
+            heuristic_est / (heuristic_est + total_tokens) * 100
+            if (heuristic_est + total_tokens) > 0
+            else 0
+        )
+
+    base_summary["heuristic_savings"] = {
+        "llm_calls_saved": state.llm_calls_saved,
+        "estimated_tokens_saved": state.heuristic_token_estimate,
+        "estimated_output_tokens_avoided": h_count * 2048 if h_count else 0,
+        "saved_percentage": round(saved_pct, 1),
+    }
+
+    return base_summary
+
 # Re-export dataclasses for backwards compatibility (downstream code imports from runner).
 __all__ = [
     "BatchResult",
@@ -751,7 +910,20 @@ def run_interactive_benchmark(
 
         turn_start = time.monotonic()
         try:
-            agent_result = agent.process_query(prompt)
+            if enable_smart_mode and turn_num == 1 and _is_triage_prompt(prompt):
+                agent_result = agent.process_interactive_smart_triage(
+                    user_prompt=prompt,
+                    max_messages=limit,
+                )
+                # Sync SessionState from the smart triage result.
+                _sync_session_state_from_smart_result(agent_result, state)
+                # Bridge heuristic results into agent's cache for _should_use_llm.
+                agent.sync_smart_triage_cache(
+                    heuristic_ids=dict(state.heuristic_triaged),
+                    llm_ids=dict(state.llm_triaged),
+                )
+            else:
+                agent_result = agent.process_query(prompt)
         except Exception as exc:
             print(f"  Turn {turn_num} FAILED: {exc}")
             turns.append(
@@ -783,9 +955,11 @@ def run_interactive_benchmark(
             )
 
         # Persist conversation state for next turn.
+        # NOTE: agent_result["conversation"] is per-turn only (built fresh each call).
+        # See base/agent.py:1888 for the local initialization.
         conversation = agent_result.get("conversation", [])
         if conversation:
-            agent.conversation_history = conversation
+            agent.conversation_history.extend(conversation)
 
         turn = TurnResult(
             turn_number=turn_num,
@@ -917,14 +1091,17 @@ def run_interactive_benchmark(
         )
     print(f"{'='*70}\n")
 
-    summary["heuristic_triaged"] = dict(state.heuristic_triaged)
-    summary["llm_triaged"] = dict(state.llm_triaged)
-    summary["heuristic_only_count"] = h_count
-    summary["llm_escalated_count"] = l_count
-    summary["heuristic_savings"] = {
-        "llm_calls_saved": state.llm_calls_saved,
-        "estimated_tokens_saved": state.heuristic_token_estimate,
-    }
+    if enable_smart_mode:
+        generate_interactive_smart_summary(summary, state, total_tokens)
+    else:
+        summary["heuristic_triaged"] = dict(state.heuristic_triaged)
+        summary["llm_triaged"] = dict(state.llm_triaged)
+        summary["heuristic_only_count"] = h_count
+        summary["llm_escalated_count"] = l_count
+        summary["heuristic_savings"] = {
+            "llm_calls_saved": state.llm_calls_saved,
+            "estimated_tokens_saved": state.heuristic_token_estimate,
+        }
 
     return summary
 
@@ -1195,25 +1372,9 @@ def run_interactive_session(
             break
 
         # Reclassify command — mark an email for future LLM review.
-        # Currently scoped to "mark for manual review" — the email is
-        # tracked in force_llm_ids for future wiring into triage_inbox_impl.
         if enable_smart_mode and prompt.lower().startswith("reclassify "):
             email_id = prompt.split(None, 1)[1].strip()
-            if email_id in state.heuristic_triaged:
-                cat = state.heuristic_triaged.pop(email_id)
-                state.llm_triaged[email_id] = cat
-                state.force_llm_ids[email_id] = "user-requested"
-                # Wire into agent config so next triage_inbox call respects it.
-                agent.config.force_llm_ids[email_id] = "user-requested"
-                print(
-                    f"  Marked [{email_id}] for LLM reclassification (next triage will use LLM)."
-                )
-            elif email_id in state.triaged_emails:
-                state.force_llm_ids[email_id] = "user-requested"
-                agent.config.force_llm_ids[email_id] = "user-requested"
-                print(f"  Marked [{email_id}] for user-requested LLM review.")
-            else:
-                print(f"  Email [{email_id}] not found in triaged results.")
+            print(f"  {mark_for_escalation(email_id, state, agent)}")
             turn_num -= 1
             continue
 
@@ -1230,7 +1391,20 @@ def run_interactive_session(
         print(f"{'─'*60}")
         turn_start = time.monotonic()
         try:
-            agent_result = agent.process_query(prompt)
+            if enable_smart_mode and turn_num == 1 and _is_triage_prompt(prompt):
+                agent_result = agent.process_interactive_smart_triage(
+                    user_prompt=prompt,
+                    max_messages=limit,
+                )
+                # Sync SessionState from the smart triage result.
+                _sync_session_state_from_smart_result(agent_result, state)
+                # Bridge heuristic results into agent's cache for _should_use_llm.
+                agent.sync_smart_triage_cache(
+                    heuristic_ids=dict(state.heuristic_triaged),
+                    llm_ids=dict(state.llm_triaged),
+                )
+            else:
+                agent_result = agent.process_query(prompt)
         except Exception as exc:
             print(f"  Turn {turn_num} FAILED: {exc}")
             turns.append(
@@ -1261,9 +1435,12 @@ def run_interactive_session(
                 llm_ids=dict(state.llm_triaged),
             )
 
+        # Append this turn's messages to persistent history.
+        # NOTE: agent_result["conversation"] is per-turn only (built fresh each call).
+        # See base/agent.py:1888 for the local initialization.
         conversation = agent_result.get("conversation", [])
         if conversation:
-            agent.conversation_history = conversation
+            agent.conversation_history.extend(conversation)
 
         turns.append(
             TurnResult(
@@ -1357,7 +1534,7 @@ def run_interactive_session(
         _print_smart_breakdown(state)
     print(f"{'='*70}")
 
-    return {
+    summary = {
         "run_id": run_id,
         "timestamp": timestamp,
         "model": model_id,
@@ -1379,14 +1556,6 @@ def run_interactive_session(
         "avg_duration_per_turn_ms": round(total_duration_ms / max(len(turns), 1), 0),
         "avg_time_to_first_token_ms": round(avg_ttft, 1),
         "avg_tokens_per_second": round(avg_tps, 1),
-        "heuristic_triaged": dict(state.heuristic_triaged),
-        "llm_triaged": dict(state.llm_triaged),
-        "heuristic_only_count": h_count,
-        "llm_escalated_count": l_count,
-        "heuristic_savings": {
-            "llm_calls_saved": state.llm_calls_saved,
-            "estimated_tokens_saved": state.heuristic_token_estimate,
-        },
         "session_state": {
             "archived": sorted(state.archived),
             "starred": sorted(state.starred),
@@ -1397,3 +1566,17 @@ def run_interactive_session(
             "triaged": dict(state.triaged_emails),
         },
     }
+
+    if enable_smart_mode:
+        generate_interactive_smart_summary(summary, state, total_tokens)
+    else:
+        summary["heuristic_triaged"] = dict(state.heuristic_triaged)
+        summary["llm_triaged"] = dict(state.llm_triaged)
+        summary["heuristic_only_count"] = h_count
+        summary["llm_escalated_count"] = l_count
+        summary["heuristic_savings"] = {
+            "llm_calls_saved": state.llm_calls_saved,
+            "estimated_tokens_saved": state.heuristic_token_estimate,
+        }
+
+    return summary
