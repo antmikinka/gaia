@@ -378,14 +378,14 @@ def main(argv: list[str] | None = None) -> int:
     # Heatmap charts.
     if df["model"].nunique() >= 2 and df["emails"].nunique() >= 2:
         create_heatmap(df, "total_llm_calls",
-                       "LLM Calls Heatmap (Model × Email Limit)",
+                       "LLM Calls Heatmap (Model x Email Limit)",
                        str(output_dir / "06_llm_calls_heatmap.png"), cmap="RdYlBu_r")
         create_heatmap(df, "total_tokens",
-                       "Total LLM Tokens Heatmap (Model × Email Limit)",
+                       "Total LLM Tokens Heatmap (Model x Email Limit)",
                        str(output_dir / "07_llm_tokens_heatmap.png"), cmap="viridis")
-        print(f"\n✅ 7 high-sophistication charts created in {output_dir}/")
+        print(f"\n7 high-sophistication charts created in {output_dir}/")
     else:
-        print(f"\n✅ 5 charts created in {output_dir}/ (heatmaps need ≥2 models and ≥2 email limits)")
+        print(f"\n5 charts created in {output_dir}/ (heatmaps need 2+ models and 2+ email limits)")
 
     return 0
 
