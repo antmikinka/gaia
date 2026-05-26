@@ -33,9 +33,25 @@ export interface AgentInfo {
     required_connections?: ConnectorRequirement[];
     /**
      * Opaque grant-ledger key. Built-ins are `builtin:<id>`, custom agents
-     * are `custom:<sha256-prefix>:<id>`. Pass this to the grants endpoint.
+     * are `custom:<sha256-prefix>:<id>`, installed agents are
+     * `installed:<id>`, and native agents are `native:<id>`. Pass this to
+     * the grants endpoint.
      */
     namespaced_agent_id?: string;
+    /** Agent Hub metadata — used to render rich discovery cards. */
+    category?: string;
+    tags?: string[];
+    icon?: string;
+    tools_count?: number;
+    language?: string;
+}
+
+export interface DiskAgentInfo {
+    id: string;
+    name: string;
+    registered: boolean;
+    registered_agent_id?: string | null;
+    source?: string | null;
 }
 
 /**
