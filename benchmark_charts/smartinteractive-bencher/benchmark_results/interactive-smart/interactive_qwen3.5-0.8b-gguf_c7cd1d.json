@@ -1,0 +1,1382 @@
+{
+  "run_id": "run-interactive-20260526-173710-Qwen3.5-0.8B-GGUF-c7cd1d",
+  "timestamp": "2026-05-26T17:37:10.934162+00:00",
+  "model": "Qwen3.5-0.8B-GGUF",
+  "mbox_path": "",
+  "total_turns": 4,
+  "total_emails_affected": 101,
+  "total_tools_used": 9,
+  "tools_used": [
+    "triage_inbox",
+    "list_labels",
+    "get_message",
+    "mark_read",
+    "archive_message",
+    "list_inbox",
+    "mark_read_batch",
+    "mark_unread_batch",
+    "remove_star_batch"
+  ],
+  "total_duration_ms": 641264,
+  "total_input_tokens": 63611,
+  "total_output_tokens": 6645,
+  "total_reasoning_tokens": 0,
+  "total_tokens": 70256,
+  "avg_tokens_per_turn": 17564.0,
+  "avg_duration_per_turn_ms": 160316.0,
+  "avg_time_to_first_token_ms": 2004.9,
+  "avg_tokens_per_second": 62.4,
+  "heuristic_triaged": {
+    "42081833-0d3d-4736-96df-a7c886db7e95": "low priority",
+    "d6c38819-605f-4eda-aecf-ec12ed674cf8": "low priority",
+    "35ba6b4b-715c-5aee-939c-d1e59f7b1302": "low priority",
+    "de9fd66c-ebf7-570c-afa2-bd36094020f5": "low priority",
+    "14c78c54-c53c-5384-a3bd-3c470e886875": "low priority",
+    "3fa0b1d9-4822-5a5a-b4df-be840c301aa2": "low priority",
+    "9265f0c0-5cb5-54d6-8ca6-6de0091c1ead": "low priority",
+    "00264298-3154-593d-83ed-248b76ee0e8d": "low priority"
+  },
+  "llm_triaged": {
+    "39dd601b-3529-46d7-9ba0-e1c3e415d117": "actionable",
+    "57032d00-466a-4eed-a78e-0be92c70a4b2": "informational",
+    "9c5eb694-6890-4765-85ae-3c950974122d": "informational",
+    "033e4369-680d-453c-91b7-130dac96c6e5": "actionable",
+    "76799a0e-ddb2-48d2-86de-61745bbce20f": "actionable",
+    "253f7071-3759-421a-9404-fee015867dcd": "actionable",
+    "7eb06431-2103-56e1-b817-e0cdc67481fd": "actionable",
+    "a5c5a0d4-b1f5-5948-b024-4c8780c3572a": "actionable",
+    "4e851a74-b11f-5fd0-ac82-7f4a45ffeec1": "actionable",
+    "7aad1901-c50e-5c02-9978-9ec7f95ab7eb": "actionable",
+    "dcf31f9b-fab1-5b08-8348-c995e58152f5": "actionable",
+    "63322984-afff-563a-bbc5-1be415b063f0": "actionable",
+    "b48fc86b-b582-5bd6-92f1-80a267b033ce": "actionable",
+    "92f68e36-c68e-52bd-a66c-7bd5d5d658d9": "actionable",
+    "fafa55a6-3d01-5ff0-8307-e877c42f3ea5": "actionable",
+    "de678a03-8a95-5519-b143-a1edc791a130": "actionable",
+    "e144aacf-8a21-5c78-95fb-25de9090c429": "actionable",
+    "c302e3b1-aa13-573d-8cab-1083a27d0ab0": "actionable",
+    "16e1c682-1887-561c-bc01-c5674582c7f3": "actionable",
+    "57c47ce0-7b0e-5c22-ad67-97a13f559f37": "actionable",
+    "fb2f57da-e1d4-5e2b-8eb2-b771f38d69ac": "actionable",
+    "8e300e97-c761-5e16-9c7e-3770c6bc0562": "actionable",
+    "cecd78bc-5f8e-5d75-9bf4-3b20b4c682c2": "actionable",
+    "44194615-a989-5c96-8501-31477193d9be": "actionable",
+    "9431635a-804d-5091-b077-0b270165fa17": "actionable",
+    "e84b69c3-468d-50cc-8325-2c90e4843f8e": "actionable",
+    "b8451e80-90ac-54ef-aa32-96e1cfa9da42": "actionable",
+    "41a2628c-8857-5183-829c-b9481eff0ea3": "actionable",
+    "1b52e961-b24b-571a-9efa-b6fc69a1ec7b": "actionable",
+    "f241dbd5-89d7-5aea-a13f-8b9374ec73ad": "actionable",
+    "9c1565ca-4fb8-5867-b03e-ba53def1e85a": "actionable",
+    "338db8d9-6272-50c5-9107-847cdf9b0c44": "actionable",
+    "6a634e2b-ca6b-54eb-b9a0-428dd2efd46c": "actionable",
+    "be21f4f8-797a-5756-acf4-f3ff810bdd61": "actionable",
+    "29cbd008-2841-5cf5-923c-ef1eaa0093ff": "actionable",
+    "fc1c6628-012a-5915-a4c2-ecf1281a2d0f": "actionable",
+    "fdff94b5-191d-5dfb-a313-6c01d9cc80c6": "actionable",
+    "e05f6503-fd74-5e98-b61c-2d310d4788a0": "actionable",
+    "5165662b-7889-58b2-a081-ee82ec943687": "actionable",
+    "fa9ce664-76e7-516d-b338-016494e888ba": "actionable",
+    "c2b13a92-47c0-5e27-ac6a-629f0975859e": "actionable",
+    "f598abbb-b6ae-5fc1-bd7e-e4a88205bbdd": "actionable",
+    "ff1c9b82-03f5-5100-a301-d8ba58e583c5": "actionable",
+    "0ebc2283-216e-5c9b-8391-8288e67fa082": "actionable",
+    "d0bce8f0-4faf-54df-8379-edb448fbf28c": "actionable",
+    "15f5f0b6-beff-53d7-a7d4-f370d230f1bc": "actionable",
+    "9f504df0-81c3-5106-a183-de244e91f174": "actionable",
+    "a342058e-5345-5cfa-b31c-568288d9503a": "actionable",
+    "4edd71ea-1b6d-5607-91a3-6ca58aff8fbd": "actionable",
+    "2c89cc90-93fb-5182-bc1e-33fbaa81d832": "actionable",
+    "c5cb4a80-c5fc-52bd-a482-002581f33007": "actionable",
+    "cd1df042-a8a2-5995-8b98-e890ee1d1c31": "actionable",
+    "ed83181d-80b1-5d73-b902-9d76d940fc80": "actionable",
+    "3954138d-7b93-515f-8b05-189954fc98bc": "actionable",
+    "584da499-6b9c-5349-a2c5-62e3a12eb763": "actionable",
+    "7fe6b35d-6eab-5999-91e6-58d56acdb919": "actionable",
+    "3daab31e-504c-5598-8765-90199ada62a9": "actionable",
+    "cc48a519-8cc8-5b88-bd19-f68b96293c5e": "actionable",
+    "ad5a37a7-28c9-5ae4-a764-6eb7f8b822c3": "informational",
+    "a29156ce-fdad-5838-a65d-aea0fd14570a": "informational",
+    "83767328-dab1-5316-9015-504a8fbdb565": "informational",
+    "f3db289e-5cb7-5c59-a7c5-4da8459f13cf": "informational",
+    "0b456e4c-1c67-5a75-beda-f27a831592d1": "informational",
+    "677475f3-91dd-5a65-8c02-eff3f35ea48d": "informational",
+    "146dfea5-0a0a-5f2d-8fee-e7a8df8b84f2": "informational",
+    "9f0b2234-5627-57e6-811b-5500d12d1658": "informational",
+    "810643cb-301b-54fe-9d4e-f3d1441e7a82": "informational",
+    "d413d06a-49c7-5c76-97a6-2f7cce12aa17": "informational",
+    "2b25ed81-be24-5e0c-9b91-178ecea3d3ea": "informational",
+    "fa211a9b-bb40-5f4c-be92-6085ea4d21c7": "informational",
+    "f6427097-620b-53cb-932a-a5ed483c86a5": "informational",
+    "09c9b988-3585-5d68-ad73-fe815f253024": "informational",
+    "ddb166a4-c6db-53b6-8b58-d3422d8636cc": "informational",
+    "200870f1-6182-5acd-a9cd-3a6bbec31f2e": "informational",
+    "022f8c70-52af-5023-a165-8747d9c84ef4": "informational",
+    "f4deb2bb-961c-532c-8821-05ea587435eb": "informational",
+    "4129c497-1700-5980-bc1e-0e7b86b8b75f": "informational",
+    "3d789155-f35e-541d-acf9-2d7c5b5038b9": "informational",
+    "9391c23f-38c5-5204-aa3a-7edf99e58177": "informational",
+    "6a26ebaf-6800-551f-b60c-0a7fc792a676": "informational",
+    "0e3f3a3b-c79a-527a-b027-c0541b78a543": "informational",
+    "67831872-6a0e-5580-bc3e-c46c316404fa": "informational",
+    "9e6169de-ab47-5448-a4bf-56db18c7685a": "informational",
+    "8d9bf30d-3424-54a2-86e5-f66755dde9c8": "informational",
+    "2712e821-157b-568f-8529-f328365b3c56": "informational",
+    "35c88aa4-3778-529e-89c0-80d52f21fad5": "informational",
+    "a4666ece-9042-5f79-83fb-7d4877c3766b": "informational",
+    "f482d10c-eba8-5499-95cf-1317c5a022ae": "informational",
+    "c25c75ca-66e2-5c70-9eaf-21b5cdff3575": "informational",
+    "ca51f4cd-2098-5bb8-8480-cfc79f2217f2": "informational",
+    "33dd026e-7bb7-504e-b6c8-c0fe2b0a897a": "informational",
+    "04f91601-416a-5891-ade7-2907f6d4b0f8": "informational",
+    "edd9056c-486f-5e84-ae1f-6a0a9b17b586": "informational"
+  },
+  "heuristic_only_count": 8,
+  "llm_escalated_count": 93,
+  "per_email_classification": [
+    {
+      "email_id": "42081833-0d3d-4736-96df-a7c886db7e95",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "d6c38819-605f-4eda-aecf-ec12ed674cf8",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "35ba6b4b-715c-5aee-939c-d1e59f7b1302",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "de9fd66c-ebf7-570c-afa2-bd36094020f5",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "14c78c54-c53c-5384-a3bd-3c470e886875",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "3fa0b1d9-4822-5a5a-b4df-be840c301aa2",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "9265f0c0-5cb5-54d6-8ca6-6de0091c1ead",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "00264298-3154-593d-83ed-248b76ee0e8d",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "39dd601b-3529-46d7-9ba0-e1c3e415d117",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "57032d00-466a-4eed-a78e-0be92c70a4b2",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "9c5eb694-6890-4765-85ae-3c950974122d",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "033e4369-680d-453c-91b7-130dac96c6e5",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "76799a0e-ddb2-48d2-86de-61745bbce20f",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "253f7071-3759-421a-9404-fee015867dcd",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "7eb06431-2103-56e1-b817-e0cdc67481fd",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "a5c5a0d4-b1f5-5948-b024-4c8780c3572a",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "4e851a74-b11f-5fd0-ac82-7f4a45ffeec1",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "7aad1901-c50e-5c02-9978-9ec7f95ab7eb",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "dcf31f9b-fab1-5b08-8348-c995e58152f5",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "63322984-afff-563a-bbc5-1be415b063f0",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "b48fc86b-b582-5bd6-92f1-80a267b033ce",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "92f68e36-c68e-52bd-a66c-7bd5d5d658d9",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "fafa55a6-3d01-5ff0-8307-e877c42f3ea5",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "de678a03-8a95-5519-b143-a1edc791a130",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "e144aacf-8a21-5c78-95fb-25de9090c429",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "c302e3b1-aa13-573d-8cab-1083a27d0ab0",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "16e1c682-1887-561c-bc01-c5674582c7f3",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "57c47ce0-7b0e-5c22-ad67-97a13f559f37",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "fb2f57da-e1d4-5e2b-8eb2-b771f38d69ac",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "8e300e97-c761-5e16-9c7e-3770c6bc0562",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "cecd78bc-5f8e-5d75-9bf4-3b20b4c682c2",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "44194615-a989-5c96-8501-31477193d9be",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "9431635a-804d-5091-b077-0b270165fa17",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "e84b69c3-468d-50cc-8325-2c90e4843f8e",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "b8451e80-90ac-54ef-aa32-96e1cfa9da42",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "41a2628c-8857-5183-829c-b9481eff0ea3",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "1b52e961-b24b-571a-9efa-b6fc69a1ec7b",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "f241dbd5-89d7-5aea-a13f-8b9374ec73ad",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "9c1565ca-4fb8-5867-b03e-ba53def1e85a",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "338db8d9-6272-50c5-9107-847cdf9b0c44",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "6a634e2b-ca6b-54eb-b9a0-428dd2efd46c",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "be21f4f8-797a-5756-acf4-f3ff810bdd61",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "29cbd008-2841-5cf5-923c-ef1eaa0093ff",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "fc1c6628-012a-5915-a4c2-ecf1281a2d0f",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "fdff94b5-191d-5dfb-a313-6c01d9cc80c6",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "e05f6503-fd74-5e98-b61c-2d310d4788a0",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "5165662b-7889-58b2-a081-ee82ec943687",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "fa9ce664-76e7-516d-b338-016494e888ba",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "c2b13a92-47c0-5e27-ac6a-629f0975859e",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "f598abbb-b6ae-5fc1-bd7e-e4a88205bbdd",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "ff1c9b82-03f5-5100-a301-d8ba58e583c5",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "0ebc2283-216e-5c9b-8391-8288e67fa082",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "d0bce8f0-4faf-54df-8379-edb448fbf28c",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "15f5f0b6-beff-53d7-a7d4-f370d230f1bc",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "9f504df0-81c3-5106-a183-de244e91f174",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "a342058e-5345-5cfa-b31c-568288d9503a",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "4edd71ea-1b6d-5607-91a3-6ca58aff8fbd",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "2c89cc90-93fb-5182-bc1e-33fbaa81d832",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "c5cb4a80-c5fc-52bd-a482-002581f33007",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "cd1df042-a8a2-5995-8b98-e890ee1d1c31",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "ed83181d-80b1-5d73-b902-9d76d940fc80",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "3954138d-7b93-515f-8b05-189954fc98bc",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "584da499-6b9c-5349-a2c5-62e3a12eb763",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "7fe6b35d-6eab-5999-91e6-58d56acdb919",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "3daab31e-504c-5598-8765-90199ada62a9",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "cc48a519-8cc8-5b88-bd19-f68b96293c5e",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "ad5a37a7-28c9-5ae4-a764-6eb7f8b822c3",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "a29156ce-fdad-5838-a65d-aea0fd14570a",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "83767328-dab1-5316-9015-504a8fbdb565",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "f3db289e-5cb7-5c59-a7c5-4da8459f13cf",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "0b456e4c-1c67-5a75-beda-f27a831592d1",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "677475f3-91dd-5a65-8c02-eff3f35ea48d",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "146dfea5-0a0a-5f2d-8fee-e7a8df8b84f2",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "9f0b2234-5627-57e6-811b-5500d12d1658",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "810643cb-301b-54fe-9d4e-f3d1441e7a82",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "d413d06a-49c7-5c76-97a6-2f7cce12aa17",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "2b25ed81-be24-5e0c-9b91-178ecea3d3ea",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "fa211a9b-bb40-5f4c-be92-6085ea4d21c7",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "f6427097-620b-53cb-932a-a5ed483c86a5",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "09c9b988-3585-5d68-ad73-fe815f253024",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "ddb166a4-c6db-53b6-8b58-d3422d8636cc",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "200870f1-6182-5acd-a9cd-3a6bbec31f2e",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "022f8c70-52af-5023-a165-8747d9c84ef4",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "f4deb2bb-961c-532c-8821-05ea587435eb",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "4129c497-1700-5980-bc1e-0e7b86b8b75f",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "3d789155-f35e-541d-acf9-2d7c5b5038b9",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "9391c23f-38c5-5204-aa3a-7edf99e58177",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "6a26ebaf-6800-551f-b60c-0a7fc792a676",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "0e3f3a3b-c79a-527a-b027-c0541b78a543",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "67831872-6a0e-5580-bc3e-c46c316404fa",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "9e6169de-ab47-5448-a4bf-56db18c7685a",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "8d9bf30d-3424-54a2-86e5-f66755dde9c8",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "2712e821-157b-568f-8529-f328365b3c56",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "35c88aa4-3778-529e-89c0-80d52f21fad5",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "a4666ece-9042-5f79-83fb-7d4877c3766b",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "f482d10c-eba8-5499-95cf-1317c5a022ae",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "c25c75ca-66e2-5c70-9eaf-21b5cdff3575",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "ca51f4cd-2098-5bb8-8480-cfc79f2217f2",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "33dd026e-7bb7-504e-b6c8-c0fe2b0a897a",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "04f91601-416a-5891-ade7-2907f6d4b0f8",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "edd9056c-486f-5e84-ae1f-6a0a9b17b586",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    }
+  ],
+  "turns": [
+    {
+      "turn_number": 1,
+      "prompt": "Triage my inbox (100 emails)",
+      "step_results": [],
+      "tools_called": [
+        "triage_inbox"
+      ],
+      "emails_affected": [
+        "00264298-3154-593d-83ed-248b76ee0e8d",
+        "022f8c70-52af-5023-a165-8747d9c84ef4",
+        "033e4369-680d-453c-91b7-130dac96c6e5",
+        "04f91601-416a-5891-ade7-2907f6d4b0f8",
+        "09c9b988-3585-5d68-ad73-fe815f253024",
+        "0b456e4c-1c67-5a75-beda-f27a831592d1",
+        "0e3f3a3b-c79a-527a-b027-c0541b78a543",
+        "0ebc2283-216e-5c9b-8391-8288e67fa082",
+        "146dfea5-0a0a-5f2d-8fee-e7a8df8b84f2",
+        "14c78c54-c53c-5384-a3bd-3c470e886875",
+        "15f5f0b6-beff-53d7-a7d4-f370d230f1bc",
+        "16e1c682-1887-561c-bc01-c5674582c7f3",
+        "1b52e961-b24b-571a-9efa-b6fc69a1ec7b",
+        "200870f1-6182-5acd-a9cd-3a6bbec31f2e",
+        "253f7071-3759-421a-9404-fee015867dcd",
+        "2712e821-157b-568f-8529-f328365b3c56",
+        "29cbd008-2841-5cf5-923c-ef1eaa0093ff",
+        "2b25ed81-be24-5e0c-9b91-178ecea3d3ea",
+        "2c89cc90-93fb-5182-bc1e-33fbaa81d832",
+        "338db8d9-6272-50c5-9107-847cdf9b0c44",
+        "33dd026e-7bb7-504e-b6c8-c0fe2b0a897a",
+        "35ba6b4b-715c-5aee-939c-d1e59f7b1302",
+        "35c88aa4-3778-529e-89c0-80d52f21fad5",
+        "3954138d-7b93-515f-8b05-189954fc98bc",
+        "39dd601b-3529-46d7-9ba0-e1c3e415d117",
+        "3d789155-f35e-541d-acf9-2d7c5b5038b9",
+        "3daab31e-504c-5598-8765-90199ada62a9",
+        "3fa0b1d9-4822-5a5a-b4df-be840c301aa2",
+        "4129c497-1700-5980-bc1e-0e7b86b8b75f",
+        "41a2628c-8857-5183-829c-b9481eff0ea3",
+        "42081833-0d3d-4736-96df-a7c886db7e95",
+        "44194615-a989-5c96-8501-31477193d9be",
+        "4e851a74-b11f-5fd0-ac82-7f4a45ffeec1",
+        "4edd71ea-1b6d-5607-91a3-6ca58aff8fbd",
+        "5165662b-7889-58b2-a081-ee82ec943687",
+        "57032d00-466a-4eed-a78e-0be92c70a4b2",
+        "57c47ce0-7b0e-5c22-ad67-97a13f559f37",
+        "584da499-6b9c-5349-a2c5-62e3a12eb763",
+        "63322984-afff-563a-bbc5-1be415b063f0",
+        "677475f3-91dd-5a65-8c02-eff3f35ea48d",
+        "67831872-6a0e-5580-bc3e-c46c316404fa",
+        "6a26ebaf-6800-551f-b60c-0a7fc792a676",
+        "6a634e2b-ca6b-54eb-b9a0-428dd2efd46c",
+        "76799a0e-ddb2-48d2-86de-61745bbce20f",
+        "7aad1901-c50e-5c02-9978-9ec7f95ab7eb",
+        "7eb06431-2103-56e1-b817-e0cdc67481fd",
+        "7fe6b35d-6eab-5999-91e6-58d56acdb919",
+        "810643cb-301b-54fe-9d4e-f3d1441e7a82",
+        "83767328-dab1-5316-9015-504a8fbdb565",
+        "8d9bf30d-3424-54a2-86e5-f66755dde9c8",
+        "8e300e97-c761-5e16-9c7e-3770c6bc0562",
+        "9265f0c0-5cb5-54d6-8ca6-6de0091c1ead",
+        "92f68e36-c68e-52bd-a66c-7bd5d5d658d9",
+        "9391c23f-38c5-5204-aa3a-7edf99e58177",
+        "9431635a-804d-5091-b077-0b270165fa17",
+        "9c1565ca-4fb8-5867-b03e-ba53def1e85a",
+        "9c5eb694-6890-4765-85ae-3c950974122d",
+        "9e6169de-ab47-5448-a4bf-56db18c7685a",
+        "9f0b2234-5627-57e6-811b-5500d12d1658",
+        "9f504df0-81c3-5106-a183-de244e91f174",
+        "a29156ce-fdad-5838-a65d-aea0fd14570a",
+        "a342058e-5345-5cfa-b31c-568288d9503a",
+        "a4666ece-9042-5f79-83fb-7d4877c3766b",
+        "a5c5a0d4-b1f5-5948-b024-4c8780c3572a",
+        "ad5a37a7-28c9-5ae4-a764-6eb7f8b822c3",
+        "b48fc86b-b582-5bd6-92f1-80a267b033ce",
+        "b8451e80-90ac-54ef-aa32-96e1cfa9da42",
+        "be21f4f8-797a-5756-acf4-f3ff810bdd61",
+        "c25c75ca-66e2-5c70-9eaf-21b5cdff3575",
+        "c2b13a92-47c0-5e27-ac6a-629f0975859e",
+        "c302e3b1-aa13-573d-8cab-1083a27d0ab0",
+        "c5cb4a80-c5fc-52bd-a482-002581f33007",
+        "ca51f4cd-2098-5bb8-8480-cfc79f2217f2",
+        "cc48a519-8cc8-5b88-bd19-f68b96293c5e",
+        "cd1df042-a8a2-5995-8b98-e890ee1d1c31",
+        "cecd78bc-5f8e-5d75-9bf4-3b20b4c682c2",
+        "d0bce8f0-4faf-54df-8379-edb448fbf28c",
+        "d413d06a-49c7-5c76-97a6-2f7cce12aa17",
+        "d6c38819-605f-4eda-aecf-ec12ed674cf8",
+        "dcf31f9b-fab1-5b08-8348-c995e58152f5",
+        "ddb166a4-c6db-53b6-8b58-d3422d8636cc",
+        "de678a03-8a95-5519-b143-a1edc791a130",
+        "de9fd66c-ebf7-570c-afa2-bd36094020f5",
+        "e05f6503-fd74-5e98-b61c-2d310d4788a0",
+        "e144aacf-8a21-5c78-95fb-25de9090c429",
+        "e84b69c3-468d-50cc-8325-2c90e4843f8e",
+        "ed83181d-80b1-5d73-b902-9d76d940fc80",
+        "f241dbd5-89d7-5aea-a13f-8b9374ec73ad",
+        "f3db289e-5cb7-5c59-a7c5-4da8459f13cf",
+        "f482d10c-eba8-5499-95cf-1317c5a022ae",
+        "f4deb2bb-961c-532c-8821-05ea587435eb",
+        "f598abbb-b6ae-5fc1-bd7e-e4a88205bbdd",
+        "f6427097-620b-53cb-932a-a5ed483c86a5",
+        "fa211a9b-bb40-5f4c-be92-6085ea4d21c7",
+        "fa9ce664-76e7-516d-b338-016494e888ba",
+        "fafa55a6-3d01-5ff0-8307-e877c42f3ea5",
+        "fb2f57da-e1d4-5e2b-8eb2-b771f38d69ac",
+        "fc1c6628-012a-5915-a4c2-ecf1281a2d0f",
+        "fdff94b5-191d-5dfb-a313-6c01d9cc80c6",
+        "ff1c9b82-03f5-5100-a301-d8ba58e583c5"
+      ],
+      "duration_ms": 371093,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "reasoning_tokens": 0,
+      "time_to_first_token_ms": 0.0,
+      "tokens_per_second": 0.0,
+      "total_tokens": 0,
+      "final_answer": "Triaged 100 emails: 8 heuristic-only, 92 LLM-processed",
+      "status": "ok",
+      "error": "",
+      "heuristic_email_count": 8,
+      "llm_email_count": 92
+    },
+    {
+      "turn_number": 2,
+      "prompt": "Archive the low priority emails",
+      "step_results": [
+        {
+          "step_number": 1,
+          "action": "llm_call",
+          "tool_name": "list_labels",
+          "input_tokens": 4,
+          "output_tokens": 215,
+          "reasoning_tokens": 0,
+          "total_tokens": 219,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 40.2,
+          "tokens_per_second": 64.0
+        },
+        {
+          "step_number": 2,
+          "action": "llm_call",
+          "tool_name": "get_message",
+          "input_tokens": 372,
+          "output_tokens": 491,
+          "reasoning_tokens": 0,
+          "total_tokens": 863,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 201.2,
+          "tokens_per_second": 66.8
+        },
+        {
+          "step_number": 3,
+          "action": "llm_call",
+          "tool_name": "mark_read",
+          "input_tokens": 794,
+          "output_tokens": 279,
+          "reasoning_tokens": 0,
+          "total_tokens": 1073,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 382.0,
+          "tokens_per_second": 67.5
+        },
+        {
+          "step_number": 4,
+          "action": "llm_call",
+          "tool_name": "archive_message",
+          "input_tokens": 716,
+          "output_tokens": 164,
+          "reasoning_tokens": 0,
+          "total_tokens": 880,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 349.7,
+          "tokens_per_second": 67.8
+        },
+        {
+          "step_number": 5,
+          "action": "llm_call",
+          "tool_name": "list_inbox",
+          "input_tokens": 714,
+          "output_tokens": 160,
+          "reasoning_tokens": 0,
+          "total_tokens": 874,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 352.9,
+          "tokens_per_second": 67.9
+        }
+      ],
+      "tools_called": [
+        "list_labels",
+        "get_message",
+        "mark_read",
+        "archive_message",
+        "list_inbox"
+      ],
+      "emails_affected": [
+        "39dd601b-3529-46d7-9ba0-e1c3e415d117"
+      ],
+      "duration_ms": 56671,
+      "input_tokens": 2600,
+      "output_tokens": 1309,
+      "reasoning_tokens": 0,
+      "time_to_first_token_ms": 265.2,
+      "tokens_per_second": 66.8,
+      "total_tokens": 3909,
+      "final_answer": "I had to trim the conversation to fit my memory but I'm still not making progress. Could you re-ask in a fresh chat with just the essentials?",
+      "status": "ok",
+      "error": "",
+      "heuristic_email_count": 8,
+      "llm_email_count": 92
+    },
+    {
+      "turn_number": 3,
+      "prompt": "Star any urgent or actionable messages",
+      "step_results": [
+        {
+          "step_number": 1,
+          "action": "llm_call",
+          "tool_name": "triage_inbox",
+          "input_tokens": 1054,
+          "output_tokens": 311,
+          "reasoning_tokens": 0,
+          "total_tokens": 1365,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 493.7,
+          "tokens_per_second": 68.3
+        },
+        {
+          "step_number": 2,
+          "action": "llm_call",
+          "tool_name": "triage_inbox",
+          "input_tokens": 17815,
+          "output_tokens": 509,
+          "reasoning_tokens": 0,
+          "total_tokens": 18324,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 11027.5,
+          "tokens_per_second": 55.9
+        },
+        {
+          "step_number": 3,
+          "action": "llm_call",
+          "tool_name": "triage_inbox",
+          "input_tokens": 9522,
+          "output_tokens": 67,
+          "reasoning_tokens": 0,
+          "total_tokens": 9589,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 8674.6,
+          "tokens_per_second": 53.1
+        },
+        {
+          "step_number": 4,
+          "action": "llm_call",
+          "tool_name": "mark_read_batch",
+          "input_tokens": 18411,
+          "output_tokens": 854,
+          "reasoning_tokens": 0,
+          "total_tokens": 19265,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 11159.1,
+          "tokens_per_second": 56.9
+        },
+        {
+          "step_number": 5,
+          "action": "llm_call",
+          "tool_name": "mark_unread_batch",
+          "input_tokens": 1433,
+          "output_tokens": 244,
+          "reasoning_tokens": 0,
+          "total_tokens": 1677,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 1149.3,
+          "tokens_per_second": 57.6
+        },
+        {
+          "step_number": 6,
+          "action": "llm_call",
+          "tool_name": "mark_read_batch",
+          "input_tokens": 915,
+          "output_tokens": 452,
+          "reasoning_tokens": 0,
+          "total_tokens": 1367,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 811.2,
+          "tokens_per_second": 55.8
+        },
+        {
+          "step_number": 7,
+          "action": "llm_call",
+          "tool_name": "remove_star_batch",
+          "input_tokens": 896,
+          "output_tokens": 411,
+          "reasoning_tokens": 0,
+          "total_tokens": 1307,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 785.8,
+          "tokens_per_second": 56.9
+        },
+        {
+          "step_number": 8,
+          "action": "llm_call",
+          "tool_name": "remove_star_batch",
+          "input_tokens": 1213,
+          "output_tokens": 609,
+          "reasoning_tokens": 0,
+          "total_tokens": 1822,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 1121.4,
+          "tokens_per_second": 56.3
+        },
+        {
+          "step_number": 9,
+          "action": "llm_call",
+          "tool_name": "remove_star_batch",
+          "input_tokens": 941,
+          "output_tokens": 283,
+          "reasoning_tokens": 0,
+          "total_tokens": 1224,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 862.3,
+          "tokens_per_second": 51.6
+        },
+        {
+          "step_number": 10,
+          "action": "llm_call",
+          "tool_name": "mark_unread_batch",
+          "input_tokens": 1010,
+          "output_tokens": 322,
+          "reasoning_tokens": 0,
+          "total_tokens": 1332,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 934.0,
+          "tokens_per_second": 55.3
+        },
+        {
+          "step_number": 11,
+          "action": "llm_call",
+          "tool_name": "mark_unread_batch",
+          "input_tokens": 1271,
+          "output_tokens": 254,
+          "reasoning_tokens": 0,
+          "total_tokens": 1525,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 1151.6,
+          "tokens_per_second": 55.7
+        },
+        {
+          "step_number": 12,
+          "action": "llm_call",
+          "tool_name": "mark_read",
+          "input_tokens": 1270,
+          "output_tokens": 520,
+          "reasoning_tokens": 0,
+          "total_tokens": 1790,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 1163.7,
+          "tokens_per_second": 54.3
+        }
+      ],
+      "tools_called": [
+        "triage_inbox",
+        "mark_read_batch",
+        "mark_unread_batch",
+        "remove_star_batch",
+        "mark_read"
+      ],
+      "emails_affected": [
+        "00264298-3154-593d-83ed-248b76ee0e8d",
+        "022f8c70-52af-5023-a165-8747d9c84ef4",
+        "033e4369-680d-453c-91b7-130dac96c6e5",
+        "04f91601-416a-5891-ade7-2907f6d4b0f8",
+        "09c9b988-3585-5d68-ad73-fe815f253024",
+        "0b456e4c-1c67-5a75-beda-f27a831592d1",
+        "0e3f3a3b-c79a-527a-b027-c0541b78a543",
+        "0ebc2283-216e-5c9b-8391-8288e67fa082",
+        "146dfea5-0a0a-5f2d-8fee-e7a8df8b84f2",
+        "14c78c54-c53c-5384-a3bd-3c470e886875",
+        "15f5f0b6-beff-53d7-a7d4-f370d230f1bc",
+        "16e1c682-1887-561c-bc01-c5674582c7f3",
+        "1b52e961-b24b-571a-9efa-b6fc69a1ec7b",
+        "200870f1-6182-5acd-a9cd-3a6bbec31f2e",
+        "253f7071-3759-421a-9404-fee015867dcd",
+        "2712e821-157b-568f-8529-f328365b3c56",
+        "29cbd008-2841-5cf5-923c-ef1eaa0093ff",
+        "2b25ed81-be24-5e0c-9b91-178ecea3d3ea",
+        "2c89cc90-93fb-5182-bc1e-33fbaa81d832",
+        "338db8d9-6272-50c5-9107-847cdf9b0c44",
+        "33dd026e-7bb7-504e-b6c8-c0fe2b0a897a",
+        "35ba6b4b-715c-5aee-939c-d1e59f7b1302",
+        "35c88aa4-3778-529e-89c0-80d52f21fad5",
+        "3954138d-7b93-515f-8b05-189954fc98bc",
+        "3d789155-f35e-541d-acf9-2d7c5b5038b9",
+        "3daab31e-504c-5598-8765-90199ada62a9",
+        "3fa0b1d9-4822-5a5a-b4df-be840c301aa2",
+        "4129c497-1700-5980-bc1e-0e7b86b8b75f",
+        "41a2628c-8857-5183-829c-b9481eff0ea3",
+        "42081833-0d3d-4736-96df-a7c886db7e95",
+        "44194615-a989-5c96-8501-31477193d9be",
+        "4e851a74-b11f-5fd0-ac82-7f4a45ffeec1",
+        "4edd71ea-1b6d-5607-91a3-6ca58aff8fbd",
+        "5165662b-7889-58b2-a081-ee82ec943687",
+        "57032d00-466a-4eed-a78e-0be92c70a4b2",
+        "57c47ce0-7b0e-5c22-ad67-97a13f559f37",
+        "584da499-6b9c-5349-a2c5-62e3a12eb763",
+        "63322984-afff-563a-bbc5-1be415b063f0",
+        "677475f3-91dd-5a65-8c02-eff3f35ea48d",
+        "67831872-6a0e-5580-bc3e-c46c316404fa",
+        "6a26ebaf-6800-551f-b60c-0a7fc792a676",
+        "6a634e2b-ca6b-54eb-b9a0-428dd2efd46c",
+        "76799a0e-ddb2-48d2-86de-61745bbce20f",
+        "7aad1901-c50e-5c02-9978-9ec7f95ab7eb",
+        "7eb06431-2103-56e1-b817-e0cdc67481fd",
+        "7fe6b35d-6eab-5999-91e6-58d56acdb919",
+        "810643cb-301b-54fe-9d4e-f3d1441e7a82",
+        "83767328-dab1-5316-9015-504a8fbdb565",
+        "8d9bf30d-3424-54a2-86e5-f66755dde9c8",
+        "8e300e97-c761-5e16-9c7e-3770c6bc0562",
+        "9265f0c0-5cb5-54d6-8ca6-6de0091c1ead",
+        "92f68e36-c68e-52bd-a66c-7bd5d5d658d9",
+        "9391c23f-38c5-5204-aa3a-7edf99e58177",
+        "9431635a-804d-5091-b077-0b270165fa17",
+        "9c1565ca-4fb8-5867-b03e-ba53def1e85a",
+        "9c5eb694-6890-4765-85ae-3c950974122d",
+        "9e6169de-ab47-5448-a4bf-56db18c7685a",
+        "9f0b2234-5627-57e6-811b-5500d12d1658",
+        "9f504df0-81c3-5106-a183-de244e91f174",
+        "a29156ce-fdad-5838-a65d-aea0fd14570a",
+        "a342058e-5345-5cfa-b31c-568288d9503a",
+        "a4666ece-9042-5f79-83fb-7d4877c3766b",
+        "a5c5a0d4-b1f5-5948-b024-4c8780c3572a",
+        "ad5a37a7-28c9-5ae4-a764-6eb7f8b822c3",
+        "b48fc86b-b582-5bd6-92f1-80a267b033ce",
+        "b8451e80-90ac-54ef-aa32-96e1cfa9da42",
+        "be21f4f8-797a-5756-acf4-f3ff810bdd61",
+        "c25c75ca-66e2-5c70-9eaf-21b5cdff3575",
+        "c2b13a92-47c0-5e27-ac6a-629f0975859e",
+        "c302e3b1-aa13-573d-8cab-1083a27d0ab0",
+        "c5cb4a80-c5fc-52bd-a482-002581f33007",
+        "ca51f4cd-2098-5bb8-8480-cfc79f2217f2",
+        "cc48a519-8cc8-5b88-bd19-f68b96293c5e",
+        "cd1df042-a8a2-5995-8b98-e890ee1d1c31",
+        "cecd78bc-5f8e-5d75-9bf4-3b20b4c682c2",
+        "d0bce8f0-4faf-54df-8379-edb448fbf28c",
+        "d413d06a-49c7-5c76-97a6-2f7cce12aa17",
+        "d6c38819-605f-4eda-aecf-ec12ed674cf8",
+        "dcf31f9b-fab1-5b08-8348-c995e58152f5",
+        "ddb166a4-c6db-53b6-8b58-d3422d8636cc",
+        "de678a03-8a95-5519-b143-a1edc791a130",
+        "de9fd66c-ebf7-570c-afa2-bd36094020f5",
+        "e05f6503-fd74-5e98-b61c-2d310d4788a0",
+        "e144aacf-8a21-5c78-95fb-25de9090c429",
+        "e84b69c3-468d-50cc-8325-2c90e4843f8e",
+        "ed83181d-80b1-5d73-b902-9d76d940fc80",
+        "edd9056c-486f-5e84-ae1f-6a0a9b17b586",
+        "f241dbd5-89d7-5aea-a13f-8b9374ec73ad",
+        "f3db289e-5cb7-5c59-a7c5-4da8459f13cf",
+        "f482d10c-eba8-5499-95cf-1317c5a022ae",
+        "f4deb2bb-961c-532c-8821-05ea587435eb",
+        "f598abbb-b6ae-5fc1-bd7e-e4a88205bbdd",
+        "f6427097-620b-53cb-932a-a5ed483c86a5",
+        "fa211a9b-bb40-5f4c-be92-6085ea4d21c7",
+        "fa9ce664-76e7-516d-b338-016494e888ba",
+        "fafa55a6-3d01-5ff0-8307-e877c42f3ea5",
+        "fb2f57da-e1d4-5e2b-8eb2-b771f38d69ac",
+        "fc1c6628-012a-5915-a4c2-ecf1281a2d0f",
+        "fdff94b5-191d-5dfb-a313-6c01d9cc80c6",
+        "ff1c9b82-03f5-5100-a301-d8ba58e583c5"
+      ],
+      "duration_ms": 185218,
+      "input_tokens": 55751,
+      "output_tokens": 4836,
+      "reasoning_tokens": 0,
+      "time_to_first_token_ms": 3277.9,
+      "tokens_per_second": 56.5,
+      "total_tokens": 60587,
+      "final_answer": "⚠️ Reached maximum steps limit (12 steps)\n\nCompleted 12 steps using these tools:\n\nTo continue or complete this task:\n1. Review the generated files and progress so far\n2. Run with --max-steps 62 to allow more steps\n3. Or complete remaining tasks manually\n",
+      "status": "ok",
+      "error": "",
+      "heuristic_email_count": 8,
+      "llm_email_count": 93
+    },
+    {
+      "turn_number": 4,
+      "prompt": "Show me a summary of what's left in my inbox",
+      "step_results": [
+        {
+          "step_number": 1,
+          "action": "llm_call",
+          "tool_name": "list_inbox",
+          "input_tokens": 5260,
+          "output_tokens": 500,
+          "reasoning_tokens": 0,
+          "total_tokens": 5760,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 2471.6,
+          "tokens_per_second": 64.0
+        }
+      ],
+      "tools_called": [
+        "list_inbox"
+      ],
+      "emails_affected": [],
+      "duration_ms": 28281,
+      "input_tokens": 5260,
+      "output_tokens": 500,
+      "reasoning_tokens": 0,
+      "time_to_first_token_ms": 2471.6,
+      "tokens_per_second": 64.0,
+      "total_tokens": 5760,
+      "final_answer": "I had to trim the conversation to fit my memory but I'm still not making progress. Could you re-ask in a fresh chat with just the essentials?",
+      "status": "ok",
+      "error": "",
+      "heuristic_email_count": 8,
+      "llm_email_count": 93
+    }
+  ],
+  "session_state": {
+    "archived": [
+      "39dd601b-3529-46d7-9ba0-e1c3e415d117"
+    ],
+    "starred": [],
+    "drafted": [],
+    "sent": [],
+    "marked_read": [
+      "39dd601b-3529-46d7-9ba0-e1c3e415d117"
+    ],
+    "deleted": [],
+    "triaged": {
+      "39dd601b-3529-46d7-9ba0-e1c3e415d117": "actionable",
+      "42081833-0d3d-4736-96df-a7c886db7e95": "low priority",
+      "d6c38819-605f-4eda-aecf-ec12ed674cf8": "low priority",
+      "57032d00-466a-4eed-a78e-0be92c70a4b2": "informational",
+      "9c5eb694-6890-4765-85ae-3c950974122d": "informational",
+      "033e4369-680d-453c-91b7-130dac96c6e5": "actionable",
+      "76799a0e-ddb2-48d2-86de-61745bbce20f": "actionable",
+      "253f7071-3759-421a-9404-fee015867dcd": "actionable",
+      "7eb06431-2103-56e1-b817-e0cdc67481fd": "actionable",
+      "a5c5a0d4-b1f5-5948-b024-4c8780c3572a": "actionable",
+      "4e851a74-b11f-5fd0-ac82-7f4a45ffeec1": "actionable",
+      "7aad1901-c50e-5c02-9978-9ec7f95ab7eb": "actionable",
+      "dcf31f9b-fab1-5b08-8348-c995e58152f5": "actionable",
+      "63322984-afff-563a-bbc5-1be415b063f0": "actionable",
+      "b48fc86b-b582-5bd6-92f1-80a267b033ce": "actionable",
+      "92f68e36-c68e-52bd-a66c-7bd5d5d658d9": "actionable",
+      "fafa55a6-3d01-5ff0-8307-e877c42f3ea5": "actionable",
+      "de678a03-8a95-5519-b143-a1edc791a130": "actionable",
+      "e144aacf-8a21-5c78-95fb-25de9090c429": "actionable",
+      "c302e3b1-aa13-573d-8cab-1083a27d0ab0": "actionable",
+      "16e1c682-1887-561c-bc01-c5674582c7f3": "actionable",
+      "57c47ce0-7b0e-5c22-ad67-97a13f559f37": "actionable",
+      "fb2f57da-e1d4-5e2b-8eb2-b771f38d69ac": "actionable",
+      "8e300e97-c761-5e16-9c7e-3770c6bc0562": "actionable",
+      "cecd78bc-5f8e-5d75-9bf4-3b20b4c682c2": "actionable",
+      "44194615-a989-5c96-8501-31477193d9be": "actionable",
+      "9431635a-804d-5091-b077-0b270165fa17": "actionable",
+      "e84b69c3-468d-50cc-8325-2c90e4843f8e": "actionable",
+      "b8451e80-90ac-54ef-aa32-96e1cfa9da42": "actionable",
+      "41a2628c-8857-5183-829c-b9481eff0ea3": "actionable",
+      "1b52e961-b24b-571a-9efa-b6fc69a1ec7b": "actionable",
+      "f241dbd5-89d7-5aea-a13f-8b9374ec73ad": "actionable",
+      "9c1565ca-4fb8-5867-b03e-ba53def1e85a": "actionable",
+      "338db8d9-6272-50c5-9107-847cdf9b0c44": "actionable",
+      "6a634e2b-ca6b-54eb-b9a0-428dd2efd46c": "actionable",
+      "be21f4f8-797a-5756-acf4-f3ff810bdd61": "actionable",
+      "29cbd008-2841-5cf5-923c-ef1eaa0093ff": "actionable",
+      "fc1c6628-012a-5915-a4c2-ecf1281a2d0f": "actionable",
+      "fdff94b5-191d-5dfb-a313-6c01d9cc80c6": "actionable",
+      "e05f6503-fd74-5e98-b61c-2d310d4788a0": "actionable",
+      "5165662b-7889-58b2-a081-ee82ec943687": "actionable",
+      "fa9ce664-76e7-516d-b338-016494e888ba": "actionable",
+      "c2b13a92-47c0-5e27-ac6a-629f0975859e": "actionable",
+      "f598abbb-b6ae-5fc1-bd7e-e4a88205bbdd": "actionable",
+      "ff1c9b82-03f5-5100-a301-d8ba58e583c5": "actionable",
+      "0ebc2283-216e-5c9b-8391-8288e67fa082": "actionable",
+      "d0bce8f0-4faf-54df-8379-edb448fbf28c": "actionable",
+      "15f5f0b6-beff-53d7-a7d4-f370d230f1bc": "actionable",
+      "9f504df0-81c3-5106-a183-de244e91f174": "actionable",
+      "a342058e-5345-5cfa-b31c-568288d9503a": "actionable",
+      "4edd71ea-1b6d-5607-91a3-6ca58aff8fbd": "actionable",
+      "2c89cc90-93fb-5182-bc1e-33fbaa81d832": "actionable",
+      "c5cb4a80-c5fc-52bd-a482-002581f33007": "actionable",
+      "cd1df042-a8a2-5995-8b98-e890ee1d1c31": "actionable",
+      "ed83181d-80b1-5d73-b902-9d76d940fc80": "actionable",
+      "3954138d-7b93-515f-8b05-189954fc98bc": "actionable",
+      "584da499-6b9c-5349-a2c5-62e3a12eb763": "actionable",
+      "7fe6b35d-6eab-5999-91e6-58d56acdb919": "actionable",
+      "3daab31e-504c-5598-8765-90199ada62a9": "actionable",
+      "cc48a519-8cc8-5b88-bd19-f68b96293c5e": "actionable",
+      "ad5a37a7-28c9-5ae4-a764-6eb7f8b822c3": "informational",
+      "a29156ce-fdad-5838-a65d-aea0fd14570a": "informational",
+      "83767328-dab1-5316-9015-504a8fbdb565": "informational",
+      "f3db289e-5cb7-5c59-a7c5-4da8459f13cf": "informational",
+      "0b456e4c-1c67-5a75-beda-f27a831592d1": "informational",
+      "677475f3-91dd-5a65-8c02-eff3f35ea48d": "informational",
+      "146dfea5-0a0a-5f2d-8fee-e7a8df8b84f2": "informational",
+      "9f0b2234-5627-57e6-811b-5500d12d1658": "informational",
+      "810643cb-301b-54fe-9d4e-f3d1441e7a82": "informational",
+      "d413d06a-49c7-5c76-97a6-2f7cce12aa17": "informational",
+      "2b25ed81-be24-5e0c-9b91-178ecea3d3ea": "informational",
+      "fa211a9b-bb40-5f4c-be92-6085ea4d21c7": "informational",
+      "f6427097-620b-53cb-932a-a5ed483c86a5": "informational",
+      "09c9b988-3585-5d68-ad73-fe815f253024": "informational",
+      "35ba6b4b-715c-5aee-939c-d1e59f7b1302": "low priority",
+      "de9fd66c-ebf7-570c-afa2-bd36094020f5": "low priority",
+      "14c78c54-c53c-5384-a3bd-3c470e886875": "low priority",
+      "3fa0b1d9-4822-5a5a-b4df-be840c301aa2": "low priority",
+      "9265f0c0-5cb5-54d6-8ca6-6de0091c1ead": "low priority",
+      "00264298-3154-593d-83ed-248b76ee0e8d": "low priority",
+      "ddb166a4-c6db-53b6-8b58-d3422d8636cc": "informational",
+      "200870f1-6182-5acd-a9cd-3a6bbec31f2e": "informational",
+      "022f8c70-52af-5023-a165-8747d9c84ef4": "informational",
+      "f4deb2bb-961c-532c-8821-05ea587435eb": "informational",
+      "4129c497-1700-5980-bc1e-0e7b86b8b75f": "informational",
+      "3d789155-f35e-541d-acf9-2d7c5b5038b9": "informational",
+      "9391c23f-38c5-5204-aa3a-7edf99e58177": "informational",
+      "6a26ebaf-6800-551f-b60c-0a7fc792a676": "informational",
+      "0e3f3a3b-c79a-527a-b027-c0541b78a543": "informational",
+      "67831872-6a0e-5580-bc3e-c46c316404fa": "informational",
+      "9e6169de-ab47-5448-a4bf-56db18c7685a": "informational",
+      "8d9bf30d-3424-54a2-86e5-f66755dde9c8": "informational",
+      "2712e821-157b-568f-8529-f328365b3c56": "informational",
+      "35c88aa4-3778-529e-89c0-80d52f21fad5": "informational",
+      "a4666ece-9042-5f79-83fb-7d4877c3766b": "informational",
+      "f482d10c-eba8-5499-95cf-1317c5a022ae": "informational",
+      "c25c75ca-66e2-5c70-9eaf-21b5cdff3575": "informational",
+      "ca51f4cd-2098-5bb8-8480-cfc79f2217f2": "informational",
+      "33dd026e-7bb7-504e-b6c8-c0fe2b0a897a": "informational",
+      "04f91601-416a-5891-ade7-2907f6d4b0f8": "informational",
+      "edd9056c-486f-5e84-ae1f-6a0a9b17b586": "informational"
+    }
+  },
+  "heuristic_savings": {
+    "llm_calls_saved": 8,
+    "estimated_tokens_saved": 400,
+    "estimated_output_tokens_avoided": 16384,
+    "saved_percentage": 0.6
+  }
+}

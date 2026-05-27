@@ -1,0 +1,325 @@
+{
+  "run_id": "run-interactive-20260526-175142-Qwen3.5-4B-GGUF-f14bc7",
+  "timestamp": "2026-05-26T17:51:42.683479+00:00",
+  "model": "Qwen3.5-4B-GGUF",
+  "mbox_path": "",
+  "total_turns": 4,
+  "total_emails_affected": 10,
+  "total_tools_used": 4,
+  "tools_used": [
+    "triage_inbox",
+    "archive_message",
+    "add_star_batch",
+    "list_inbox"
+  ],
+  "total_duration_ms": 378578,
+  "total_input_tokens": 21086,
+  "total_output_tokens": 2955,
+  "total_reasoning_tokens": 0,
+  "total_tokens": 24041,
+  "avg_tokens_per_turn": 6010.2,
+  "avg_duration_per_turn_ms": 94644.0,
+  "avg_time_to_first_token_ms": 8748.0,
+  "avg_tokens_per_second": 19.4,
+  "heuristic_triaged": {
+    "42081833-0d3d-4736-96df-a7c886db7e95": "low priority",
+    "d6c38819-605f-4eda-aecf-ec12ed674cf8": "low priority"
+  },
+  "llm_triaged": {
+    "39dd601b-3529-46d7-9ba0-e1c3e415d117": "actionable",
+    "57032d00-466a-4eed-a78e-0be92c70a4b2": "informational",
+    "9c5eb694-6890-4765-85ae-3c950974122d": "informational",
+    "033e4369-680d-453c-91b7-130dac96c6e5": "actionable",
+    "76799a0e-ddb2-48d2-86de-61745bbce20f": "actionable",
+    "253f7071-3759-421a-9404-fee015867dcd": "actionable",
+    "7eb06431-2103-56e1-b817-e0cdc67481fd": "actionable",
+    "a5c5a0d4-b1f5-5948-b024-4c8780c3572a": "actionable"
+  },
+  "heuristic_only_count": 2,
+  "llm_escalated_count": 8,
+  "per_email_classification": [
+    {
+      "email_id": "42081833-0d3d-4736-96df-a7c886db7e95",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "d6c38819-605f-4eda-aecf-ec12ed674cf8",
+      "category": "low priority",
+      "confident": true,
+      "source": "heuristic"
+    },
+    {
+      "email_id": "39dd601b-3529-46d7-9ba0-e1c3e415d117",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "57032d00-466a-4eed-a78e-0be92c70a4b2",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "9c5eb694-6890-4765-85ae-3c950974122d",
+      "category": "informational",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "033e4369-680d-453c-91b7-130dac96c6e5",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "76799a0e-ddb2-48d2-86de-61745bbce20f",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "253f7071-3759-421a-9404-fee015867dcd",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "7eb06431-2103-56e1-b817-e0cdc67481fd",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    },
+    {
+      "email_id": "a5c5a0d4-b1f5-5948-b024-4c8780c3572a",
+      "category": "actionable",
+      "confident": false,
+      "source": "llm"
+    }
+  ],
+  "turns": [
+    {
+      "turn_number": 1,
+      "prompt": "Triage my inbox (10 emails)",
+      "step_results": [],
+      "tools_called": [
+        "triage_inbox"
+      ],
+      "emails_affected": [
+        "033e4369-680d-453c-91b7-130dac96c6e5",
+        "253f7071-3759-421a-9404-fee015867dcd",
+        "39dd601b-3529-46d7-9ba0-e1c3e415d117",
+        "42081833-0d3d-4736-96df-a7c886db7e95",
+        "57032d00-466a-4eed-a78e-0be92c70a4b2",
+        "76799a0e-ddb2-48d2-86de-61745bbce20f",
+        "7eb06431-2103-56e1-b817-e0cdc67481fd",
+        "9c5eb694-6890-4765-85ae-3c950974122d",
+        "a5c5a0d4-b1f5-5948-b024-4c8780c3572a",
+        "d6c38819-605f-4eda-aecf-ec12ed674cf8"
+      ],
+      "duration_ms": 109781,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "reasoning_tokens": 0,
+      "time_to_first_token_ms": 0.0,
+      "tokens_per_second": 0.0,
+      "total_tokens": 0,
+      "final_answer": "Triaged 10 emails: 2 heuristic-only, 8 LLM-processed",
+      "status": "ok",
+      "error": "",
+      "heuristic_email_count": 2,
+      "llm_email_count": 8
+    },
+    {
+      "turn_number": 2,
+      "prompt": "Archive the low priority emails",
+      "step_results": [
+        {
+          "step_number": 1,
+          "action": "llm_call",
+          "tool_name": "archive_message",
+          "input_tokens": 69,
+          "output_tokens": 345,
+          "reasoning_tokens": 0,
+          "total_tokens": 414,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 289.4,
+          "tokens_per_second": 19.7
+        },
+        {
+          "step_number": 2,
+          "action": "llm_call",
+          "tool_name": "archive_message",
+          "input_tokens": 213,
+          "output_tokens": 171,
+          "reasoning_tokens": 0,
+          "total_tokens": 384,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 491.6,
+          "tokens_per_second": 20.0
+        },
+        {
+          "step_number": 3,
+          "action": "llm_call",
+          "tool_name": "",
+          "input_tokens": 404,
+          "output_tokens": 320,
+          "reasoning_tokens": 0,
+          "total_tokens": 724,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 865.3,
+          "tokens_per_second": 19.7
+        }
+      ],
+      "tools_called": [
+        "archive_message"
+      ],
+      "emails_affected": [
+        "42081833-0d3d-4736-96df-a7c886db7e95",
+        "d6c38819-605f-4eda-aecf-ec12ed674cf8"
+      ],
+      "duration_ms": 88608,
+      "input_tokens": 686,
+      "output_tokens": 836,
+      "reasoning_tokens": 0,
+      "time_to_first_token_ms": 548.8,
+      "tokens_per_second": 19.8,
+      "total_tokens": 1522,
+      "final_answer": "All low priority emails have been successfully archived:\n\n1. ✅ Archived: \"Checking In: Your Grounded Rituals Experience\" from Liam Chen\n2. ✅ Archived: \"Quick Fix Available - Your Data Sync Issue\" from marcus.chen@techsolutions.com\n\nBoth messages were moved out of your INBOX and are now stored under their respective labels (likely PROMOTIONS based on Gmail's categorization).",
+      "status": "ok",
+      "error": "",
+      "heuristic_email_count": 2,
+      "llm_email_count": 8
+    },
+    {
+      "turn_number": 3,
+      "prompt": "Star any urgent or actionable messages",
+      "step_results": [
+        {
+          "step_number": 1,
+          "action": "llm_call",
+          "tool_name": "add_star_batch",
+          "input_tokens": 437,
+          "output_tokens": 616,
+          "reasoning_tokens": 0,
+          "total_tokens": 1053,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 972.5,
+          "tokens_per_second": 19.8
+        },
+        {
+          "step_number": 2,
+          "action": "llm_call",
+          "tool_name": "",
+          "input_tokens": 786,
+          "output_tokens": 940,
+          "reasoning_tokens": 0,
+          "total_tokens": 1726,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 1627.9,
+          "tokens_per_second": 19.8
+        }
+      ],
+      "tools_called": [
+        "add_star_batch"
+      ],
+      "emails_affected": [
+        "033e4369-680d-453c-91b7-130dac96c6e5",
+        "253f7071-3759-421a-9404-fee015867dcd",
+        "39dd601b-3529-46d7-9ba0-e1c3e415d117",
+        "76799a0e-ddb2-48d2-86de-61745bbce20f",
+        "7eb06431-2103-56e1-b817-e0cdc67481fd",
+        "a5c5a0d4-b1f5-5948-b024-4c8780c3572a"
+      ],
+      "duration_ms": 89937,
+      "input_tokens": 1223,
+      "output_tokens": 1556,
+      "reasoning_tokens": 0,
+      "time_to_first_token_ms": 1300.2,
+      "tokens_per_second": 19.8,
+      "total_tokens": 2779,
+      "final_answer": "[Tool result: add_star_batch] {\"ok\": true, \"data\": {\"batch_id\": \"c2a9ec26f9ac440aa3aef0e2ed5c2ce9\", \"total\": 6, \"succeeded\": [{\"message_id\": \"39dd601b-3529-46d7-9ba0-e1c3e415d117\", \"action_id\": \"e8277ec15a4e486493b93e44aa6e3a0d\"}, {\"message_id\": \"033e4369-680d-453c-91b7-130dac96c6e5\", \"action_id\": \"b86baee8334047658a7c83a404e1af37\"}, {\"message_id\": \"76799a0e-ddb2-48d2-86de-61745bbce20f\", \"action_id\": \"5adaaa3532d6423380b6d38fda4a2bba\"}, {\"message_id\": \"253f7071-3759-421a-9404-fee015867dcd\", \"act",
+      "status": "ok",
+      "error": "",
+      "heuristic_email_count": 2,
+      "llm_email_count": 8
+    },
+    {
+      "turn_number": 4,
+      "prompt": "Show me a summary of what's left in my inbox",
+      "step_results": [
+        {
+          "step_number": 1,
+          "action": "llm_call",
+          "tool_name": "list_inbox",
+          "input_tokens": 1269,
+          "output_tokens": 54,
+          "reasoning_tokens": 0,
+          "total_tokens": 1323,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 2703.5,
+          "tokens_per_second": 20.0
+        },
+        {
+          "step_number": 2,
+          "action": "llm_call",
+          "tool_name": "",
+          "input_tokens": 17908,
+          "output_tokens": 509,
+          "reasoning_tokens": 0,
+          "total_tokens": 18417,
+          "duration_ms": 0,
+          "time_to_first_token_ms": 46086.7,
+          "tokens_per_second": 17.0
+        }
+      ],
+      "tools_called": [
+        "list_inbox"
+      ],
+      "emails_affected": [],
+      "duration_ms": 90250,
+      "input_tokens": 19177,
+      "output_tokens": 563,
+      "reasoning_tokens": 0,
+      "time_to_first_token_ms": 24395.1,
+      "tokens_per_second": 18.5,
+      "total_tokens": 19740,
+      "final_answer": "[Tool result: list_inbox] {\"ok\": true, \"data\": {\"messages\": [{\"id\": \"39dd601b-3529-46d7-9ba0-e1c3e415d117\", \"thread_id\": \"c9750c54ebd0c5b8\", \"subject\": \"Re: Handoff: Q3 Marketing Analytics Dashboard\", \"from\": \"Anya Sharma <a.sharma@bluecometdata.com>\", ...}, {\"id\": \"57032d00-466a-4eed-a78e-0be92c70a4b2\", \"thread_id\": \"8bb2332cda85caeb\", \"subject\": \"URGENT: Q3 Budget Allocation - Decision Required by 4PM Today\", ...}, {\"id\": \"9c5eb694-6890-4765-85ae-3c950974122d\", \"thread_id\": \"141b515ce7d3d31f\",",
+      "status": "ok",
+      "error": "",
+      "heuristic_email_count": 2,
+      "llm_email_count": 8
+    }
+  ],
+  "session_state": {
+    "archived": [
+      "42081833-0d3d-4736-96df-a7c886db7e95",
+      "d6c38819-605f-4eda-aecf-ec12ed674cf8"
+    ],
+    "starred": [],
+    "drafted": [],
+    "sent": [],
+    "marked_read": [],
+    "deleted": [],
+    "triaged": {
+      "39dd601b-3529-46d7-9ba0-e1c3e415d117": "actionable",
+      "42081833-0d3d-4736-96df-a7c886db7e95": "low priority",
+      "d6c38819-605f-4eda-aecf-ec12ed674cf8": "low priority",
+      "57032d00-466a-4eed-a78e-0be92c70a4b2": "informational",
+      "9c5eb694-6890-4765-85ae-3c950974122d": "informational",
+      "033e4369-680d-453c-91b7-130dac96c6e5": "actionable",
+      "76799a0e-ddb2-48d2-86de-61745bbce20f": "actionable",
+      "253f7071-3759-421a-9404-fee015867dcd": "actionable",
+      "7eb06431-2103-56e1-b817-e0cdc67481fd": "actionable",
+      "a5c5a0d4-b1f5-5948-b024-4c8780c3572a": "actionable"
+    }
+  },
+  "heuristic_savings": {
+    "llm_calls_saved": 2,
+    "estimated_tokens_saved": 100,
+    "estimated_output_tokens_avoided": 4096,
+    "saved_percentage": 0.4
+  }
+}
