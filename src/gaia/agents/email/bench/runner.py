@@ -1092,6 +1092,8 @@ def run_interactive_benchmark(
             if tool not in all_tools:
                 all_tools.append(tool)
 
+    emails_in_initial_triage = len(turns[0].emails_affected) if turns else 0
+
     summary = {
         "run_id": run_id,
         "timestamp": timestamp,
@@ -1101,6 +1103,7 @@ def run_interactive_benchmark(
         "data_source": "jsonl" if jsonl_path else "mbox",
         "turns": turns,
         "total_turns": len(turns),
+        "emails_in_initial_triage": emails_in_initial_triage,
         "total_emails_affected": len(all_emails),
         "total_tools_used": len(all_tools),
         "tools_used": all_tools,
@@ -1133,7 +1136,8 @@ def run_interactive_benchmark(
         f"  Avg/turn:  {summary['avg_tokens_per_turn']} tokens, {summary['avg_duration_per_turn_ms']}ms"
     )
     print(f"  Tools:     {', '.join(all_tools)}")
-    print(f"  Emails:    {len(all_emails)} unique emails affected")
+    print(f"  Emails:    {len(all_emails)} unique emails affected"
+          f" (initial triage: {emails_in_initial_triage})")
     if h_count or l_count:
         print(f"  Heuristic: {h_count} emails (confident)")
         print(f"  LLM:       {l_count} emails (non-confident)")
@@ -1550,6 +1554,8 @@ def run_interactive_session(
             if tool not in all_tools:
                 all_tools.append(tool)
 
+    emails_in_initial_triage = len(turns[0].emails_affected) if turns else 0
+
     print(f"\n{'='*70}")
     print(f"  Interactive Session — Final Summary")
     print(f"{'='*70}")
@@ -1562,7 +1568,8 @@ def run_interactive_session(
     print(f"    Output:   {total_output:,}")
     print(f"    Reasoning: {total_reasoning:,}")
     print(f"  Tools:     {', '.join(all_tools) if all_tools else '(none)'}")
-    print(f"  Emails:    {len(all_emails)} unique emails affected")
+    print(f"  Emails:    {len(all_emails)} unique emails affected"
+          f" (initial triage: {emails_in_initial_triage})")
     # Smart-mode breakdown in final summary.
     h_count = len(state.heuristic_triaged)
     l_count = len(state.llm_triaged)
@@ -1607,6 +1614,7 @@ def run_interactive_session(
         "mode": "interactive",
         "turns": turns,
         "total_turns": len(turns),
+        "emails_in_initial_triage": emails_in_initial_triage,
         "total_emails_affected": len(all_emails),
         "total_tools_used": len(all_tools),
         "tools_used": all_tools,

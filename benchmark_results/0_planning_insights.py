@@ -121,6 +121,7 @@ def load_all_runs(
         runs.append({
             "model": data.get("model", "unknown"),
             "emails": data.get("total_emails_affected", 0),
+            "emails_in_initial_triage": data.get("emails_in_initial_triage", 0),
             "planning_calls": total_planning,
             "tool_exec_calls": total_tool_exec,
             "total_llm_calls": total_steps,
@@ -192,6 +193,7 @@ def load_all_runs(
             runs.append({
                 "model": data.get("model", "unknown"),
                 "emails": data.get("total_emails_affected", 0),
+                "emails_in_initial_triage": data.get("emails_in_initial_triage", 0),
                 "planning_calls": total_planning,
                 "tool_exec_calls": total_tool_exec,
                 "total_llm_calls": total_steps,
@@ -216,6 +218,7 @@ def load_all_runs(
             runs.append({
                 "model": data.get("model", "unknown"),
                 "emails": data.get("total_emails", 0),
+                "emails_in_initial_triage": data.get("emails_in_initial_triage", 0),
                 "planning_calls": counts["planning"],
                 "tool_exec_calls": counts["tool_execution"],
                 "total_llm_calls": counts["total"],
