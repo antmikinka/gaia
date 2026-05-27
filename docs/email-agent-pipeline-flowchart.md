@@ -118,15 +118,26 @@ The primary benchmark execution path. Covered in detail in Sections 3-14.
 
 ### clawflow → `clawflow_runner.main()`
 
+**File:** `src/gaia/agents/email/bench/clawflow_runner.py`
+
 Alternative benchmark using ClawFlow workflow engine. Outputs `clawflow_results.json`. Optional workflow parameter (default: `inbox-zero-helper`).
 
 ### report → `report_generator.main()`
 
-Post-hoc analysis of existing benchmark data. Generates:
+**File:** `src/gaia/agents/email/bench/report_generator.py`
+
+Post-hoc analysis of existing benchmark data. Depends on:
+- `output.py` — `load_jsonl()`, `save_csv()`, `save_json()`, `save_jsonl()`
+- `variance.py` — `compare_runs()`, `compare_runs_by_model()` for statistical variance
+- `visualize.py` — `generate_charts()` for PNG visualizations
+
+Generates:
 - `report.csv` — unified table
 - `variance.json` — statistical variance
 - `statistical_tests.json` — Mann-Whitney U, Cliff's delta, bootstrap CI
 - `framework_comparison.json` — GAIA vs ClawFlow (if present)
+- `quality.json` — classification accuracy vs ground truth (`_compute_quality()` from `output.py`)
+- `cost` estimates — `_compute_cost()` from `output.py` using input/output token pricing
 - `charts/` — PNG visualizations
 
 ---
@@ -516,7 +527,10 @@ Post-hoc analysis of existing benchmark data. Generates:
 │                                                                 │
 │  FOR each email_info IN batch:                                  │
 │    full_msg = get_message_impl(self._gmail, email_id)           │
-│    body = full_msg["body"] (strip delimiter wrappers)           │
+│    body = full_msg["body"]                                      │
+│      .replace("<<<UNTRUSTED_EMAIL_BODY_START>>>\n", "")        │
+│      .replace("\n<<<UNTRUSTED_EMAIL_BODY_END>>>", "")          │
+│    ──▶ Strips delimiters from body before embedding in prompt   │
 │    email_payloads.append({id, thread_id, subject, sender, body})│
 │                                                                 │
 │  ┌──────────────────────────────────────────────────────────┐  │
@@ -538,6 +552,7 @@ Post-hoc analysis of existing benchmark data. Generates:
 │                                                                 │
 │  System prompt: "You are an email classification assistant..."  │
 │  [+ SMART TRIAGE MODE preamble if smart mode enabled]           │
+│  ──▶ References <<<UNTRUSTED_EMAIL*>>> delimiters as DATA guard │
 │                                                                 │
 │  LLM call:                                                      │
 │    self.chat.send_messages(                                     │
@@ -556,6 +571,8 @@ Post-hoc analysis of existing benchmark data. Generates:
 │  FOR each ep IN email_payloads:                                 │
 │    result = results_by_id.get(ep["id"], {})                     │
 │    category = result.get("category", "informational")           │
+│    ──▶ Category validation: if category not in ALL_CATEGORIES,  │
+│        default to "informational" (prevents LLM hallucination)  │
 │    confident = result.get("confident", False)                   │
 │    llm_summary = result.get("summary", "")                      │
 │    record_triage_result(self, run_id, batch_number, ...)        │
@@ -567,10 +584,13 @@ Post-hoc analysis of existing benchmark data. Generates:
 ### Batch Mode Characteristics
 
 - **Every email gets LLM classification** (no heuristic skip in pure batched mode)
+- **Heuristic pre-filter**: `triage_inbox_impl` runs heuristic classification first to build the email list, but results are forwarded to LLM batches (not discarded) — the heuristics serve as data collection, not classification bypass
 - **One LLM call per batch** (not per email)
 - **Full message bodies** sent to LLM (no truncation)
 - **batch_size** controls how many emails per LLM call
 - **Batch boundary risk**: related emails in same thread may land in different batches (Risk 8 in code comments)
+- **Delimiter stripping**: `_process_single_batch()` strips `<<<UNTRUSTED_EMAIL_BODY_START>>>` / `<<<UNTRUSTED_EMAIL_BODY_END>>>` wrapper delimiters from body before embedding in LLM prompt — the system prompt references these delimiters as a DATA guard, but the actual bodies sent to the LLM have them removed
+- **Category validation**: LLM-returned categories are validated against `ALL_CATEGORIES`; unknown categories default to `"informational"`
 
 ---
 
@@ -639,6 +659,49 @@ def _should_use_llm(self, email_id: str) -> bool:
     if entry.get("confident", False): return False  # Heuristic confident → skip
     return True                                   # Non-confident → use LLM
 ```
+
+### Smart Mode Gate: `mark_for_escalation()` Three-Path Logic
+
+The `mark_for_escalation()` function (in `runner.py`) handles reclassification requests in interactive smart mode via three distinct paths:
+
+1. **Path A — Heuristic-triaged email** (`email_id in state.heuristic_triaged`):
+   - Pops entry from `state.heuristic_triaged` and moves it to `state.llm_triaged`
+   - Sets `force_llm_ids[email_id] = "user-requested"` AND `agent.config.force_llm_ids[email_id] = "user-requested"`
+   - Effect: next triage will use LLM (the `force_llm` check in `_should_use_llm()` catches this)
+
+2. **Path B — Already LLM-triaged email** (`email_id in state.triaged_emails`):
+   - Only sets `force_llm_ids` on both state and config
+   - Does NOT move between partitions (already in LLM path)
+   - Effect: marks for user-requested LLM review
+
+3. **Path C — Email not found**:
+   - Returns "Email not found in triaged results"
+   - No state modification
+
+**How `force_llm_ids` bridges into `_should_use_llm()`:**
+- `mark_for_escalation()` writes to `state.force_llm_ids` and `agent.config.force_llm_ids`
+- The interactive runner calls `agent.sync_smart_triage_cache(heuristic_ids=state.heuristic_triaged, llm_ids=state.llm_triaged)` after each turn
+- `sync_smart_triage_cache()` populates `agent._smart_triaged_cache` with `confident=False` for LLM-triaged emails
+- `_should_use_llm()` reads `entry.get("confident", False)` from the cache — emails moved to `llm_triaged` get `confident=False` entries, so `_should_use_llm()` returns True for them
+- The per-email `force_llm_ids` dict is consumed by `triage_inbox_impl` (not by `_should_use_llm()`) on subsequent triage runs to skip heuristics for those emails
+
+### Result Shape Normalization: `_normalize_agent_result()`
+
+`process_smart_triage` returns a JSON string (`{"ok": ..., "data": {...}}`), while `process_query` and `process_interactive_smart_triage` return dicts directly. The `_normalize_agent_result()` helper (in `runner.py`) handles both:
+
+```python
+def _normalize_agent_result(agent_result: object) -> dict:
+    if isinstance(agent_result, str):
+        parsed = json.loads(agent_result)
+        if parsed.get("ok") and "data" in parsed:
+            return parsed["data"]  # Unwrap smart triage envelope
+        return parsed
+    if isinstance(agent_result, dict):
+        return agent_result
+    raise TypeError(...)
+```
+
+This ensures downstream extraction code always receives a dict (Risk 5 mitigation in code comments).
 
 ### Smart Mode Characteristics
 
@@ -757,6 +820,94 @@ def _is_triage_prompt(prompt: str) -> bool:
 "archive the low priority emails" (has target "emails" but no triage verb) or
 "classify these documents" (has verb but no email target).
 
+### `process_interactive_smart_triage()` — 5-Step Flow
+
+**File:** `src/gaia/agents/email/agent.py` → `process_interactive_smart_triage()`
+
+Called by `run_interactive_benchmark()` and `run_interactive_session()` on turn 1 when smart mode is enabled and the prompt matches `_is_triage_prompt()`. Five distinct steps:
+
+```
+Step 1: Heuristic Triage (0 LLM tokens)
+  ──▶ triage_inbox_impl(self._gmail, max_messages, force_llm, force_llm_ids)
+  ──▶ Returns {"results": [email_info, ...], "grouped": {}}
+  ──✅ Zero LLM cost; uses only Gmail labels + subject/sender patterns
+
+Step 2: Partition into Confident vs. Non-Confident
+  ──▶ confident_emails = [e for e in all_emails if e.get("confident")]
+  ──▶ needs_llm_raw = [e for e in all_emails if not e.get("confident")]
+
+Step 3: Cache Confident Emails (Heuristic-Only)
+  ──▶ FOR each: self._smart_triaged_cache[id] = {category, confident=True, source="heuristic"}
+  ──▶ record_triage_result() with batch_number=0, token_count=0
+  ──✅ Persisted to SQLite via action_store for later retrieval
+
+Step 4: Respect _should_use_llm() for Non-Confident Emails
+  ──▶ FOR each in needs_llm_raw:
+        if NOT _should_use_llm(id):
+          ──▶ Already classified in prior turn; cache as heuristic
+          ──▶ record_triage_result() with batch_number=0, token_count=0
+        else:
+          ──▶ needs_llm.append(email_info)  # truly needs LLM
+  ──✅ Cross-turn dedup: emails from prior sessions skip re-triage
+
+Step 5: LLM Batch Pipeline for Uncertain Emails
+  ──▶ batches = chunk(needs_llm, batch_size)
+  ──▶ FOR batch_idx, batch IN enumerate(batches, start=1):
+        self._process_single_batch(batch, batch_number=batch_idx, run_id=run_id)
+  ──✅ Same _process_single_batch() as batched/smart modes
+
+Result: Returns structured dict with "conversation" (tool message with triage data),
+  "result" (summary string), "input_tokens", "output_tokens", "total_tokens" (all 0 for heuristic).
+```
+
+### `_sync_session_state_from_smart_result()`
+
+**File:** `runner.py` → `_sync_session_state_from_smart_result()`
+
+Called immediately after `process_interactive_smart_triage()` returns. Populates `SessionState` from the smart triage result dict:
+
+```
+Reads triage results from agent_result["conversation"][0]["content"]:
+  ──▶ JSON envelope: {"ok": true, "data": {"results": [...]}}
+  ──▶ FOR each item in results:
+        eid = item["id"]
+        cat = item.get("category", "unknown")
+        confident = item.get("confident", False)
+
+        state.triaged_emails[eid] = cat
+        if confident:
+          if eid NOT in state.heuristic_triaged:
+            state.llm_calls_saved += 1
+            state.heuristic_token_estimate += 50  # rough per-email estimate
+          state.heuristic_triaged[eid] = cat
+        else:
+          state.llm_triaged[eid] = cat
+```
+
+This bridges the agent's internal triage results into the runner's SessionState so cost tracking (llm_calls_saved, heuristic_token_estimate) and partition tracking (heuristic_triaged vs llm_triaged) stay synchronized.
+
+### `generate_interactive_smart_summary()`
+
+**File:** `runner.py` → `generate_interactive_smart_summary()`
+
+Called at the end of `run_interactive_benchmark()` and `run_interactive_session()` when smart mode is enabled. Augments the base summary dict with smart-mode keys:
+
+```
+Adds to base_summary (preserves all 24 original keys):
+  - "heuristic_triaged": dict(state.heuristic_triaged)
+  - "llm_triaged": dict(state.llm_triaged)
+  - "heuristic_only_count": len(state.heuristic_triaged)
+  - "llm_escalated_count": len(state.llm_triaged)
+  - "heuristic_savings": {
+      "llm_calls_saved": state.llm_calls_saved,
+      "estimated_tokens_saved": state.heuristic_token_estimate,
+      "estimated_output_tokens_avoided": h_count * 2048,
+      "saved_percentage": round(heuristic_est / (heuristic_est + total_tokens) * 100, 1)
+    }
+```
+
+When smart mode is disabled, the runner adds equivalent keys directly (without the `saved_percentage` and `estimated_output_tokens_avoided` fields).
+
 ---
 
 ## 10. Interactive Session Mode — User-Driven
@@ -860,6 +1011,35 @@ compact_context(conversation, max_chars=5000):
   │    truncated. Only body content is shortened.    │
   └──────────────────────────────────────────────────┘
 ```
+
+### Interactive Mode JSON Output
+
+Both `run_interactive_benchmark()` and `run_interactive_session()` return a summary dict that the CLI (`bench_runner.main()`) serializes to JSON:
+
+```
+Output file: interactive_{model_slug}_{run_id}.json
+  ──▶ Saved via json.dump(summary, path) with indent=2
+  ──▶ model_slug = model_id.replace('/', '-').lower().replace(' ', '_')
+  ──▶ run_id embedded in filename for lineage tracking
+
+Summary dict contains:
+  - 24 base keys: run_id, timestamp, model, turns, total_turns, tokens, etc.
+  - Smart-mode keys (if enabled): heuristic_triaged, llm_triaged,
+    heuristic_only_count, llm_escalated_count, heuristic_savings
+  - Session state (run_interactive_session only): archived, starred,
+    drafted, sent, marked_read, deleted, triaged (as serializable dicts/sets)
+
+Also written to _manifest.json:
+  - Entry with mode="interactive", output_files list, total_turns,
+    emails_in_initial_triage, total_emails_affected, heuristic/LLM counts
+```
+
+### Tool Hard Cap
+
+All read tools enforce a hard cap of 100 messages:
+- `triage_inbox`, `list_inbox`, `search_messages` — all cap at `max_results=100`
+- This prevents unbounded LLM context growth regardless of `--limit` CLI value
+- The `FakeGmailBackend._messages` dict loads the entire corpus into memory, but tool methods enforce the cap on returned results
 
 ---
 
@@ -1038,15 +1218,34 @@ record_triage_result(agent, triage_id, run_id, batch_number,
 
 ## 13. Result Extraction Pipeline
 
-### From Agent Result to RunResult
+### Central Hub: `extract_from_agent_result()`
 
-**File:** `runner.py` → `extract_from_agent_result()` (imported from `trace_extractor.py`)
+**File:** `src/gaia/agents/email/bench/trace_extractor.py` → `extract_from_agent_result()`
 
-### Three Extraction Functions
+This is the central extraction function that converts raw `process_query()` result dicts into structured `RunResult` objects. Both the benchmark path (`_run_full_agent()`) and the CLI trace path (`extract_from_trace_json()`) flow through this function.
+
+```
+extract_from_agent_result(agent_result, run_id, timestamp, model_id, mode, ...):
+  1. Extract aggregated tokens: input_tokens, output_tokens, total_tokens
+  2. Extract per-step stats: _extract_step_stats(conversation) → [StepResult], reasoning_total
+  3. Extract triage results: _find_triage_results(conversation) → [triage_items], tool_error
+  4. On tool_error with no triage results → return error RunResult
+  5. Build EmailResult per triage item:
+       email_id=item["id"], subject, sender, category, is_spam, is_phishing,
+       confident, reason=item["rationale"]
+  6. Build BatchResult wrapping all EmailResults
+  7. Compute avg TTFT and TPS across steps
+  8. Return RunResult with: batch_results, step_results, category_counts,
+     total_emails, total_tokens, avg_time_to_first_token_ms, avg_tokens_per_second
+```
+
+Also supports post-hoc tracing via `extract_from_trace_json(trace_path, ...)` which loads a `--trace` JSON file and delegates to `extract_from_agent_result()`.
+
+### Helper Functions in `trace_extractor.py`
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│              _extract_steps_from_result()                      │
+│              _extract_step_stats() (internal)                  │
 │                                                               │
 │  Scans agent_result["conversation"] for stats messages:       │
 │    role == "system" AND content["type"] == "stats"           │
@@ -1062,10 +1261,44 @@ record_triage_result(agent, triage_id, run_id, batch_number,
 │    - Set from msg["name"] on role=="tool"                     │
 │    - So each stats message inherits the tool_name of the      │
 │      preceding tool result (or "" for planning/reasoning)     │
+│                                                               │
+│  Also extracts reasoning tokens from assistant messages:      │
+│    _extract_reasoning_tokens(assistant_text)                  │
+│    ──▶ Counts chars in <thinking>...</thinking> blocks       │
+│    ──▶ Uses 1 token ≈ 4 char BPE estimate                     │
+│    ──▶ Returns max(1, total_chars // 4) or 0 if no blocks    │
 └───────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────┐
-│              _extract_tools_called()                           │
+│              _extract_reasoning_tokens() (internal)            │
+│                                                               │
+│  Estimates reasoning tokens from <thinking> blocks.           │
+│  The Lemonade /stats endpoint does not report reasoning       │
+│  tokens separately, so this approximates via:                 │
+│    1. re.findall(r"<thinking>(.*?)</thinking>", text, DOTALL) │
+│    2. Sum stripped char lengths of all blocks                 │
+│    3. Return max(1, total_chars // 4)  (BPE estimate)        │
+│    4. Return 0 if no thinking blocks found                    │
+└───────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────┐
+│              _last_assistant_text() (internal)                 │
+│                                                               │
+│  Finds the last assistant message before a system stats msg.  │
+│  Used to extract text for reasoning token estimation.         │
+│  Handles content as str or list[dict] (content blocks).       │
+└───────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────┐
+│              _find_triage_results() (internal)                 │
+│                                                               │
+│  Walks conversation to find triage_inbox tool results.        │
+│  Returns (triage_results_list, tool_error_string).            │
+│  Handles content as str, list[dict], or dict.                 │
+└───────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────┐
+│              _extract_tools_called() (in runner.py)            │
 │                                                               │
 │  Scans conversation for tool usage:                           │
 │    role == "assistant" AND content["tool"]                    │
@@ -1074,7 +1307,7 @@ record_triage_result(agent, triage_id, run_id, batch_number,
 └───────────────────────────────────────────────────────────────┘
 
 ┌───────────────────────────────────────────────────────────────┐
-│              _extract_emails_affected()                        │
+│              _extract_emails_affected() (in runner.py)         │
 │                                                               │
 │  Scans tool result messages (role == "tool"):                 │
 │    content can be: str, list[dict], or dict                   │
@@ -1252,6 +1485,139 @@ _manifest.json — append-only array of entries:
 }
 ```
 
+### Output Module: `output.py`
+
+**File:** `src/gaia/agents/email/bench/output.py`
+
+The `output.py` module handles all serialization formats:
+
+| Function | Output | Description |
+|----------|--------|-------------|
+| `to_csv(run)` | CSV text | Per-email rows + summary row; matches openclaw-eval column layout (39 columns) |
+| `save_csv(run, path)` | CSV file | Writes CSV to disk |
+| `to_json(run)` | JSON text | Per-run detail with nested batch/email results |
+| `save_json(run, path)` | JSON file | Writes JSON to disk |
+| `save_jsonl(run, path)` | JSONL file | Append-only; used for multi-iteration runs |
+| `load_jsonl(path)` | list[dict] | Reads all results from JSONL |
+| `print_summary(run)` | stdout | Human-readable console output |
+| `to_summary_csv(run)` | CSV text | Spreadsheet format matching "Email Triage Bench.csv" layout |
+| `save_summary_csv(run, path)` | CSV file | Summary spreadsheet with cost/quality metrics |
+| `map_category(cat, target)` | str | Translates between GAIA and openclaw taxonomies |
+
+### CSV Output Detail
+
+CSV columns match the openclaw-eval layout with GAIA-specific extensions:
+
+```
+Core columns: run_id, timestamp, model, source_framework, provider, mbox_path,
+  turn_number, turn_type, role, input_text, output_text, tool_name,
+  tool_input, tool_output, turn_input_tokens, turn_output_tokens,
+  turn_reasoning_tokens, cumulative_input_tokens, cumulative_output_tokens,
+  cumulative_reasoning_tokens, total_input_tokens, total_output_tokens,
+  total_reasoning_tokens, total_tokens, total_steps, total_duration_ms,
+  emails_fetched, categories_assigned, final_response, run_status,
+  batch_number, batch_size, batch_total_batches
+
+GAIA extensions: email_id, subject, sender, gaia_category, openclaw_category,
+  is_spam, is_phishing, confident, reason, error, duration_per_email_ms
+
+One row per email + one SUMMARY row at the end.
+```
+
+### Console Output: `print_summary()`
+
+```
+======================================================================
+  GAIA Email Triage Benchmark — {MODE} mode
+======================================================================
+  Run ID:       {run_id}
+  Model:        {model}
+  Provider:     {provider}
+  MBOX:         {mbox_path}
+  Emails:       {total_emails}
+  Duration:     {duration}s
+  Avg/email:    {avg_ms}ms
+  [Smart mode: Heuristic: N emails (zero LLM cost), LLM: M emails]
+  Total tokens: {total:,}
+    Input:      {input:,}
+    Output:     {output:,}
+    Reasoning:  {reasoning:,}
+  [Per-Step Token Breakdown table (full mode)]
+  [Performance: Avg TTFT, Avg TPS]
+  Status:       {status}
+
+  Category Distribution:
+    urgent       (URGENT        ):    3 (3.0%)
+    actionable   (NEEDS_RESPONSE):   12 (12.0%)
+    informational(FYI            ):   55 (55.0%)
+    low priority (PROMOTIONAL   ):   30 (30.0%)
+======================================================================
+```
+
+### Quality and Cost Computation
+
+**File:** `output.py` → `_compute_quality()` and `_compute_cost()`
+
+```
+_compute_quality(run, ground_truth):
+  ──▶ Returns score 0.0-1.0 based on category agreement
+  ──▶ Compares email.category against ground_truth[email_id]["category"]
+  ──▶ correct / max(total_matched, 1), rounded to 4 decimal places
+  ──▶ Returns 0.0 if no ground truth or no emails
+
+_compute_cost(run, cost_per_1m_input, cost_per_1m_output):
+  ──▶ input_cost = total_input_tokens * cost_per_1m_input / 1_000_000
+  ──▶ output_cost = total_output_tokens * cost_per_1m_output / 1_000_000
+  ──▶ Default: $0.00 for Lemonade local models
+  ──▶ Override via --cost-per-1m-tokens for paid APIs
+```
+
+### Data Shapes: `data_shapes.py` Dataclass Fields
+
+**File:** `src/gaia/agents/email/bench/data_shapes.py`
+
+```
+StepResult:
+  step_number, action ("llm_call"|"planning"|"final_answer"), tool_name,
+  input_tokens, output_tokens, reasoning_tokens, total_tokens,
+  duration_ms, time_to_first_token_ms (TTFT), tokens_per_second (TPS),
+  status ("ok")
+
+TurnResult:
+  turn_number, prompt, step_results[], tools_called[], emails_affected[],
+  duration_ms, input_tokens, output_tokens, reasoning_tokens, total_tokens,
+  time_to_first_token_ms, tokens_per_second, final_answer, status, error,
+  heuristic_email_count, llm_email_count, context_compacted, gate_decisions[]
+
+EmailResult:
+  email_id, subject, sender, label_ids[], category, is_spam, is_phishing,
+  confident, reason, llm_summary, duration_ms, input_tokens, output_tokens,
+  reasoning_tokens, total_tokens, time_to_first_token_ms, tokens_per_second,
+  status, error
+
+SessionState:
+  archived{}, starred{}, drafted{}, sent{}, marked_read{}, deleted{},
+  triaged_emails{id: category}, heuristic_triaged{id: category},
+  llm_triaged{id: category}, force_llm_ids{id: reason},
+  llm_calls_saved, heuristic_token_estimate
+
+BatchResult:
+  batch_number, batch_size, total_batches, email_results[],
+  duration_ms, total_input_tokens, total_output_tokens, total_reasoning_tokens,
+  total_tokens, avg_time_to_first_token_ms, avg_tokens_per_second,
+  categories[], status, error
+
+RunResult:
+  run_id, timestamp, model, provider, mbox_path, jsonl_path,
+  data_source ("mbox"|"jsonl"), mode ("heuristic"|"full"|"batched"|"smart"),
+  batch_results[], step_results[], total_emails, total_duration_ms,
+  total_input_tokens, total_output_tokens, total_reasoning_tokens,
+  total_tokens, avg_time_to_first_token_ms, avg_tokens_per_second,
+  category_counts{cat: count}, status, error,
+  is_cold_start, source_framework ("gaia"), estimated_steps,
+  heuristic_only_count, llm_processed_count
+```
+
 ---
 
 ## 15. Report Generation
@@ -1309,17 +1675,55 @@ _manifest.json — append-only array of entries:
 │                                                                 │
 │  9. Generate charts (if --charts):                             │
 │     ┌──────────────────────────────────────────────────────┐   │
-│     │ charts-{run_suffix}/                                 │   │
-│     │   01_token_efficiency.png    (bar: tokens per email) │   │
-│     │   02_duration_breakdown.png  (bar: ms per email)     │   │
-│     │   03_category_distribution.png (stacked bar)         │   │
-│     │   04_step_analysis.png       (timeline per step)     │   │
-│     │   05_tool_usage.png          (bar: tool call counts)  │   │
-│     │   06_model_comparison.png    (multi-model bar)       │   │
-│     │   07_cost_comparison.png     (bar: estimated cost)   │   │
-│     │   08_accuracy_vs_cost.png    (scatter)               │   │
-│     │   09_framework_comparison.png (GAIA vs ClawFlow)     │   │
-│     │   10_smart_mode_efficiency.png (heuristic vs LLM)    │   │
+│     │ benchmark_charts-{run_suffix}/ (or plain benchmark_  │   │
+│     │   charts/ if no run_id extractable)                   │   │
+│     │                                                       │   │
+│     │ ALWAYS (single run available):                        │   │
+│     │   Chart  1: category_distribution.png                 │   │
+│     │   Chart  4: email_duration_histogram.png              │   │
+│     │   Chart  9: token_duration_scatter.png                │   │
+│     │   Chart  15: heuristic_vs_llm_escalation.png          │   │
+│     │                                                       │   │
+│     │ FULL/INTERACTIVE mode only:                           │   │
+│     │   Chart  2: token_composition.png (donut)             │   │
+│     │   Chart  3: duration_vs_tokens.png                    │   │
+│     │   Chart 10: step_performance.png (TTFT & TPS)         │   │
+│     │                                                       │   │
+│     │ VARIANCE (>= 2 runs in JSONL):                        │   │
+│     │   Chart  5: variance_trend_*.png (input/output/total  │   │
+│     │              tokens, duration — 4 separate charts)    │   │
+│     │   Chart  8: category_stability.png                    │   │
+│     │                                                       │   │
+│     │ INTERACTIVE mode:                                     │   │
+│     │   Chart  6: interactive_turns.png                     │   │
+│     │   Chart  7: interactive_token_heatmap.png             │   │
+│     │   Chart 27: interactive_llm_activity.png              │   │
+│     │   Chart I2: interactive_context_growth.png            │   │
+│     │   Chart I3: interactive_tool_calls.png                │   │
+│     │                                                       │   │
+│     │ MULTI-MODEL (>= 2 runs):                              │   │
+│     │   Chart 11: model_duration_comparison.png             │   │
+│     │   Chart 12: model_token_cost.png                      │   │
+│     │   Chart 13: ttft_comparison.png                       │   │
+│     │   Chart 14: tps_comparison.png                        │   │
+│     │   Chart 17: per_model_variance_trend.png              │   │
+│     │   Chart 18: cold_start_impact.png                     │   │
+│     │   Chart 22: run_scatter.png                           │   │
+│     │   Chart 24: planning_steps_heatmap.png                │   │
+│     │   Chart 25: token_efficiency.png                      │   │
+│     │   Chart 26: latency_heuristic_scatter.png             │   │
+│     │   Chart 28: model_performance_radar.png               │   │
+│     │   Chart 29: steps_scaling_heatmap.png                 │   │
+│     │   Chart 27 (batched): batched_llm_activity.png        │   │
+│     │                                                       │   │
+│     │ FRAMEWORK COMPARISON (ClawFlow present):              │   │
+│     │   Chart 15: framework_category_comparison.png         │   │
+│     │   Chart 16: architecture_radar.png                    │   │
+│     │   Chart 19: model_architecture_duration.png           │   │
+│     │   Chart 20: model_architecture_tokens.png             │   │
+│     │   Chart 21: architecture_dashboard.png (4-panel)      │   │
+│     │                                                       │   │
+│     │ AUTO-GENERATED: CHARTS.md index with descriptions     │   │
 │     └──────────────────────────────────────────────────────┘   │
 │                                                                 │
 │  10. Write report generation entry to _manifest.json           │
@@ -1328,9 +1732,43 @@ _manifest.json — append-only array of entries:
 └────────────────────────────────────────────────────────────────┘
 ```
 
+### Run ID Suffix Patterns
+
+Output directories embed run ID suffixes for cross-generation lineage tracking:
+
+```
+Full mode:
+  JSONL: results_{model_slug}.jsonl          (per-model, all experiments appended)
+  JSON:  run_{run_id}.json                   (per-run)
+  Manifest: _manifest.json                   (append-only, all modes)
+
+Batched mode:
+  JSONL: results_{run_id}_batched.jsonl
+  Manifest: _manifest.json
+
+Smart mode:
+  JSONL: results_{run_id}_smart.jsonl
+  Manifest: _manifest.json
+
+Interactive mode:
+  JSON:  interactive_{model_slug}_{run_id}.json
+  Manifest: _manifest.json
+
+Charts:
+  benchmark_charts-{run_suffix}/             (run_suffix from last 6 chars of run_id)
+  Falls back to benchmark_charts/ if no run_id extractable
+
+Planning insights:
+  0_planning-{run_suffix}/                   (same suffix extraction as charts)
+
+Run ID format: run-{YYYYMMDD-HHMMSS}-{model-slug}-{uuid[:6]}
+  Example: run-20260527-143022-Qwen3.5-35B-A3B-GGUF-a1b2c3
+  Suffix extracted via rsplit("-", 1)[-1] → "a1b2c3"
+```
+
 ### Planning Insights Report
 
-**File:** `benchmark_results/0_planning_insights.py`
+**File:** `benchmark_charts/smartinteractive-bencher/v6_planning_analysis.py`
 
 A separate analysis script that focuses on LLM invocation patterns:
 
@@ -1404,7 +1842,16 @@ LLM calls with a named tool (tool execution).
 │  │     │ save_jsonl(result, results_{slug}.jsonl)                 │   │  │
 │  │     │ save JSON(run_{run_id}.json)                             │   │  │
 │  │     │ write _manifest.json entry                               │   │  │
-│  │     │ on exception: write error record, check --fail-fast     │   │  │
+│  │     │                                                          │   │  │
+│  │     │ ERROR HANDLING:                                          │   │  │
+│  │     │   on exception:                                          │   │  │
+│  │     │     1. Write error record to JSONL:                      │   │  │
+│  │     │        {"run_id": "run-error-...", "status": "error",    │   │  │
+│  │     │         "error": str(exc), "mode": "full"}               │   │  │
+│  │     │     2. If --fail-fast: sys.exit(1) immediately           │   │  │
+│  │     │     3. Otherwise: continue to next experiment/model      │   │  │
+│  │     │     4. Error runs tracked in _manifest.json with         │   │  │
+│  │     │        status="error" for post-hoc exclusion             │   │  │
 │  │     └─────────────────────────────────────────────────────────┘   │  │
 │  └───────────────────────────────────────────────────────────────────┘  │
 │                              │                                          │
@@ -1614,12 +2061,15 @@ LLM calls with a named tool (tool execution).
 │        - Experiment iteration tracking                            │
 │        - Error run tracking                                       │
 │                                                                   │
+│  Run ID format: run-{YYYYMMDD-HHMMSS}-{model-slug}-{uuid[:6]}    │
+│  Suffix extraction: rsplit("-", 1)[-1] → last 6-char UUID segment │
+│                                                                   │
 │  Output directory structure:                                      │
 │    benchmark_results/                                             │
 │      ├── results_{model_slug}.jsonl    (full mode, per model)    │
 │      ├── results_{run_id}_batched.jsonl (batched mode)           │
 │      ├── results_{run_id}_smart.jsonl   (smart mode)             │
-│      ├── interactive_{model}_{run_id}.json (interactive mode)    │
+│      ├── interactive_{model_slug}_{run_id}.json (interactive)    │
 │      ├── run_{run_id}.json             (full mode, per run)      │
 │      ├── _manifest.json                (generation tracking)     │
 │      ├── report.csv                    (report generator)        │
@@ -1627,12 +2077,25 @@ LLM calls with a named tool (tool execution).
 │      ├── quality.json                  (report generator)        │
 │      ├── statistical_tests.json        (report generator)        │
 │      ├── framework_comparison.json     (report generator)        │
-│      ├── charts-{run_suffix}/          (visualizations)          │
-│      │   ├── 01_token_efficiency.png   │                         │
-│      │   ├── 02_duration_breakdown.png │                         │
-│      │   ├── ...                       │                         │
-│      │   └── 10_smart_mode_efficiency.png                        │
-│      └── 0_planning-{run_suffix}/      (planning insights)       │
+│      ├── benchmark_charts-{suffix}/    (visualizations, 30+)     │
+│      │   ├── Single run: category_distribution,                  │
+│      │   │   email_duration_histogram, token_duration_scatter,    │
+│      │   │   heuristic_vs_llm_escalation                         │
+│      │   ├── Full/Interactive: token_composition,                │
+│      │   │   duration_vs_tokens, step_performance                │
+│      │   ├── Variance (>=2 runs): variance_trend_*(4 charts),    │
+│      │   │   category_stability                                  │
+│      │   ├── Interactive: interactive_turns, token_heatmap,      │
+│      │   │   llm_activity, context_growth, tool_calls            │
+│      │   ├── Multi-model: duration_comparison, token_cost,       │
+│      │   │   ttft_comparison, tps_comparison, cold_start,        │
+│      │   │   run_scatter, planning_heatmap, token_efficiency,    │
+│      │   │   latency_heuristic_scatter, performance_radar,       │
+│      │   │   steps_scaling_heatmap                              │
+│      │   ├── Framework: category_comparison, architecture_radar, │
+│      │   │   model_architecture_duration/tokens, dashboard       │
+│      │   └── CHARTS.md (auto-generated index)                    │
+│      └── 0_planning-{suffix}/          (v6_planning_analysis.py) │
 │          ├── 01_llm_stability.png      │                         │
 │          ├── 02_llm_efficiency.png     │                         │
 │          ├── 03_planning_vs_tool.png   │                         │
