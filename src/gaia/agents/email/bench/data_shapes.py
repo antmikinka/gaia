@@ -89,6 +89,8 @@ class SessionState:
     drafted: set = field(default_factory=set)
     sent: set = field(default_factory=set)
     marked_read: set = field(default_factory=set)
+    marked_unread: set = field(default_factory=set)
+    unstarred: set = field(default_factory=set)
     deleted: set = field(default_factory=set)
     triaged_emails: dict = field(default_factory=dict)  # id -> category
     # Smart-mode partitions (id -> category).

@@ -1175,6 +1175,47 @@ def run_interactive_benchmark(
 # ---------------------------------------------------------------------------
 
 
+def _collect_ids(data: dict) -> set[str]:
+    """Extract all email IDs from a batch or singleton tool result.
+
+    Scans all known response shapes:
+      - data.ids                  (batch ID list)
+      - data.results[*].id        (triage-style array)
+      - data.succeeded[*].message_id  (batch success array)
+      - data.message_id           (singleton)
+      - data.id                   (singleton fallback)
+
+    Returns a set of unique email ID strings.
+    """
+    ids: set[str] = set()
+    if not isinstance(data, dict):
+        return ids
+
+    # Batch list fields.
+    if "ids" in data and isinstance(data["ids"], list):
+        for item in data["ids"]:
+            if isinstance(item, str) and item:
+                ids.add(item)
+
+    if "results" in data and isinstance(data["results"], list):
+        for item in data["results"]:
+            if isinstance(item, dict) and item.get("id"):
+                ids.add(item["id"])
+
+    if "succeeded" in data and isinstance(data["succeeded"], list):
+        for item in data["succeeded"]:
+            if isinstance(item, dict) and item.get("message_id"):
+                ids.add(item["message_id"])
+
+    # Singleton fallback (for non-batch tools or mixed results).
+    if not ids:
+        msg_id = data.get("message_id", "") or data.get("id", "")
+        if msg_id:
+            ids.add(msg_id)
+
+    return ids
+
+
 def _extract_actions(agent_result: dict, state: SessionState) -> None:
     """Parse tool calls/results to update SessionState."""
     for msg in agent_result.get("conversation", []):
@@ -1229,11 +1270,9 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
         if tool_name in ("archive_message", "archive_message_batch") and isinstance(
             data, dict
         ):
-            msg_id = data.get("message_id", "") or data.get("id", "")
-            if msg_id:
-                state.archived.add(msg_id)
+            state.archived.update(_collect_ids(data))
 
-        # Draft/send.
+        # Draft/send — no batch variants observed in corpus; single-ID extraction retained.
         if tool_name in ("create_draft", "save_draft") and isinstance(data, dict):
             draft_id = data.get("id", "") or data.get("draft_id", "")
             if draft_id:
@@ -1245,27 +1284,26 @@ def _extract_actions(agent_result: dict, state: SessionState) -> None:
 
         # Star/unstar.
         if tool_name in ("add_star", "add_star_batch") and isinstance(data, dict):
-            msg_id = data.get("id", "") or data.get("message_id", "")
-            if msg_id:
-                state.starred.add(msg_id)
+            state.starred.update(_collect_ids(data))
         if tool_name in ("remove_star", "remove_star_batch") and isinstance(data, dict):
-            msg_id = data.get("id", "") or data.get("message_id", "")
-            if msg_id:
-                state.starred.discard(msg_id)
+            for eid in _collect_ids(data):
+                state.starred.discard(eid)
+                state.unstarred.add(eid)
 
         # Mark read/unread.
         if tool_name in ("mark_read", "mark_read_batch", "mark_as_read") and isinstance(
             data, dict
         ):
-            msg_id = data.get("id", "") or data.get("message_id", "")
-            if msg_id:
-                state.marked_read.add(msg_id)
+            state.marked_read.update(_collect_ids(data))
+
+        if tool_name == "mark_unread_batch" and isinstance(data, dict):
+            state.marked_unread.update(_collect_ids(data))
 
         # Delete.
-        if tool_name == "trash_message" and isinstance(data, dict):
-            msg_id = data.get("id", "") or data.get("message_id", "")
-            if msg_id:
-                state.deleted.add(msg_id)
+        if tool_name in ("trash_message", "delete_message", "delete_message_batch") and isinstance(
+            data, dict
+        ):
+            state.deleted.update(_collect_ids(data))
 
 
 def _print_smart_breakdown(state: SessionState) -> None:
@@ -1633,6 +1671,8 @@ def run_interactive_session(
             "drafted": sorted(state.drafted),
             "sent": sorted(state.sent),
             "marked_read": sorted(state.marked_read),
+            "marked_unread": sorted(state.marked_unread),
+            "unstarred": sorted(state.unstarred),
             "deleted": sorted(state.deleted),
             "triaged": dict(state.triaged_emails),
         },
