@@ -203,15 +203,20 @@ def _run_claude(
         raise ValueError(f"Claude CLI output is not valid JSON: {exc}") from exc
 
     # Extract content text.
+    # Claude CLI with --output-format json uses "result" for the text field,
+    # but some CLI versions may use "content". Check both.
     content = ""
-    if "content" in envelope:
-        content_block = envelope["content"]
+    for field_name in ["result", "content"]:
+        content_block = envelope.get(field_name)
+        if not content_block:
+            continue
         if isinstance(content_block, list):
             for block in content_block:
                 if block.get("type") == "text":
                     content += block.get("text", "")
         elif isinstance(content_block, str):
             content = content_block
+            break  # Found raw text, use it directly.
 
     # Extract usage dict.
     usage = envelope.get("usage", {})
@@ -284,10 +289,7 @@ def run_benchmark(args) -> int:
 
         try:
             content, usage, cost, last_elapsed_ms = _run_claude(prompt, args.model, timeout=args.timeout)
-            duration_ms = int(usage.get("duration_ms", 0))
-            if duration_ms == 0:
-                # Use measured wall-clock time from subprocess.
-                duration_ms = elapsed_ms
+            duration_ms = last_elapsed_ms
 
             result = parse_claude_response(
                 result_text=content,

@@ -1666,6 +1666,58 @@ def main():
         help="Cost per 1M output tokens.",
     )
 
+    # Claude CLI benchmark subcommand.
+    _email_claude_cli_parser = email_subparsers.add_parser(
+        "claude-cli",
+        help="Run Claude CLI email classification benchmark.",
+    )
+    _email_claude_cli_parser.add_argument(
+        "--jsonl-path",
+        type=str,
+        required=True,
+        help="Path to the JSONL file containing emails to classify.",
+    )
+    _email_claude_cli_parser.add_argument(
+        "--model",
+        type=str,
+        default="sonnet",
+        help="Claude model to use (default: sonnet).",
+    )
+    _email_claude_cli_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of emails to process (default: all).",
+    )
+    _email_claude_cli_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="benchmark_results",
+        help="Directory to write results (default: benchmark_results).",
+    )
+    _email_claude_cli_parser.add_argument(
+        "--checkpoint-interval",
+        type=int,
+        default=25,
+        help="Save checkpoint every N emails (default: 25).",
+    )
+    _email_claude_cli_parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Do not resume from existing checkpoint.",
+    )
+    _email_claude_cli_parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Abort on first error.",
+    )
+    _email_claude_cli_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=120,
+        help="Timeout in seconds per email (default: 120).",
+    )
+
     # Add Docker app command
     docker_parser = subparsers.add_parser(
         "docker",
@@ -4168,6 +4220,30 @@ def handle_email_command(args):
             rpt_args.extend(compare_paths)
 
         rc = bench_dispatch_main(rpt_args)
+        sys.exit(rc)
+
+    elif email_action == "claude-cli":
+        from gaia.agents.email.bench.claude_cli_bench import main as claude_cli_main
+
+        cc_args = []
+        for key in [
+            "jsonl_path",
+            "model",
+            "limit",
+            "output_dir",
+            "checkpoint_interval",
+            "timeout",
+        ]:
+            val = getattr(args, key, None)
+            if val is not None:
+                cc_args.append(f"--{key.replace('_', '-')}")
+                cc_args.append(str(val))
+
+        for flag in ["no_resume", "fail_fast"]:
+            if getattr(args, flag, False):
+                cc_args.append(f"--{flag.replace('_', '-')}")
+
+        rc = claude_cli_main(cc_args)
         sys.exit(rc)
 
     # Initialize Lemonade — local LLM only. The email agent's config will
