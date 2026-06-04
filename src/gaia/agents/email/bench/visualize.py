@@ -52,6 +52,7 @@ COLORS = {
     # Framework colors.
     "gaia": "#ED6C02",  # AMD orange
     "clawflow": "#3182CE",  # Blue
+    "claude_cli": "#8B5CF6",  # Purple
 }
 
 # ---------------------------------------------------------------------------

@@ -30,6 +30,7 @@ _PRICING_PER_1M: dict[str, tuple[float, float]] = {
     "qwen3.5-4b-gguf": (0.0, 0.0),
     "qwen3.5-9b-gguf": (0.0, 0.0),
     "qwen3.5-35b-a3b-gguf": (0.0, 0.0),
+    "sonnet": (3.0, 15.0),
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-opus-4-6": (15.0, 75.0),
     "gpt-4o": (2.5, 10.0),

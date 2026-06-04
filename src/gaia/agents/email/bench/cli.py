@@ -3,14 +3,16 @@
 """
 CLI entry point for the GAIA Email Triage Agent benchmark.
 
-Three independent subcommands:
+Four independent subcommands:
     gaia email bench       -- Run GAIA benchmarks, produce results.jsonl
     gaia email clawflow    -- Run ClawFlow benchmarks, produce clawflow_results.json
+    gaia email claude-cli  -- Run Claude CLI benchmarks, produce results_claude_cli.jsonl
     gaia email report      -- Generate reports from existing benchmark data
 
 Usage:
     gaia email bench --mbox-path <path> --models A --models B --experiments-per-model 3
     gaia email clawflow --workflow inbox-zero-helper --model A
+    gaia email claude-cli --jsonl-path emails.jsonl --model sonnet
     gaia email report --input-dir benchmark_results --charts
 """
 
@@ -200,6 +202,60 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     # ------------------------------------------------------------------
+    # Subcommand: claude-cli (Claude CLI email classification benchmark)
+    # ------------------------------------------------------------------
+    cc_parser = subparsers.add_parser(
+        "claude-cli",
+        help="Run email classification benchmark via Claude CLI. Outputs results_claude_cli.jsonl.",
+    )
+    cc_parser.add_argument(
+        "--jsonl-path",
+        type=str,
+        required=True,
+        help="Path to the JSONL file containing emails to classify.",
+    )
+    cc_parser.add_argument(
+        "--model",
+        type=str,
+        default="sonnet",
+        help="Claude model to use (default: sonnet).",
+    )
+    cc_parser.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Maximum number of emails to process (default: all).",
+    )
+    cc_parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="benchmark_results",
+        help="Directory to write results (default: benchmark_results).",
+    )
+    cc_parser.add_argument(
+        "--checkpoint-interval",
+        type=int,
+        default=25,
+        help="Save checkpoint every N emails (default: 25).",
+    )
+    cc_parser.add_argument(
+        "--no-resume",
+        action="store_true",
+        help="Do not resume from existing checkpoint.",
+    )
+    cc_parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Abort on first error.",
+    )
+    cc_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=120,
+        help="Timeout in seconds per email (default: 120).",
+    )
+
+    # ------------------------------------------------------------------
     # Subcommand: report (unified report generator)
     # ------------------------------------------------------------------
     rpt_parser = subparsers.add_parser(
@@ -296,6 +352,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         from gaia.agents.email.bench.clawflow_runner import main as cf_main
 
         return cf_main(_build_clawflow_args(args))
+
+    elif args.bench_action == "claude-cli":
+        from gaia.agents.email.bench.claude_cli_bench import main as cc_main
+
+        return cc_main(_build_claude_cli_args(args))
 
     elif args.bench_action == "report":
         from gaia.agents.email.bench.report_generator import main as rpt_main
@@ -426,6 +487,27 @@ def _build_report_args(args) -> list[str]:
         rpt_args.extend(["--cost-per-1m-output", str(args.cost_per_1m_output)])
 
     return rpt_args
+
+
+def _build_claude_cli_args(args) -> list[str]:
+    """Convert argparse Namespace to argv list for claude_cli_bench.main()."""
+    cc_args = ["--jsonl-path", args.jsonl_path]
+    if args.model != "sonnet":
+        cc_args.extend(["--model", args.model])
+    if args.limit is not None:
+        cc_args.extend(["--limit", str(args.limit)])
+    if args.output_dir != "benchmark_results":
+        cc_args.extend(["--output-dir", args.output_dir])
+    if args.checkpoint_interval != 25:
+        cc_args.extend(["--checkpoint-interval", str(args.checkpoint_interval)])
+    if args.no_resume:
+        cc_args.append("--no-resume")
+    if args.fail_fast:
+        cc_args.append("--fail-fast")
+    if args.timeout != 120:
+        cc_args.extend(["--timeout", str(args.timeout)])
+
+    return cc_args
 
 
 if __name__ == "__main__":
